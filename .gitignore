@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# 环境变量（密钥绝不入库）
+.env
+*.env
+
+# 知识库（本地生成，按需决定是否提交）
+knowledge_md/
+
+# 视频帧缓存
+video_frames/
+# 运行日志
+run_logs/
+
+# 临时截图
+/tmp/florr_frame.png
+*.png
+*.jpg
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
