@@ -6,7 +6,8 @@ FlorrVLM-Agent MCP Server mcp_server.py
 
 知识库：
   - 全部知识以 Markdown (.md) 存储在 ./knowledge_md/
-  - 目录不存在自动创建
+  - 目录不存在自动创建（v0.2）
+  - 目录为空时自动写入基础模板文件（v0.2）
   - 默认纯文本关键词检索；向量检索预留开关，默认关闭
 
 MCP 工具（9 个）：
@@ -43,6 +44,33 @@ PERCEPTION_URL = "http://127.0.0.1:5001/perceive"
 USE_VECTOR_SEARCH = os.getenv("FLORR_VECTOR_SEARCH", "0") == "1"
 
 mcp = FastMCP("FlorrVLM-Agent")
+
+
+# ---------------------------------------------------------------------------
+# 知识库初始化（v0.2：自动建目录 + 基础模板）
+# ---------------------------------------------------------------------------
+KB_TEMPLATES = {
+    "_README.md": "# 本地知识库\n\n所有知识以 Markdown 存储，由 MCP 工具管理。\n\n## 目录约定\n- `_README.md` 本说明\n- `boss_behavior_log.md` BOSS 行为习惯记录（自动追加）\n- `player_tactics.md` 玩家打法笔记（可手动/自动写入）\n- `review_*.md` 对局复盘（自动生成）\n- `video_tactic_*.md` 视频学习战术（自动生成）\n\n## 检索方式\n默认纯文本关键词检索；设置环境变量 `FLORR_VECTOR_SEARCH=1` 可开启向量检索（需额外安装依赖）。\n",
+    "boss_behavior_log.md": "# BOSS 行为日志\n\n记录每次遭遇 BOSS（Super / Unique / Eternal）时的行为习惯：\n- 移动模式\n- 攻击前摇\n- 仇恨切换\n- 击杀/逃脱经验\n\n（由 agent_main.py 每 12 秒批量追加，无需手动维护）\n",
+    "player_tactics.md": "# 玩家打法笔记\n\n记录从教程视频 / 对局复盘中学到的打法：\n- 花瓣套装搭配\n- 走位技巧\n- 组队配合\n- 反制套路\n",
+    "review_template.md": "# 对局复盘模板\n\n- 结果: 存活 / 死亡\n- 面对怪物: \n- 自身套装: \n- 死亡原因: \n- 可改进点: \n",
+}
+
+
+def ensure_kb_templates():
+    """知识库目录为空时自动写入基础模板，保证缺失文件不崩溃。"""
+    md_files = [f for f in os.listdir(KB_DIR) if f.endswith(".md")]
+    if md_files:
+        return
+    for fname, content in KB_TEMPLATES.items():
+        fpath = os.path.join(KB_DIR, fname)
+        if not os.path.exists(fpath):
+            with open(fpath, "w", encoding="utf-8") as f:
+                f.write(content)
+    print(f"[MCP] 知识库为空，已自动写入 {len(KB_TEMPLATES)} 个基础模板到 {KB_DIR}")
+
+
+ensure_kb_templates()
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +185,9 @@ def predict_all_entities() -> str:
     基于最近多帧坐标，预测全部实体未来 1.2 秒的位置。
     按威胁等级排序，只返回最高前 8 个实体，节省 Token。
     每个实体包含：raw_id, rarity, category, threat_score, x_now, y_now,
-                   x_predict, y_predict, vx_per_sec, vy_per_sec, confidence
+                   x_predict, y_predict, vx_per_sec, vy_per_sec,
+                   confidence, prediction_trusted
+    confidence < 0.65 时 prediction_trusted=false 且 x_predict/y_predict 为 null。
     """
     results = predictor.predict_all_entities()
     if not results:

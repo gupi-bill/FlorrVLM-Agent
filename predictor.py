@@ -7,6 +7,8 @@ FlorrVLM-Agent 预判模块 predictor.py
 功能：
 - 同时预判 BOSS + 精英 + 全部普通小怪的未来 1.2 秒位置
 - 输出 0~1 置信度，帧数少/移动过快置信度降低
+- 置信度阈值锁：低于 CONFIDENCE_THRESHOLD 时标记 prediction_trusted=False
+  并置空预判坐标，下游不再采信，只参考当前画面真实位置
 - 实体消失后保留 0.4 秒历史，抵抗 YOLO 漏检抖动
 - 非法/越界/负数坐标直接丢弃，不参与预判
 - 输出时按威胁等级排序，只返回最高前 8 个实体，节省 Token
@@ -31,6 +33,7 @@ MIN_FRAMES = 3              # 至少 3 帧才算速度
 ENTITY_TIMEOUT = 0.4        # 实体消失后保留 0.4 秒历史
 MAX_OUTPUT_ENTITIES = 8     # 最多输出前 8 个威胁最高实体
 HISTORY_MAXLEN = 10         # 每实体最多保留 10 帧
+CONFIDENCE_THRESHOLD = 0.65 # 置信度阈值锁：低于此值不采信预判
 
 # 稀有度 -> 分类
 RARITY_HIGHEST_BOSS = {"Unique", "Eternal"}
@@ -114,6 +117,7 @@ class EntityTracker:
         """
         计算该实体的预判位置和置信度。
         返回 None 表示帧数不足或无法计算。
+        置信度低于 CONFIDENCE_THRESHOLD 时置空预判坐标并标记不可信。
         """
         if len(self.history) < MIN_FRAMES:
             return None
@@ -136,6 +140,11 @@ class EntityTracker:
         speed_penalty = max(0.3, 1.0 - speed / 2000.0)
         confidence = round(frame_conf * speed_penalty, 3)
 
+        # 置信度阈值锁：低于阈值不采信预判，置空坐标
+        trusted = confidence >= CONFIDENCE_THRESHOLD
+        out_x = round(pred_x, 1) if trusted else None
+        out_y = round(pred_y, 1) if trusted else None
+
         return {
             "raw_id": self.raw_id,
             "rarity": self.rarity,
@@ -143,11 +152,12 @@ class EntityTracker:
             "threat_score": CATEGORY_THREAT.get(self.category, 5),
             "x_now": round(latest["x"], 1),
             "y_now": round(latest["y"], 1),
-            "x_predict": round(pred_x, 1),
-            "y_predict": round(pred_y, 1),
+            "x_predict": out_x,
+            "y_predict": out_y,
             "vx_per_sec": round(vx, 2),
             "vy_per_sec": round(vy, 2),
             "confidence": confidence,
+            "prediction_trusted": trusted,
         }
 
 
@@ -228,6 +238,7 @@ def predict_all_entities() -> list:
                     "vx_per_sec": 0,
                     "vy_per_sec": 0,
                     "confidence": 0.0,
+                    "prediction_trusted": False,
                 })
 
     results.sort(key=lambda e: e["threat_score"], reverse=True)
@@ -254,4 +265,5 @@ def get_status() -> dict:
         "predict_seconds": PREDICT_SECONDS,
         "entity_timeout": ENTITY_TIMEOUT,
         "max_output": MAX_OUTPUT_ENTITIES,
+        "confidence_threshold": CONFIDENCE_THRESHOLD,
     }
