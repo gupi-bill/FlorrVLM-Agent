@@ -1,0 +1,13 @@
+# 打包时排除本地产生的运行时数据（减小镜像体积、避免带脏文件）
+run_logs/
+knowledge_md/
+knowledge_archive/
+video_frames/
+agent_state.json
+.git/
+*.pid
+*.log
+__pycache__/
+*.pyc
+.env
+.nvenv
