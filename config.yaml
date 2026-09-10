@@ -40,6 +40,7 @@ combat:
   safe_zone_h: 1080
 
 agent:
+  game: florr                # 当前激活的游戏档案(game_profiles/<name>.yaml)
   loop_interval: 0.5           # 主循环间隔秒
   death_frame_threshold: 8     # 连续死亡帧阈值
   boss_memory_interval: 12     # BOSS 记忆写入间隔秒

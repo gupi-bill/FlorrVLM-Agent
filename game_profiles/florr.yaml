@@ -1,0 +1,32 @@
+# FlorrVLM-Agent 游戏档案 florr.yaml
+# ====================================
+# v0.9 —— 每个游戏一份档案。核心模块(predictor/combat_judge/agent_main)只认这些
+# 键的语义，不认具体游戏名。切换游戏 = 设 AGENT_GAME 指向另一份档案，核心零改动。
+#
+# 优先级：DEFAULT 兜底 < config.yaml(通用项) < 本档案(游戏专属项)。
+# config.py 启动/热加载时读取 AGENT_GAME(=config.yaml 里 agent.game) 合并本档案。
+
+# 游戏元信息
+game:
+  name: florr
+  description: Florr.io 网页游戏，花瓣对战、吃莲花升级、组队打 BOSS。
+
+# 实体分类（Florr.io 原生稀有度体系）
+# 体系: Common < Unusual < Rare < Epic < Legendary < Mythic < Ultra < Super < Unique = Eternal
+predictor:
+  rarity_highest_boss: ["Unique", "Eternal"]   # 最高威胁，紧急避险
+  rarity_boss: ["Super"]                       # 普通 BOSS
+  rarity_elite: ["Ultra", "Mythic", "Legendary", "Epic"]
+  rarity_normal: ["Rare", "Unusual", "Common"]
+  # 分类 -> 威胁分数（战斗评估也用 threat 值判断打/跑/追）
+  threat:
+    highest_boss: 1000
+    boss: 400
+    elite: 120
+    normal: 15
+    player_enemy: 150
+    player_ally: 0
+    unknown: 5
+
+combat:
+  chase_min_category: elite      # 追击套最低怪物档次（默认取本档案的高价值怪）
