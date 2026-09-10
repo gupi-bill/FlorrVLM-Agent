@@ -6,6 +6,13 @@ set -e
 cd "$(dirname "$0")"
 PY=python
 
+# v1.0 启动自检：缺依赖/配置时给修复指引，且以 fail-fast 终止。
+echo "==> 启动自检..."
+if ! $PY boot_check.py --fail-fast; then
+    echo "自检未通过，已终止启动。请先按上面指引修复。"
+    exit 1
+fi
+
 echo "==> 启动感知服务 (端口 $(grep perception_port config.yaml))..."
 $PY perception_server.py &  echo $! > .perception.pid
 
