@@ -23,8 +23,13 @@ from datetime import datetime
 
 import config
 
+from skill_manager import SkillManager
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(BASE_DIR, "agent_state.json")
+
+# 全局技能管理器（v0.8）
+SKILLS = SkillManager()
 
 # 当前激活的游戏（v0.9 之后改为从 game_profiles/ 读取）
 ACTIVE_GAME = os.getenv("AGENT_GAME", "florr")
@@ -111,6 +116,8 @@ def describe_capabilities() -> str:
         "已具备组件:",
     ]
     lines += [f"  - {x}" for x in _inspected_components()]
+    lines.append("")
+    lines.append(SKILLS.summary())
     lines.append("=" * 44)
     return "\n".join(lines)
 
@@ -230,6 +237,10 @@ HELP_TEXT = """可用命令:
   report              汇报当前进度与最近战况
   capabilities        查看能力清单
   state               查看会话状态
+  skills              查看可用 Skill
+  load <技能名>       加载一个 Skill
+  unload <技能名>     卸载一个 Skill
+  run_skill <技能名>  运行一个已加载的 Skill
   auto                自动跑完整条链路: detect→research→ensure→play
   help                显示本帮助
   quit / exit         退出"""
@@ -278,6 +289,14 @@ def interactive():
             print(_cmd_play(int(arg) if arg.isdigit() else 0))
         elif cmd == "report":
             print(_cmd_report())
+        elif cmd == "skills":
+            print(SKILLS.summary())
+        elif cmd == "load":
+            print(SKILLS.load(arg))
+        elif cmd == "unload":
+            print(SKILLS.unload(arg))
+        elif cmd == "run_skill":
+            print(SKILLS.call(arg))
         elif cmd == "auto":
             print(_run_auto(arg or "florr"))
             print(_cmd_play(0))
@@ -304,6 +323,10 @@ def main():
             "research": lambda: _cmd_research(arg),
             "ensure": lambda: _cmd_ensure(),
             "report": lambda: _cmd_report(),
+            "skills": lambda: SKILLS.summary(),
+            "load": lambda: SKILLS.load(arg),
+            "unload": lambda: SKILLS.unload(arg),
+            "run_skill": lambda: SKILLS.call(arg),
         }.get(cmd)
         print(fn() if fn else f"未知命令: {cmd}")
         return
