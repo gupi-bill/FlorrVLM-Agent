@@ -57,6 +57,8 @@ DEFAULT = {
     "agent.boss_sample_max": 120,
     "agent.boss_close_dist": 120,
     "agent.learning_stats_interval": 24,
+    "agent.kb_max_mb": 50,
+    "agent.kb_archive_dir": "knowledge_archive",
 
     "mcp.streamable_http": False,
     "mcp.streamable_port": 5050,

@@ -156,6 +156,13 @@ def startup_cleanup():
         except OSError:
             pass
 
+    # v1.0 知识库体积维护：归档超限旧笔记 + 合并重复笔记
+    try:
+        import kb_maintainer
+        log(kb_maintainer.run())
+    except Exception as e:
+        log(f"[清理] 知识库维护失败: {e}")
+
 
 # ---------------------------------------------------------------------------
 # LLM 决策
