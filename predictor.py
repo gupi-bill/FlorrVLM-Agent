@@ -11,6 +11,7 @@ FlorrVLM-Agent 预判模块 predictor.py
   并置空预判坐标，下游不再采信，只参考当前画面真实位置
 - 实体消失后保留 0.4 秒历史，抵抗 YOLO 漏检抖动
 - 非法/越界/负数坐标直接丢弃，不参与预判
+- 同屏多怪最近距离匹配（v0.2 修复：防止同名怪跟踪错乱、优先级排序混乱）
 - 输出时按威胁等级排序，只返回最高前 8 个实体，节省 Token
 
 稀有度体系（Florr.io 原生）：
@@ -90,7 +91,7 @@ def _is_valid_coord(x, y) -> bool:
 class EntityTracker:
     """
     追踪单个实体的坐标历史。
-    用 raw_id 作为唯一标识；raw_id 相同时按出现顺序区分。
+    用 raw_id 作为唯一标识；raw_id 相同时按距离匹配区分多只。
     """
 
     def __init__(self, raw_id: str, rarity: str):
@@ -179,6 +180,7 @@ def update_frame_entities(entity_list: list):
     """
     每帧调用，传入 perception 输出的 entities 数组。
     自动过滤非法坐标，更新追踪器。
+    同屏多个同名怪时，用上一帧坐标最近距离匹配，防止跟踪错乱。
     entity_list 格式：
       [{"raw_id":"wasp","rarity":"Super","x":520,"y":330}, ...]
     """
@@ -194,13 +196,22 @@ def update_frame_entities(entity_list: list):
         if not _is_valid_coord(x, y):
             continue
 
-        # 查找或创建追踪器
+        # 查找或创建追踪器（v0.2：最近距离匹配，修复多怪同屏优先级错乱）
         uid = None
-        for existing_uid, tracker in _trackers.items():
-            if tracker.raw_id == raw_id and existing_uid not in seen_uids:
-                uid = existing_uid
-                break
-        if uid is None:
+        candidates = [
+            (existing_uid, tracker)
+            for existing_uid, tracker in _trackers.items()
+            if tracker.raw_id == raw_id and existing_uid not in seen_uids
+        ]
+        if candidates:
+            # 选上一帧坐标距离最近的那个 tracker
+            best_uid, best_t = min(
+                candidates,
+                key=lambda it: ((it[1].history[-1]["x"] - x) ** 2 +
+                                (it[1].history[-1]["y"] - y) ** 2)
+            )
+            uid = best_uid
+        else:
             uid = _make_uid(raw_id)
             _trackers[uid] = EntityTracker(raw_id, rarity)
 

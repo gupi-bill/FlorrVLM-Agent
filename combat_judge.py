@@ -12,8 +12,10 @@ FlorrVLM-Agent 战斗评估模块 combat_judge.py
 - 移动抖动：固定小范围随机偏移，模拟真人手操
 - 动态心态：面对不同怪物 + 自身实力，自动切换保守/均衡/激进
 - highest_boss 动态避险：实力强可周旋，实力弱全力逃跑
+- 实力评估防抖（v0.2）：CombatEvaluator 每 0.7s 才重算一次，降低 J1900 CPU 压力
 """
 import random
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -43,6 +45,9 @@ JITTER_MAX = 15              # 最大抖动像素
 # 有限追杀参数
 CHASE_MAX_DISTANCE = 400     # 最多追杀距离（像素）
 CHASE_MIN_CATEGORY = "elite"  # 至少精英级才追杀
+
+# 评估防抖间隔（秒）
+EVAL_DEBOUNCE_INTERVAL = 0.7  # v0.2：实力评估每 0.7s 一次
 
 # 威胁分数（与 predictor 保持一致）
 CATEGORY_THREAT = {
@@ -239,6 +244,34 @@ def _team_set_adjust(teammates: list, current_rec: str) -> str:
     if tank_count > output_count:
         return SET_COMBAT
     return current_rec
+
+
+# ---------------------------------------------------------------------------
+# 实力评估防抖（v0.2）
+# ---------------------------------------------------------------------------
+class CombatEvaluator:
+    """
+    带防抖缓存的战斗评估器。
+    默认 0.7 秒内重复评估直接返回上次结果，不重算，降低 J1900 CPU 压力。
+    """
+
+    def __init__(self, debounce_interval: float = EVAL_DEBOUNCE_INTERVAL):
+        self.interval = debounce_interval
+        self._last_time = 0.0
+        self._cache = None
+
+    def evaluate(self, context: CombatContext) -> dict:
+        """返回评估结果，0.7 秒内命中缓存。"""
+        now = time.time()
+        if self._cache is not None and (now - self._last_time) < self.interval:
+            return self._cache
+        self._cache = judge_combat(context)
+        self._last_time = now
+        return self._cache
+
+    def invalidate(self):
+        """对局结束 / 状态大变化时调用，强制下一次重算。"""
+        self._cache = None
 
 
 # ---------------------------------------------------------------------------

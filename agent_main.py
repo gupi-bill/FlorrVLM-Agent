@@ -10,17 +10,21 @@ MCP Client 主循环，串联全部模块：
 附加功能：
 - 死亡防抖：连续 2 帧 alive=false 才判定真实死亡
 - 复盘过滤：只有 highest_boss / boss / 组队对局才生成复盘 md
+- 统一复盘模板（v0.2）：结果 / 面对怪物 / 自身套装 / 死亡原因 / 可改进点
+- 崩溃兜底清理（v0.2）：启动时清理上次残留的临时帧目录与截图
 - BOSS 习惯记忆：每 12 秒批量追加写入 knowledge_md
 - 鼠标角落安全暂停：鼠标碰到屏幕四角自动暂停
 - 滚动日志：run_logs/ 最大 500KB 自动截断
 - 随机抖动：移动坐标加固定小范围偏移，模拟真人
 - highest_boss 动态避险：实力强可周旋，弱全力逃跑
 - 组队协同：读取队友花瓣套装，调整我方推荐套装
+- 实力评估防抖（v0.2）：CombatEvaluator 每 0.7s 重算一次
 """
 import argparse
 import asyncio
 import json
 import os
+import shutil
 import sys
 import time
 from datetime import datetime
@@ -84,6 +88,32 @@ def log(msg: str):
     except Exception:
         pass
     print(line.rstrip())
+
+
+# ---------------------------------------------------------------------------
+# 崩溃兜底清理（v0.2）
+# ---------------------------------------------------------------------------
+def startup_cleanup():
+    """
+    启动时清理上次可能残留的临时文件：
+    - video_frames/ 临时帧目录
+    - /tmp/florr_frame.png 临时截图
+    """
+    frame_dir = os.path.join(BASE_DIR, "video_frames")
+    if os.path.isdir(frame_dir):
+        try:
+            shutil.rmtree(frame_dir, ignore_errors=True)
+            log(f"[清理] 已删除残留临时帧目录 {frame_dir}")
+        except Exception as e:
+            log(f"[清理] 删除临时帧目录失败: {e}")
+
+    tmp_shot = "/tmp/florr_frame.png"
+    if os.path.exists(tmp_shot):
+        try:
+            os.remove(tmp_shot)
+            log("[清理] 已删除残留临时截图 /tmp/florr_frame.png")
+        except OSError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -177,14 +207,33 @@ def _should_review(state_data: dict, has_teammate: bool) -> bool:
 
 
 async def review_round(session, survived: bool, note: str, state: str):
-    """对局复盘，写入知识库 md。"""
+    """对局复盘，按统一模板写入知识库 md（v0.2）。"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     outcome = "存活" if survived else "死亡"
+
+    # 从最终画面状态尽力提取字段
+    monster_info, set_info, cause = "未知", "未知", note
+    try:
+        s = json.loads(state)
+        p = s.get("player", {})
+        set_info = p.get("petal_set", "未知")
+        ents = s.get("entities", [])
+        if ents:
+            monster_info = "、".join(
+                f"{e.get('raw_id','?')}({e.get('rarity','?')})" for e in ents[:5]
+            )
+        if not survived:
+            cause = f"死亡。当时面对怪物: {monster_info}，自身套装: {set_info}"
+    except Exception:
+        pass
+
     content = (
         f"# 对局复盘 — {timestamp}\n\n"
         f"- 结果: {outcome}\n"
-        f"- 经验总结: {note}\n"
-        f"- 最终画面状态: {state[:500]}\n"
+        f"- 面对怪物: {monster_info}\n"
+        f"- 自身套装: {set_info}\n"
+        f"- 死亡原因: {cause}\n"
+        f"- 可改进点: {note}\n"
     )
     await session.call_tool("kb_write", {
         "filename": f"review_{timestamp}",
@@ -231,6 +280,9 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
     log("  FlorrVLM-Agent 启动 (MCP Client + 预判 + 战斗评估)")
     log("=" * 55)
 
+    # v0.2 崩溃兜底：启动时清理残留临时文件
+    startup_cleanup()
+
     async with stdio_client(SERVER_PARAMS) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
@@ -247,6 +299,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
             last_boss_memory_time = 0
             boss_observations = []
             paused = False
+            evaluator = combat_judge.CombatEvaluator()  # v0.2 评估防抖
 
             log("\n[Agent] 进入游戏主循环...\n")
 
@@ -298,6 +351,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                                 log("[复盘] 普通小怪局，不生成复盘 md（节省硬盘）")
                                 await session.call_tool("reset_predictor")
                             death_streak = 0
+                            evaluator.invalidate()  # 死亡后强制重算
                             await asyncio.sleep(2)
                             continue
                     else:
@@ -307,7 +361,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                     pred_result = await session.call_tool("predict_all_entities")
                     predictions = pred_result.content[0].text
 
-                    # 4. 战斗评估
+                    # 4. 战斗评估（v0.2 防抖：0.7s 内命中缓存不重算）
                     pred_data = json.loads(predictions) if predictions.startswith("[") else []
                     ctx = combat_judge.CombatContext(
                         player=combat_judge.PlayerState(
@@ -322,7 +376,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                         enemies=pred_data if isinstance(pred_data, list) else [],
                         teammates=[],
                     )
-                    combat_eval = combat_judge.judge_combat(ctx)
+                    combat_eval = evaluator.evaluate(ctx)
                     combat_eval_str = json.dumps(combat_eval, ensure_ascii=False)
 
                     # 5. 检索知识库
