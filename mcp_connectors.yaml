@@ -1,0 +1,18 @@
+# FlorrVLM-Agent 外部 MCP 连接配置 mcp_connectors.yaml
+# v0.7 —— Agent 启动时会逐个连接这里的 MCP Server，把外部工具并入能力。
+#
+# 每条连接：
+#   name:   连接别名（用于调用，格式为 "别名.工具名"）
+#   command:外部 MCP Server 的启动命令
+#   args:   传给该命令的参数列表
+#
+# 连接失败只会跳过该条并提示，不影响整体启动。
+#
+# 示例（取消注释即可启用）：
+# connectors:
+#   - name: search
+#     command: python
+#     args: ["/path/to/your/mcp_search_server.py"]
+#
+# 默认空配置：暂无外部 MCP，先保持空，等有可用的再填。
+connectors: []

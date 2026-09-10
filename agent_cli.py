@@ -69,11 +69,28 @@ def save_state(state: dict):
 # ---------------------------------------------------------------------------
 # 能力清单
 # ---------------------------------------------------------------------------
+def _configured_connectors() -> list:
+    """读取 mcp_connectors.yaml 里已配置的外部 MCP 名称（仅展示，不实际连接）。"""
+    try:
+        import yaml
+        with open(os.path.join(BASE_DIR, "mcp_connectors.yaml"), "r",
+                  encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        return [str(c.get("name")) for c in data.get("connectors", []) if c.get("name")]
+    except Exception:
+        return []
+
+
 def _inspected_components() -> list:
-    """检测当前已具备的组件（后续版本会自动加上外部 MCP / Skill）。"""
+    """检测当前已具备的组件。"""
     parts = [f"游戏档案: {ACTIVE_GAME}"]
     parts.append("MCP Server(对外提供工具): mcp_server.py")
-    # v0.7：在此追加已连接的外部 MCP 工具；v0.8：追加已加载的 Skill
+    ext = _configured_connectors()
+    if ext:
+        parts.append(f"外部 MCP(可主动连接): {', '.join(ext)}")
+    else:
+        parts.append("外部 MCP(可主动连接): 暂无(见 mcp_connectors.yaml)")
+    # v0.8：在此追加已加载的 Skill
     return parts
 
 
@@ -112,21 +129,34 @@ def _cmd_detect(game: str) -> str:
 
 def _cmd_research(query: str) -> str:
     """
-    查资料。当前依赖外部 MCP/Skill（v0.7/v0.8 接通）。
-    现在做一个诚实占位：能借用本地视频学习时用之，否则明确告知。
+    查资料。优先用已连接的外部 MCP 工具去查；没有可用的外部连接时，
+    诚实占位：能借用本地视频学习时用之，否则明确告知。
     """
     st = load_state()
     if query:
         st["status"] = "researching"
         save_state(st)
-    # 若本机有 video_learner，可把它作为一个研究入口
-    learner = os.path.join(BASE_DIR, "video_learner.py")
-    if os.path.exists(learner):
-        return ("[research] 已检测到本地学习器 video_learner.py\n"
-                "  可先手动运行: python video_learner.py --auto --query \"<关键词>\" 从视频学打法\n"
-                "  (v0.8 之后会把\"学习\"封装成 Skill，这里直接一句话就能调用)")
-    return ("[research] 目前查资料需要外部 MCP / Skill（对应 v0.7 / v0.8 规划）。\n"
-            "  在接通前，资料查询能力暂不可用。")
+
+    if not query:
+        return "[research] 请给出要查的关键词，例如: research florr.io 最强花瓣套"
+    # 1) 尝试通过外部 MCP 查询
+    try:
+        from mcp_connector import ExternalConnector
+
+        async def _query():
+            ec = await ExternalConnector.create()
+            try:
+                tools = ec.tool_catalog()
+                if not tools:
+                    return (f"未连接外部 MCP，无法联网查询「{query}」\n"
+                             f"  (在 mcp_connectors.yaml 配置外部 MCP 后即可用)")
+                return f"已连接外部工具: {', '.join(tools)}\n查询「{query}」请由 LLM 决策层调用对应工具。"
+            finally:
+                await ec.close()
+
+        return asyncio.run(_query())
+    except Exception as e:
+        return f"[research] 外部 MCP 查询不可用: {e}"
 
 
 def _cmd_ensure() -> str:
