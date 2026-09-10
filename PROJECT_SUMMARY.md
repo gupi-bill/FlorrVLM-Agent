@@ -10,7 +10,7 @@
 
 ### 核心能力
 
-1. **视频学习** — 解析本地教程视频，VLM 逐帧提取战术，写入 Markdown 知识库
+1. **视频学习** — 解析教程视频，VLM 逐帧提取战术，写入 Markdown 知识库；支持本地路径或 --auto 联网搜索下载（v0.4）
 2. **全实体预判** — 同时预判 BOSS/精英/小怪未来 1.2 秒位置，带 0~1 置信度
 3. **战斗评估** — 自身实力 vs 敌方总威胁，输出 fight / cautious_fight / retreat
 4. **动态心态** — 面对不同怪物 + 自身实力，自动切换保守/均衡/激进
@@ -62,7 +62,8 @@ git clone https://github.com/OpenCloserOrg/OpenClaw.git
 FlorrVLM-Agent/
 ├── perception_server.py    # YOLO 感知 HTTP 服务 (127.0.0.1:5001)
 ├── mcp_server.py           # MCP 服务端，10 个工具，MD 知识库
-├── video_learner.py        # 视频解析，VLM 提取战术
+├── video_learner.py        # 视频解析，VLM 提取战术（支持 --auto 联网）
+├── video_sources.py        # v0.4 视频来源注册表（数据驱动，不写死平台）
 ├── agent_main.py           # MCP 客户端主循环，串联全部模块
 ├── predictor.py            # 全实体运动预判 + 置信度
 ├── combat_judge.py         # 战斗评估 + 套装 + 组队 + 动态心态
@@ -204,6 +205,7 @@ python perception_server.py
 
 # 终端2（可选）：学习教程视频构建知识库
 python video_learner.py ./florr_tutorial.mp4
+python video_learner.py --auto --query "florr.io教程"   # v0.4 自动搜索下载再学（需 yt-dlp）
 
 # 终端3：启动 Agent
 python agent_main.py

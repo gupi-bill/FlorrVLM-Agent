@@ -247,6 +247,20 @@ async def review_round(session, survived: bool, note: str, state: str):
         f"- 死亡原因: {cause}\n"
         f"- 可改进点: {note}\n"
     )
+
+    # v0.4 复盘升级：先检索历史相似对局（同怪物），附上对比，帮助找出改进点
+    try:
+        history = await session.call_tool("kb_search", {"keyword": "对局复盘"})
+        text = history if isinstance(history, str) else str(history)
+        # 粗略提取出历史有效战绩的结论
+        content += "\n## 与历史对局对比\n"
+        if monster_info != "未知" and monster_info in text:
+            content += f"- 历史上出现过同类怪物({monster_info})的复盘，可重点回顾上次的决策差异\n"
+        else:
+            content += "- 暂无同怪物历史复盘\n"
+    except Exception:
+        content += "\n- 历史对比检索失败\n"
+
     await session.call_tool("kb_write", {
         "filename": f"review_{timestamp}",
         "markdown_content": content,
@@ -260,6 +274,7 @@ async def review_round(session, survived: bool, note: str, state: str):
 # ---------------------------------------------------------------------------
 BOSS_SAMPLE_MAX = 120       # 每种 BOSS 最多保留多少个坐标样本（防内存膨胀）
 BOSS_CLOSE_DIST = 120       # 距离玩家多少像素内视为"接近/攻击"
+LEARNING_STATS_INTERVAL = 24  # v0.4 每 24 轮落盘一次学习命中统计
 
 
 def _analyze_boss_behavior(samples: list) -> str:
@@ -363,6 +378,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
             boss_observations = []
             boss_samples = {}         # v0.3：BOSS 坐标样本，累积归纳习性
             current_set = "combat"    # 当前套装，用于换套去抖
+            learn_stats = []          # v0.4 学习命中统计：[("战术", True/False), ...]
             paused = False
             evaluator = combat_judge.CombatEvaluator()  # v0.2 评估防抖
 
@@ -474,7 +490,17 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                     # 6. 检索知识库
                     keyword = "boss" if combat_eval.get("has_highest_boss") else "战术"
                     kb_result = await session.call_tool("kb_search", {"keyword": keyword})
-                    kb_tactics = kb_result.content[0].text
+                    try:
+                        kb_tactics = kb_result.content[0].text
+                    except Exception:
+                        kb_tactics = str(kb_result)
+                    # v0.4 学习效果验证：记录每次决策是否命中知识库
+                    # 命中 = 检索结果非空 且不包含"未找到"类提示
+                    low = (kb_tactics or "").lower()
+                    hit = bool(kb_tactics) and not any(
+                        k in low for k in ("未找到", "没有找到", "无相关")
+                    )
+                    learn_stats.append((keyword, hit))
 
                     # 7. LLM 决策
                     action = llm_decide(game_state, predictions, combat_eval_str, kb_tactics)
@@ -525,6 +551,25 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                     # 偶发 100~300ms 停顿，模拟人类反应（v0.3）
                     if random.random() < 0.05:
                         await asyncio.sleep(random.uniform(0.1, 0.3))
+
+                    # v0.4 学习效果验证：定期汇总命中率，标记薄弱方向
+                    if round_count and round_count % LEARNING_STATS_INTERVAL == 0 and learn_stats:
+                        weak = {}
+                        for k, h in learn_stats:
+                            col = weak.setdefault(k, [0, 0])
+                            col[0] += 1
+                            col[1] += int(h)
+                        summary = [f"- {k}: {col[1]}/{col[0]} 次命中" for k, col in weak.items()]
+                        await session.call_tool("kb_append", {
+                            "filename": "learning_stats",
+                            "markdown_content": (
+                                f"- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+                                f"汇总：{'；'.join(summary)}。"
+                                f"命中率低的方向({[k for k, c in weak.items() if c[1] == 0]})"
+                                f"应优先补充教程"
+                            ),
+                        })
+                        learn_stats = []
 
                     # 日志
                     log(f"[回合 {round_count}] HP={player.get('hp')} "

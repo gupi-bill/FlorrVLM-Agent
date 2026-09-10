@@ -42,14 +42,36 @@ RARITY_BOSS = {"Super"}
 RARITY_ELITE = {"Ultra", "Mythic", "Legendary", "Epic"}
 RARITY_NORMAL = {"Rare", "Unusual", "Common"}
 
-# 分类 -> 威胁分数（用于排序）
+# 分类 -> 威胁分数（用于排序；可按游戏替换）
 CATEGORY_THREAT = {
     "highest_boss": 1000,
     "boss": 400,
     "elite": 120,
     "normal": 15,
+    "player_enemy": 150,   # 玩家敌对：威胁较高、难预判
+    "player_ally": 0,      # 队友：不作威胁
     "unknown": 5,
 }
+
+# v0.4 玩家实体识别标记（数据驱动，换游戏时改这份即可）：
+PLAYER_ENEMY_MARKERS = ("player_enemy", "enemy_player", "hostile", "enemy")
+PLAYER_ALLY_MARKERS = ("player_ally", "ally", "teammate", "friend", "party")
+
+
+def detect_role(raw_id: str, explicit: Optional[str] = None) -> str:
+    """
+    判断实体角色：monster / player_enemy / player_ally。
+    优先信任感知层给的 explicit role，否则按 raw_id 里的标识词匹配。
+    匹配标记在 PLAYER_*_MARKERS 常量里集中配置，避免散落硬编码。
+    """
+    if explicit in ("player_enemy", "player_ally", "monster"):
+        return explicit
+    rid = (raw_id or "").lower()
+    if any(m in rid for m in PLAYER_ENEMY_MARKERS):
+        return "player_enemy"
+    if any(m in rid for m in PLAYER_ALLY_MARKERS):
+        return "player_ally"
+    return "monster"
 
 
 # ---------------------------------------------------------------------------
@@ -94,10 +116,12 @@ class EntityTracker:
     用 raw_id 作为唯一标识；raw_id 相同时按距离匹配区分多只。
     """
 
-    def __init__(self, raw_id: str, rarity: str):
+    def __init__(self, raw_id: str, rarity: str, role: str = "monster"):
         self.raw_id = raw_id
         self.rarity = rarity
-        self.category = classify_by_rarity(rarity)
+        self.role = role
+        # 玩家按角色分类，怪物按稀有度分类
+        self.category = role if role != "monster" else classify_by_rarity(rarity)
         self.history = deque(maxlen=HISTORY_MAXLEN)
         self.last_seen = time.time()
 
@@ -150,6 +174,7 @@ class EntityTracker:
             "raw_id": self.raw_id,
             "rarity": self.rarity,
             "category": self.category,
+            "role": self.role,
             "threat_score": CATEGORY_THREAT.get(self.category, 5),
             "x_now": round(latest["x"], 1),
             "y_now": round(latest["y"], 1),
@@ -191,6 +216,8 @@ def update_frame_entities(entity_list: list):
         rarity = ent.get("rarity", "Common")
         x = ent.get("x")
         y = ent.get("y")
+        # v0.4 玩家识别：优先用感知层给的 role，否则按 raw_id 匹配
+        role = detect_role(raw_id, ent.get("role"))
 
         # 过滤非法坐标
         if not _is_valid_coord(x, y):
@@ -213,8 +240,11 @@ def update_frame_entities(entity_list: list):
             uid = best_uid
         else:
             uid = _make_uid(raw_id)
-            _trackers[uid] = EntityTracker(raw_id, rarity)
+            _trackers[uid] = EntityTracker(raw_id, rarity, role)
 
+        # 更新角色（玩家身份可能变化，逐帧刷新）
+        _trackers[uid].role = role
+        _trackers[uid].category = role if role != "monster" else _trackers[uid].category
         _trackers[uid].update(x, y)
         seen_uids.add(uid)
 
@@ -241,6 +271,7 @@ def predict_all_entities() -> list:
                     "raw_id": tracker.raw_id,
                     "rarity": tracker.rarity,
                     "category": tracker.category,
+                    "role": tracker.role,
                     "threat_score": CATEGORY_THREAT.get(tracker.category, 5),
                     "x_now": round(latest["x"], 1),
                     "y_now": round(latest["y"], 1),

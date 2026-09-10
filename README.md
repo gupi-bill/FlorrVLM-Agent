@@ -32,7 +32,8 @@
 FlorrVLM-Agent/
 ├── perception_server.py    # YOLO 感知 HTTP 服务
 ├── mcp_server.py           # MCP 服务端 + MD 知识库
-├── video_learner.py        # 视频解析学习
+├── video_learner.py        # 视频解析学习（支持本地 或 --auto 联网）
+├── video_sources.py        # v0.4 视频来源注册表（数据驱动）
 ├── agent_main.py           # MCP 客户端主循环
 ├── predictor.py            # 全实体运动预判
 ├── combat_judge.py         # 战斗评估 + 套装 + 组队 + 动态心态
@@ -61,7 +62,8 @@ cp .env.example .env
 
 # 4. 启动（三个终端）
 python perception_server.py          # 终端1：感知服务
-python video_learner.py ./tutorial.mp4  # 终端2（可选）：学视频
+python video_learner.py ./tutorial.mp4        # 终端2（可选）：学本地视频
+python video_learner.py --auto --query "florr.io教程"  # 或联网自动搜索下载再学（需 yt-dlp）
 python agent_main.py                 # 终端3：Agent 主程序
 ```
 
@@ -71,7 +73,7 @@ python agent_main.py                 # 终端3：Agent 主程序
 
 ## 注意
 
-- 教程视频需用户自行下载到本地，程序不联网下载
+- 教程视频可用本地路径，也可用 `--auto` 联网搜索下载再学（v0.4，源文件学完即删）
 - 向量检索默认关闭，设置 `FLORR_VECTOR_SEARCH=1` 可开启（需额外安装依赖）
 - 成就仅内存记录，程序退出清空
 - 详见 `PROJECT_SUMMARY.md`

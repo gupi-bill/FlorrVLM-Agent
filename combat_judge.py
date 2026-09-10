@@ -53,12 +53,14 @@ CHASE_MIN_CATEGORY = "elite"  # 至少精英级才追杀
 # 评估防抖间隔（秒）
 EVAL_DEBOUNCE_INTERVAL = 0.7  # v0.2：实力评估每 0.7s 一次
 
-# 威胁分数（与 predictor 保持一致）
+# 威胁分数（与 predictor 保持一致；按游戏可替换）
 CATEGORY_THREAT = {
     "highest_boss": 1000,
     "boss": 400,
     "elite": 120,
     "normal": 15,
+    "player_enemy": 150,   # 敌对玩家：威胁较高、难预判
+    "player_ally": 0,      # 队友：不构成威胁
     "unknown": 5,
 }
 
