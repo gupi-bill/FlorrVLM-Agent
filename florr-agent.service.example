@@ -1,0 +1,26 @@
+# FlorrVLM-Agent systemd 示例（v1.0 稳定性保障）
+# =================================================
+# 用法:
+#   1. 把本文件复制为 /etc/systemd/system/florr-agent.service
+#   2. 把 /path/to/FlorrVLM-Agent 改为实际路径
+#   3. 启用: systemctl daemon-reload
+#           systemctl enable --now florr-agent
+#   4. 查看: journalctl -u florr-agent -f
+#
+# 效果: 开机自启、崩溃自动重启(看门狗内部再兜一层)、内存有上限。
+
+[Unit]
+Description=FlorrVLM-Agent (game agent)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/FlorrVLM-Agent
+ExecStart=/usr/bin/bash /path/to/FlorrVLM-Agent/watchdog.sh --max-mem=1G
+Restart=always
+RestartSec=5
+# 内存上限(硬性): 超过则 OOM 杀掉由 Restart=always 拉起
+MemoryMax=1100M
+
+[Install]
+WantedBy=multi-user.target
