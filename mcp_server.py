@@ -10,13 +10,14 @@ FlorrVLM-Agent MCP Server mcp_server.py
   - 目录为空时自动写入基础模板文件（v0.2）
   - 默认纯文本关键词检索；向量检索预留开关，默认关闭
 
-MCP 工具（9 个）：
+MCP 工具（10 个）：
   kb_list, kb_search, kb_write, kb_append,
   perceive_game, predict_all_entities, reset_predictor,
-  game_action, handle_afk
+  game_action, switch_set, handle_afk
 """
 import json
 import os
+import random
 import time
 from typing import Optional
 
@@ -207,6 +208,20 @@ def reset_predictor() -> str:
 # ---------------------------------------------------------------------------
 # 游戏动作工具
 # ---------------------------------------------------------------------------
+# v0.3 拟人移动：先走到目标附近一个随机中间点，再微移到位，偶尔停顿
+# 消除"笔直冲向目标"的机器感
+def _path_perturb_move(x: int, y: int):
+    import pyautogui
+    # 目标点附近随机二次寻路
+    mid_x = x + random.uniform(-25, 25)
+    mid_y = y + random.uniform(-25, 25)
+    pyautogui.moveTo(mid_x, mid_y, duration=0.04)
+    # 偶发 100~300ms 停顿，模拟人类反应
+    if random.random() < 0.15:
+        time.sleep(random.uniform(0.1, 0.3))
+    pyautogui.moveTo(x, y, duration=0.06)
+
+
 @mcp.tool()
 def game_action(action_type: str,
                 x: Optional[int] = None,
@@ -214,7 +229,8 @@ def game_action(action_type: str,
     """
     执行 florr.io 游戏键鼠动作。
     action_type: move / attack / defend / synthesize / idle
-    move 时需提供 x, y 坐标。
+    move 时需提供 x, y 坐标，会自动做拟人化路径微扰+偶发停顿。
+    套装切换请使用独立工具 switch_set。
     """
     try:
         import pyautogui
@@ -226,7 +242,7 @@ def game_action(action_type: str,
     if action_type == "move":
         if x is None or y is None:
             return "move 动作必须提供 x 和 y 坐标"
-        pyautogui.moveTo(x, y, duration=0.06)
+        _path_perturb_move(x, y)
     elif action_type == "attack":
         pyautogui.keyDown("space")
         time.sleep(0.2)
@@ -243,6 +259,35 @@ def game_action(action_type: str,
         return f"未知动作类型: {action_type}，可选 move/attack/defend/synthesize/idle"
 
     return f"动作执行成功: {action_type}" + (f" ({x},{y})" if action_type == "move" else "")
+
+
+# v0.3 套装切换：映射到数字键 1~5（florr.io 花瓣槽位）
+SET_TO_KEY = {
+    "combat": "1",
+    "tank": "2",
+    "retreat": "3",
+    "chase": "4",
+    "team": "5",
+}
+
+
+@mcp.tool()
+def switch_set(set_name: str) -> str:
+    """
+    切换花瓣套装（v0.3）。
+    set_name: combat / tank / retreat / chase / team。
+    通过按数字键完成切换。
+    """
+    try:
+        import pyautogui
+    except ImportError:
+        return "错误: 未安装 pyautogui，请执行 pip install pyautogui"
+
+    key = SET_TO_KEY.get(set_name.lower())
+    if key is None:
+        return f"未知套装: {set_name}，可选 {'/'.join(SET_TO_KEY)}"
+    pyautogui.press(key)
+    return f"已切换套装: {set_name} (按键 {key})"
 
 
 @mcp.tool()

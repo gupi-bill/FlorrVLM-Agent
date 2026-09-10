@@ -131,6 +131,34 @@ def _normalize_player(raw: dict) -> dict:
     }
 
 
+def _is_teammate_ent(ent: dict) -> bool:
+    """从实体里粗判是否为队友（同阵营标识：raw_id/分类带 player/ally/team）。"""
+    rid = str(ent.get("raw_id", "")).lower()
+    cat = str(ent.get("category", "")).lower()
+    return any(k in rid or k in cat
+               for k in ("player_ally", "ally", "teammate", "friend", "party"))
+
+
+def _normalize_teammates(raw: dict, all_raw: list) -> list:
+    """标准化队友列表（v0.3）：优先取 raw.teammates，其次从实体中按同阵营标识识别。"""
+    result = []
+    raw_teams = raw.get("teammates", []) if isinstance(raw.get("teammates"), list) else []
+    sources = list(raw_teams)
+    if not sources:
+        sources = [e for e in all_raw if _is_teammate_ent(e)]
+    for tm in sources:
+        try:
+            result.append({
+                "raw_id": str(tm.get("raw_id", "player_ally")),
+                "petal_set": str(tm.get("petal_set", "combat")),
+                "x": round(float(tm.get("x", 0)), 1),
+                "y": round(float(tm.get("y", 0)), 1),
+            })
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
 # ---------------------------------------------------------------------------
 # 路由
 # ---------------------------------------------------------------------------
@@ -182,12 +210,17 @@ def perceive():
 
     # 4. 标准化输出
     player = _normalize_player(detections.get("player", {}))
-    entities = _normalize_entities(detections.get("entities", detections.get("monsters", [])))
+    raw_entities = detections.get("entities", detections.get("monsters", []))
+    entities = _normalize_entities(raw_entities)
+    # 队友会从 entities 里排掉，避免被当作敌人
+    entities = [e for e in entities if not _is_teammate_ent(e)]
+    teammates = _normalize_teammates(detections, raw_entities)
     afk_popup = bool(detections.get("afk_popup", False))
 
     return jsonify({
         "player": player,
         "entities": entities,
+        "teammates": teammates,
         "afk_popup": afk_popup,
         "_raw": detections,
     })

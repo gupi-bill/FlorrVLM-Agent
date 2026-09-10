@@ -65,9 +65,9 @@ python video_learner.py ./tutorial.mp4  # 终端2（可选）：学视频
 python agent_main.py                 # 终端3：Agent 主程序
 ```
 
-## MCP 工具（9 个）
+## MCP 工具（10 个）
 
-`kb_list` `kb_search` `kb_write` `kb_append` `perceive_game` `predict_all_entities` `reset_predictor` `game_action` `handle_afk`
+`kb_list` `kb_search` `kb_write` `kb_append` `perceive_game` `predict_all_entities` `reset_predictor` `game_action` `switch_set` `handle_afk`
 
 ## 注意
 

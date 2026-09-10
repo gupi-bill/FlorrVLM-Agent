@@ -27,11 +27,15 @@ DECISION_FIGHT = "fight"
 DECISION_CAUTIOUS = "cautious_fight"
 DECISION_RETREAT = "retreat"
 
-# 套装类型（只推荐名称，不实际切换）
+# 套装类型（只推荐名称，由 game_action 的 switch_set 实际切换）
 SET_COMBAT = "combat"           # 输出战斗套
 SET_TANK = "tank"               # 抗伤套
 SET_RETREAT = "retreat"         # 跑路逃生套
+SET_CHASE = "chase"             # 追击套（v0.3：追杀高价值目标时用）
 SET_TEAM_SUPPORT = "team"       # 组队辅助套
+
+# 追击判定：至少精英级才追杀（复用下方有限追杀常量）
+CHASE_MIN_CATEGORY = "elite"
 
 # 心态模式
 MINDSET_CONSERVATIVE = "conservative"   # 保守：血量偏低就跑
@@ -200,7 +204,10 @@ def judge_combat(context: CombatContext) -> dict:
         recommended_set = SET_TANK
     else:
         decision = DECISION_FIGHT
-        recommended_set = SET_COMBAT
+        # v0.3：实力充足且场上有精英/BOSS 值得追 → 追击套
+        chaseable = [e for e in context.enemies
+                     if e.get("category") in ("boss", "elite")]
+        recommended_set = SET_CHASE if chaseable else SET_COMBAT
 
     # ---- 心态修正 ----
     if mindset == MINDSET_CONSERVATIVE and hp_ratio < 0.5:
@@ -293,6 +300,27 @@ def should_chase(entity: dict, player: PlayerState,
     if chased_distance >= CHASE_MAX_DISTANCE:
         return False
     return True
+
+
+# ---------------------------------------------------------------------------
+# 安全区钳制（v0.3）
+# ---------------------------------------------------------------------------
+SAFE_ZONE_MARGIN = 100   # 距离屏幕边缘 100 像素内视为安全区外（避开四角暂停区）
+SAFE_ZONE_W = 1920
+SAFE_ZONE_H = 1080
+
+
+def clamp_to_safe_zone(x: float, y: float,
+                       screen_w: int = SAFE_ZONE_W,
+                       screen_h: int = SAFE_ZONE_H,
+                       margin: int = SAFE_ZONE_MARGIN) -> tuple:
+    """
+    把走位目标点限制在安全区内，防止无脑贴墙/贴四角卡死。
+    距离屏幕边缘小于 margin 的坐标会被拉回安全区。
+    """
+    x = max(margin, min(screen_w - margin, float(x)))
+    y = max(margin, min(screen_h - margin, float(y)))
+    return round(x, 1), round(y, 1)
 
 
 # ---------------------------------------------------------------------------

@@ -61,7 +61,7 @@ git clone https://github.com/OpenCloserOrg/OpenClaw.git
 ```
 FlorrVLM-Agent/
 ├── perception_server.py    # YOLO 感知 HTTP 服务 (127.0.0.1:5001)
-├── mcp_server.py           # MCP 服务端，9 个工具，MD 知识库
+├── mcp_server.py           # MCP 服务端，10 个工具，MD 知识库
 ├── video_learner.py        # 视频解析，VLM 提取战术
 ├── agent_main.py           # MCP 客户端主循环，串联全部模块
 ├── predictor.py            # 全实体运动预判 + 置信度
@@ -135,7 +135,7 @@ FlorrVLM-Agent/
 
 ---
 
-## 六、MCP 工具列表（9 个）
+## 六、MCP 工具列表（10 个）
 
 | 工具 | 参数 | 说明 |
 |------|------|------|
@@ -146,7 +146,8 @@ FlorrVLM-Agent/
 | `perceive_game` | 无 | 获取游戏状态，自动更新预判历史 |
 | `predict_all_entities` | 无 | 全部实体 1.2s 预判，前8威胁 |
 | `reset_predictor` | 无 | 清空预判历史 |
-| `game_action` | `action_type`, `x?`, `y?` | 键鼠动作 move/attack/defend/synthesize/idle |
+| `game_action` | `action_type`, `x?`, `y?` | 键鼠动作 move/attack/defend/synthesize/idle（move 带拟人路径微扰+偶发停顿） |
+| `switch_set` | `set_name` | 切换花瓣套装 combat/tank/retreat/chase/team（按数字键） |
 | `handle_afk` | 无 | 触发 AFK 弹窗处理 |
 
 ---

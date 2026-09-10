@@ -19,11 +19,21 @@ MCP Client 主循环，串联全部模块：
 - highest_boss 动态避险：实力强可周旋，弱全力逃跑
 - 组队协同：读取队友花瓣套装，调整我方推荐套装
 - 实力评估防抖（v0.2）：CombatEvaluator 每 0.7s 重算一次
+
+v0.3 基础战术扩充：
+- 多套装自动切换：按战斗评估结果调用 switch_set，实际切换
+- 战术记忆：每次换套写入 player_tactics.md（什么情况用什么套）
+- BOSS 习性记忆增强：不只记坐标，归纳移动模式/追踪距离/攻击接近
+- 简单组队协同：识别队友 → 分工 → 保持距离跟随
+- 安全区检测：走位目标钳制在安全区内，防贴墙卡死
+- 随机停顿：偶发 100~300ms 停顿 + 移动路径微扰（拟人）
 """
 import argparse
 import asyncio
 import json
+import math
 import os
+import random
 import shutil
 import sys
 import time
@@ -121,10 +131,12 @@ def startup_cleanup():
 # ---------------------------------------------------------------------------
 SYSTEM_PROMPT = """你是 FlorrVLM-Agent，一个玩 florr.io 的游戏智能体，目标是优先保命、持续作战。
 可调用工具：perceive_game, kb_search, predict_all_entities, game_action, kb_write, handle_afk, reset_predictor。
+套装切换(switch_set)由战斗评估自动执行，无需你手动调用。
 决策规则：
 - afk_popup=true 优先处理验证
 - 遇 highest_boss(Unique/Eternal) 时，根据自身实力评估：实力不足全力避险，实力充足可谨慎周旋
 - 预判置信度<0.6 时，降低对预判坐标的依赖，更多参考当前画面
+- 有队友时注意保持安全距离，配合分工
 - 每步只输出一个动作 JSON：{"action":"move","x":100,"y":200}
 动作：move(x,y) / attack / defend / synthesize / idle。"""
 
@@ -243,14 +255,65 @@ async def review_round(session, survived: bool, note: str, state: str):
     log(f"[复盘] 对局结束，结果={outcome}，经验已写入知识库，预判历史已清空")
 
 
-async def write_boss_memory(session, boss_observations: list):
-    """每 12 秒批量写入 BOSS 行为习惯记忆。"""
+# ---------------------------------------------------------------------------
+# BOSS 习惯记忆（v0.3 增强：归纳行为模式）
+# ---------------------------------------------------------------------------
+BOSS_SAMPLE_MAX = 120       # 每种 BOSS 最多保留多少个坐标样本（防内存膨胀）
+BOSS_CLOSE_DIST = 120       # 距离玩家多少像素内视为"接近/攻击"
+
+
+def _analyze_boss_behavior(samples: list) -> str:
+    """
+    从坐标样本归纳 BOSS 行为模式。
+    samples: [(ex, ey, px, py), ...]（BOSS 位置 + 玩家位置）
+    返回一句话：移动模式 + 追踪距离 + 攻击接近倾向。
+    """
+    n = len(samples)
+    if n < 3:
+        return "样本不足，暂无法归纳"
+    # 移动模式：平均每次转角大小决定 绕圈/直线/徘徊
+    turns = []
+    for i in range(1, n - 1):
+        ax = samples[i][0] - samples[i - 1][0]
+        ay = samples[i][1] - samples[i - 1][1]
+        bx = samples[i + 1][0] - samples[i][0]
+        by = samples[i + 1][1] - samples[i][1]
+        da = (ax * ax + ay * ay) ** 0.5
+        db = (bx * bx + by * by) ** 0.5
+        if da < 1 or db < 1:
+            continue
+        cos_t = max(-1.0, min(1.0, (ax * bx + ay * by) / (da * db)))
+        turns.append(math.degrees(math.acos(cos_t)))
+    avg_turn = sum(turns) / len(turns) if turns else 0.0
+    if avg_turn > 30:
+        pattern = "绕圈/游走"
+    elif avg_turn < 15:
+        pattern = "直线移动"
+    else:
+        pattern = "缓行徘徊"
+
+    dists = [((px - ex) ** 2 + (py - ey) ** 2) ** 0.5
+             for ex, ey, px, py in samples]
+    avg_dist = sum(dists) / len(dists)
+    close_cnt = sum(1 for d in dists if d < BOSS_CLOSE_DIST)
+    return (f"{pattern}；平均距离玩家约 {avg_dist:.0f}px；"
+            f"近距离接近 {close_cnt} 次（越接近越凶/仇恨越强）")
+
+
+async def write_boss_memory(session, boss_observations: list, boss_samples: dict = None):
+    """每 12 秒批量写入 BOSS 行为习惯记忆（轨迹 + 行为归纳）。"""
     if not boss_observations:
         return
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     content = f"# BOSS 行为观察 — {timestamp}\n\n"
     for obs in boss_observations:
         content += f"- {obs}\n"
+    # v0.3：多次遭遇累计的行为共性归纳
+    if boss_samples:
+        content += "\n## 行为归纳（多次遭遇累计共性）\n"
+        for uid, samples in boss_samples.items():
+            if len(samples) >= 3:
+                content += f"- {uid}: {_analyze_boss_behavior(samples)}\n"
     await session.call_tool("kb_append", {
         "filename": "boss_behavior_log",
         "markdown_content": content,
@@ -298,6 +361,8 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
             death_streak = 0          # 连续死亡帧数
             last_boss_memory_time = 0
             boss_observations = []
+            boss_samples = {}         # v0.3：BOSS 坐标样本，累积归纳习性
+            current_set = "combat"    # 当前套装，用于换套去抖
             paused = False
             evaluator = combat_judge.CombatEvaluator()  # v0.2 评估防抖
 
@@ -342,7 +407,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                         death_streak += 1
                         if death_streak >= DEATH_FRAME_THRESHOLD:
                             # 判定真实死亡，复盘（过滤普通小怪局）
-                            has_teammate = False  # TODO: 从 entities 识别队友
+                            has_teammate = bool(state_data.get("teammates", []))
                             if _should_review(state_data, has_teammate):
                                 await review_round(session, False,
                                                    "玩家死亡，复盘本局",
@@ -363,68 +428,110 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
 
                     # 4. 战斗评估（v0.2 防抖：0.7s 内命中缓存不重算）
                     pred_data = json.loads(predictions) if predictions.startswith("[") else []
+                    # v0.3 组队识别：perceive 已返回队友列表
+                    teammates = [
+                        combat_judge.Teammate(
+                            raw_id=t.get("raw_id", "ally"),
+                            petal_set=t.get("petal_set", "combat"),
+                            x=t.get("x", 0),
+                            y=t.get("y", 0),
+                        )
+                        for t in state_data.get("teammates", [])
+                    ]
                     ctx = combat_judge.CombatContext(
                         player=combat_judge.PlayerState(
                             hp=player.get("hp", 100),
                             max_hp=player.get("max_hp", 100),
                             power_score=player.get("power_score", 100),
-                            current_set=player.get("petal_set", "combat"),
+                            current_set=current_set,
                             talent=player.get("talent", "none"),
                             x=player.get("x", 0),
                             y=player.get("y", 0),
                         ),
                         enemies=pred_data if isinstance(pred_data, list) else [],
-                        teammates=[],
+                        teammates=teammates,
                     )
                     combat_eval = evaluator.evaluate(ctx)
                     combat_eval_str = json.dumps(combat_eval, ensure_ascii=False)
 
-                    # 5. 检索知识库
+                    # 5. 套装自动切换 + 战术记忆（v0.3）
+                    recommended_set = combat_eval.get("recommended_set")
+                    if recommended_set and recommended_set != current_set:
+                        await session.call_tool("switch_set", {"set_name": recommended_set})
+                        await session.call_tool("kb_append", {
+                            "filename": "player_tactics",
+                            "markdown_content": (
+                                f"- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+                                f"决策={combat_eval.get('decision')} "
+                                f"心态={combat_eval.get('mindset')} "
+                                f"威胁比={combat_eval.get('threat_ratio')} "
+                                f"→ 换 {recommended_set} 套"
+                            ),
+                        })
+                        log(f"[套装] {current_set} → {recommended_set}，已记入 player_tactics.md")
+                        current_set = recommended_set
+
+                    # 6. 检索知识库
                     keyword = "boss" if combat_eval.get("has_highest_boss") else "战术"
                     kb_result = await session.call_tool("kb_search", {"keyword": keyword})
                     kb_tactics = kb_result.content[0].text
 
-                    # 6. LLM 决策
+                    # 7. LLM 决策
                     action = llm_decide(game_state, predictions, combat_eval_str, kb_tactics)
                     if not action:
                         action = {"action": "idle"}
 
-                    # 7. 移动抖动（模拟真人）
+                    # 8. 移动抖动 + 安全区钳制（v0.3 防贴墙卡死）
                     action_type = action.get("action", "idle")
                     action_args = {"action_type": action_type}
                     if action_type == "move":
                         tx = action.get("x", 400)
                         ty = action.get("y", 300)
+                        tx, ty = combat_judge.clamp_to_safe_zone(tx, ty)
                         tx, ty = combat_judge.apply_jitter(tx, ty)
                         action_args["x"] = int(tx)
                         action_args["y"] = int(ty)
 
-                    # 8. 执行
+                    # 9. 执行
                     exec_result = await session.call_tool("game_action", action_args)
 
-                    # 9. BOSS 行为观察收集（每 12 秒批量写）
+                    # 10. BOSS 行为观察收集（v0.3 累积坐标样本，归纳习性）
                     if combat_eval.get("has_highest_boss") or any(
                         e.get("category") == "boss" for e in pred_data
                     ):
-                        top = pred_data[0] if pred_data else {}
-                        obs = (f"{datetime.now().strftime('%H:%M:%S')} "
-                               f"{top.get('raw_id','?')}({top.get('rarity','?')}) "
-                               f"位置({top.get('x_now')},{top.get('y_now')}) "
-                               f"预判({top.get('x_predict')},{top.get('y_predict')}) "
-                               f"决策={combat_eval.get('decision')}")
-                        boss_observations.append(obs)
+                        px, py = player.get("x", 0), player.get("y", 0)
+                        for e in pred_data:
+                            if e.get("category") not in ("boss", "highest_boss"):
+                                continue
+                            uid = f"{e.get('raw_id','?')}({e.get('rarity','?')})"
+                            obs = (f"{datetime.now().strftime('%H:%M:%S')} "
+                                   f"{uid} 位置({e.get('x_now')},{e.get('y_now')}) "
+                                   f"预判({e.get('x_predict')},{e.get('y_predict')}) "
+                                   f"决策={combat_eval.get('decision')}")
+                            boss_observations.append(obs)
+                            # 累积坐标样本（用于行为归纳），限制数量防内存膨胀
+                            samples = boss_samples.setdefault(uid, [])
+                            if len(samples) >= BOSS_SAMPLE_MAX:
+                                samples.pop(0)
+                            samples.append((e.get("x_now", 0), e.get("y_now", 0),
+                                            px, py))
 
                     now = time.time()
                     if now - last_boss_memory_time > BOSS_MEMORY_INTERVAL:
-                        await write_boss_memory(session, boss_observations)
+                        await write_boss_memory(session, boss_observations, boss_samples)
                         boss_observations = []
                         last_boss_memory_time = now
+
+                    # 偶发 100~300ms 停顿，模拟人类反应（v0.3）
+                    if random.random() < 0.05:
+                        await asyncio.sleep(random.uniform(0.1, 0.3))
 
                     # 日志
                     log(f"[回合 {round_count}] HP={player.get('hp')} "
                         f"敌人={len(pred_data) if isinstance(pred_data, list) else 0} "
+                        f"队友={len(teammates)} "
                         f"决策={combat_eval.get('decision')} "
-                        f"套装={combat_eval.get('recommended_set')} "
+                        f"套装={current_set} "
                         f"心态={combat_eval.get('mindset')} "
                         f"→ {action_type}")
 
@@ -435,7 +542,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
             finally:
                 # 退出前写剩余 BOSS 记忆
                 if boss_observations:
-                    await write_boss_memory(session, boss_observations)
+                    await write_boss_memory(session, boss_observations, boss_samples)
                 await review_round(session, True, "Agent 正常退出", game_state)
 
     log("[Agent] 已断开 MCP 连接")
