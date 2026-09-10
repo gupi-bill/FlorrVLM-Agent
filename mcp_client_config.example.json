@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "florr_agent": {
+      "command": "python",
+      "args": ["/workspace/mcp_server.py"]
+    }
+  }
+}

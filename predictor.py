@@ -26,32 +26,37 @@ import time
 from collections import deque
 from typing import Optional
 
-# ---------------------------------------------------------------------------
-# 常量
-# ---------------------------------------------------------------------------
-PREDICT_SECONDS = 1.2       # 预判未来 1.2 秒
-MIN_FRAMES = 3              # 至少 3 帧才算速度
-ENTITY_TIMEOUT = 0.4        # 实体消失后保留 0.4 秒历史
-MAX_OUTPUT_ENTITIES = 8     # 最多输出前 8 个威胁最高实体
-HISTORY_MAXLEN = 10         # 每实体最多保留 10 帧
-CONFIDENCE_THRESHOLD = 0.65 # 置信度阈值锁：低于此值不采信预判
+import config
 
-# 稀有度 -> 分类
-RARITY_HIGHEST_BOSS = {"Unique", "Eternal"}
-RARITY_BOSS = {"Super"}
-RARITY_ELITE = {"Ultra", "Mythic", "Legendary", "Epic"}
-RARITY_NORMAL = {"Rare", "Unusual", "Common"}
+# ---------------------------------------------------------------------------
+# 常量（v0.5：全部来自 config.yaml，改参数不用改源码）
+# 热加载：agent_main 检测到 config.yaml 变化后调用 reload_config()
+# ---------------------------------------------------------------------------
+def reload_config():
+    """从 config.yaml 重新读取全部常量（热加载入口）。"""
+    global PREDICT_SECONDS, MIN_FRAMES, ENTITY_TIMEOUT, MAX_OUTPUT_ENTITIES
+    global HISTORY_MAXLEN, CONFIDENCE_THRESHOLD, CATEGORY_THREAT
+    global RARITY_HIGHEST_BOSS, RARITY_BOSS, RARITY_ELITE, RARITY_NORMAL
 
-# 分类 -> 威胁分数（用于排序；可按游戏替换）
-CATEGORY_THREAT = {
-    "highest_boss": 1000,
-    "boss": 400,
-    "elite": 120,
-    "normal": 15,
-    "player_enemy": 150,   # 玩家敌对：威胁较高、难预判
-    "player_ally": 0,      # 队友：不作威胁
-    "unknown": 5,
-}
+    PREDICT_SECONDS = config.get("predictor.predict_seconds", 1.2)
+    MIN_FRAMES = config.get("predictor.min_frames", 3)
+    ENTITY_TIMEOUT = config.get("predictor.entity_timeout", 0.4)
+    MAX_OUTPUT_ENTITIES = config.get("predictor.max_output_entities", 8)
+    HISTORY_MAXLEN = config.get("predictor.history_maxlen", 10)
+    CONFIDENCE_THRESHOLD = config.get("predictor.confidence_threshold", 0.65)
+
+    RARITY_HIGHEST_BOSS = set(config.get("predictor.rarity_highest_boss", ["Unique", "Eternal"]))
+    RARITY_BOSS = set(config.get("predictor.rarity_boss", ["Super"]))
+    RARITY_ELITE = set(config.get("predictor.rarity_elite", ["Ultra", "Mythic", "Legendary", "Epic"]))
+    RARITY_NORMAL = set(config.get("predictor.rarity_normal", ["Rare", "Unusual", "Common"]))
+
+    CATEGORY_THREAT = dict(config.get("predictor.threat", {
+        "highest_boss": 1000, "boss": 400, "elite": 120, "normal": 15,
+        "player_enemy": 150, "player_ally": 0, "unknown": 5,
+    }))
+
+
+reload_config()  # 首次加载
 
 # v0.4 玩家实体识别标记（数据驱动，换游戏时改这份即可）：
 PLAYER_ENEMY_MARKERS = ("player_enemy", "enemy_player", "hostile", "enemy")
@@ -258,6 +263,9 @@ def predict_all_entities() -> list:
     """
     返回全部实体的预判结果，按威胁分数降序，只取前 MAX_OUTPUT_ENTITIES 个。
     """
+    # v0.5 热加载：config.yaml 变了自动刷新本模块常量（MCP 子进程内生效）
+    if config.reload_if_changed():
+        reload_config()
     results = []
     for tracker in _trackers.values():
         pred = tracker.predict()

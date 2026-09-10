@@ -40,12 +40,15 @@ import time
 from datetime import datetime
 
 import requests
+import gzip
 from dotenv import load_dotenv
+
+import config
 
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# 配置
+# 配置（v0.5：全部来自 config.yaml，改参数不用改源码；热加载见 reload_config）
 # ---------------------------------------------------------------------------
 LLM_API_URL = os.getenv("LLM_API_URL", "")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
@@ -53,17 +56,26 @@ LLM_MODEL = os.getenv("LLM_MODEL", "")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MCP_SERVER_SCRIPT = os.path.join(BASE_DIR, "mcp_server.py")
-LOG_DIR = os.path.join(BASE_DIR, "run_logs")
-os.makedirs(LOG_DIR, exist_ok=True)
 
-# 死亡防抖
-DEATH_FRAME_THRESHOLD = 2     # 连续 N 帧死亡才判定
-# BOSS 记忆写入间隔
-BOSS_MEMORY_INTERVAL = 12     # 每 12 秒批量写一次
-# 日志上限
-LOG_MAX_SIZE = 500 * 1024     # 500KB
-# 鼠标角落安全暂停
-CORNER_MARGIN = 20            # 距离边缘 20 像素内触发暂停
+
+def reload_config():
+    """从 config.yaml 重读参数（热加载入口）。"""
+    global LOG_DIR, DEATH_FRAME_THRESHOLD, BOSS_MEMORY_INTERVAL
+    global LOG_MAX_SIZE, CORNER_MARGIN
+    global BOSS_SAMPLE_MAX, BOSS_CLOSE_DIST, LEARNING_STATS_INTERVAL
+
+    LOG_DIR = os.path.join(BASE_DIR, config.get("paths.run_logs", "run_logs"))
+    DEATH_FRAME_THRESHOLD = config.get("agent.death_frame_threshold", 2)
+    BOSS_MEMORY_INTERVAL = config.get("agent.boss_memory_interval", 12)
+    LOG_MAX_SIZE = config.get("logs.max_size_mb", 20) * 1024 * 1024
+    CORNER_MARGIN = config.get("combat.safe_zone_margin", 100)  # 复用安全区边距
+    BOSS_SAMPLE_MAX = config.get("agent.boss_sample_max", 120)
+    BOSS_CLOSE_DIST = config.get("agent.boss_close_dist", 120)
+    LEARNING_STATS_INTERVAL = config.get("agent.learning_stats_interval", 24)
+
+
+reload_config()
+os.makedirs(LOG_DIR, exist_ok=True)
 
 try:
     from mcp import ClientSession, StdioServerParameters
@@ -79,21 +91,40 @@ SERVER_PARAMS = StdioServerParameters(command=sys.executable, args=[MCP_SERVER_S
 
 
 # ---------------------------------------------------------------------------
-# 滚动日志
+# 滚动日志（v0.5：按天滚动 + 超限压缩 + 超期清理）
 # ---------------------------------------------------------------------------
+def _log_cleanup(days: int = None):
+    """删除超过保留天数的旧日志（.log / .gz），硬盘占用有上限。"""
+    days = days or config.get("logs.retention_days", 7)
+    cutoff = time.time() - days * 86400
+    try:
+        for fn in os.listdir(LOG_DIR):
+            fp = os.path.join(LOG_DIR, fn)
+            if os.path.isfile(fp) and fn.startswith("agent_") and os.path.getmtime(fp) < cutoff:
+                os.remove(fp)
+    except OSError:
+        pass
+
+
+def _maybe_rotate():
+    """当日日志超过大小上限 → 压缩为 .gz 并另起新文件。"""
+    today = datetime.now().strftime("%Y%m%d")
+    daily = os.path.join(LOG_DIR, f"agent_{today}.log")
+    if os.path.exists(daily) and os.path.getsize(daily) > LOG_MAX_SIZE:
+        gz = f"{daily}.{int(time.time())}.gz"
+        with open(daily, "rb") as fi, gzip.open(gz, "wb") as fo:
+            shutil.copyfileobj(fi, fo)
+        os.remove(daily)
+
+
 def log(msg: str):
-    """写滚动日志，超过 500KB 自动截断旧内容。"""
-    log_file = os.path.join(LOG_DIR, "agent.log")
+    """写当日日志并打印；超限自动压缩，保留期外自动删除。"""
+    daily = os.path.join(LOG_DIR, f"agent_{datetime.now().strftime('%Y%m%d')}.log")
     line = f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n"
     try:
-        # 检查大小，超限就截断
-        if os.path.exists(log_file) and os.path.getsize(log_file) > LOG_MAX_SIZE:
-            with open(log_file, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-            # 保留后半部分
-            with open(log_file, "w", encoding="utf-8") as f:
-                f.writelines(lines[len(lines) // 2:])
-        with open(log_file, "a", encoding="utf-8") as f:
+        _log_cleanup()
+        _maybe_rotate()
+        with open(daily, "a", encoding="utf-8") as f:
             f.write(line)
     except Exception:
         pass
@@ -271,10 +302,8 @@ async def review_round(session, survived: bool, note: str, state: str):
 
 # ---------------------------------------------------------------------------
 # BOSS 习惯记忆（v0.3 增强：归纳行为模式）
+# 相关阈值（BOSS_SAMPLE_MAX / BOSS_CLOSE_DIST）由 reload_config 从 config.yaml 读取
 # ---------------------------------------------------------------------------
-BOSS_SAMPLE_MAX = 120       # 每种 BOSS 最多保留多少个坐标样本（防内存膨胀）
-BOSS_CLOSE_DIST = 120       # 距离玩家多少像素内视为"接近/攻击"
-LEARNING_STATS_INTERVAL = 24  # v0.4 每 24 轮落盘一次学习命中统计
 
 
 def _analyze_boss_behavior(samples: list) -> str:
@@ -390,6 +419,13 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                     if max_rounds and round_count > max_rounds:
                         log("[Agent] 达到最大轮数，退出")
                         break
+
+                    # v0.5 热加载：config.yaml 变了就刷新各模块常量
+                    if config.reload_if_changed():
+                        reload_config()
+                        combat_judge.reload_config()
+                        # predictor 运行在 MCP 子进程，由其 predict 入口自行热加载
+                        log("[配置] config.yaml 已变更，热加载完成")
 
                     # 鼠标角落安全暂停
                     if _is_mouse_in_corner():

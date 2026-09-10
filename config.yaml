@@ -1,0 +1,61 @@
+# FlorrVLM-Agent 全局配置 config.yaml
+# 所有阈值/路径集中在这里，改参数不用改源码。
+# 改完保存即热加载生效（agent_main 每轮会检测文件变化）。
+# 这些是 Florr 专属部分：1.0 之后整份可作为第一张"游戏档案"抽走。
+
+server:
+  perception_port: 5001        # 感知服务端口
+  panel_port: 5002             # 本地面板端口
+
+predictor:
+  predict_seconds: 1.2         # 预判未来秒数
+  min_frames: 3                # 至少多少帧才算速度
+  entity_timeout: 0.4          # 实体消失后保留秒数（抗漏检抖动）
+  max_output_entities: 8       # 最多输出前 N 个威胁最高实体
+  history_maxlen: 10           # 每个实体保留帧数
+  confidence_threshold: 0.65   # 置信度阈值锁
+  # 稀有度体系（Florr.io 原生，按游戏可换）
+  rarity_highest_boss: ["Unique", "Eternal"]
+  rarity_boss: ["Super"]
+  rarity_elite: ["Ultra", "Mythic", "Legendary", "Epic"]
+  rarity_normal: ["Rare", "Unusual", "Common"]
+  # 分类 -> 威胁分数
+  threat:
+    highest_boss: 1000
+    boss: 400
+    elite: 120
+    normal: 15
+    player_enemy: 150
+    player_ally: 0
+    unknown: 5
+
+combat:
+  eval_debounce_interval: 0.7  # 实力评估防抖秒数
+  jitter_base: 8               # 移动抖动基础像素
+  jitter_max: 15               # 移动抖动最大像素
+  chase_max_distance: 400      # 追杀最远像素
+  chase_min_category: elite    # 追击套最低怪物档次
+  safe_zone_margin: 100        # 安全区屏幕边缘边距
+  safe_zone_w: 1920
+  safe_zone_h: 1080
+
+agent:
+  loop_interval: 0.5           # 主循环间隔秒
+  death_frame_threshold: 8     # 连续死亡帧阈值
+  boss_memory_interval: 12     # BOSS 记忆写入间隔秒
+  boss_sample_max: 120         # 每种 BOSS 最大样本数
+  boss_close_dist: 120         # BOSS 接近判定像素
+  learning_stats_interval: 24  # 学习命中统计落盘轮数
+
+mcp:
+  streamable_http: false       # 是否启用 streamable HTTP 传输
+  streamable_port: 5050
+
+paths:
+  knowledge_md: knowledge_md   # 知识库目录
+  frames: video_frames         # 视频抽帧临时目录
+  run_logs: run_logs           # 运行日志目录
+
+logs:
+  retention_days: 7            # 日志保留天数，超期删除
+  max_size_mb: 20              # 单个日志文件超过该大小先压缩

@@ -10,14 +10,16 @@ FlorrVLM-Agent MCP Server mcp_server.py
   - 目录为空时自动写入基础模板文件（v0.2）
   - 默认纯文本关键词检索；向量检索预留开关，默认关闭
 
-MCP 工具（10 个）：
+MCP 工具（13 个）：
   kb_list, kb_search, kb_write, kb_append,
   perceive_game, predict_all_entities, reset_predictor,
-  game_action, switch_set, handle_afk
+  game_action, switch_set, handle_afk,
+  query_boss_history, clean_cache, switch_tactic
 """
 import json
 import os
 import random
+import shutil
 import time
 from typing import Optional
 
@@ -29,13 +31,14 @@ except ImportError:
     raise ImportError("请先安装 mcp: pip install mcp")
 
 # 本地模块
+import config
 import predictor
 
 # ---------------------------------------------------------------------------
-# 配置
+# 配置（v0.5：知识库路径来自 config.yaml，改参数不用改源码）
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-KB_DIR = os.path.join(BASE_DIR, "knowledge_md")
+KB_DIR = os.path.join(BASE_DIR, config.get("paths.knowledge_md", "knowledge_md"))
 os.makedirs(KB_DIR, exist_ok=True)
 
 PERCEPTION_URL = "http://127.0.0.1:5001/perceive"
@@ -295,6 +298,67 @@ def handle_afk() -> str:
     """处理 florr.io 游戏内 AFK 人机验证弹窗。"""
     return ("AFK 弹窗处理流程已触发：请结合 perceive_game 返回的弹窗坐标，"
             "使用 game_action(move/click) 完成验证。")
+
+
+# ---------------------------------------------------------------------------
+# 运行辅助工具（v0.5）
+# ---------------------------------------------------------------------------
+@mcp.tool()
+def query_boss_history(boss_name: str = "") -> str:
+    """
+    读取知识库里的 BOSS 行为习惯记录。
+    缺省返回全部；传入 boss_name 则只返回包含该名字的记录。
+    """
+    fpath = os.path.join(KB_DIR, "boss_behavior_log.md")
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            content = f.read()
+    except OSError:
+        return "知识库还没有 BOSS 行为记录(文件不存在)。"
+    if not boss_name:
+        return content or "知识库还没有 BOSS 行为记录。"
+    # 按 "### " 小节切分，只看命中的段落
+    hits = [seg for seg in content.split("### ")
+            if boss_name.lower() in seg.lower()]
+    return ("\n\n".join(f"### {seg}" for seg in hits)
+            if hits else f"知识库中没有关于「{boss_name}」的 BOSS 行为记录。")
+
+
+@mcp.tool()
+def clean_cache(target: str = "all") -> str:
+    """
+    清理运行期缓存。
+    target: all(默认, 清预判历史)/ predict(只清预判) / frames(只清临时帧目录)。
+    """
+    done = []
+    if target in ("all", "predict"):
+        predictor.reset()
+        done.append("预判历史已清空")
+    if target in ("all", "frames"):
+        frame_dir = os.path.join(BASE_DIR, config.get("paths.frames", "video_frames"))
+        if os.path.isdir(frame_dir):
+            shutil.rmtree(frame_dir, ignore_errors=True)
+        done.append("临时帧目录已清理")
+    return "; ".join(done) if done else f"未知目标: {target}，可选 all/predict/frames"
+
+
+@mcp.tool()
+def switch_tactic(tactic_file: str) -> str:
+    """
+    指定知识库里的一份 Markdown 文件作为"当前战术"。
+    会在玩家战术文档(_current_tactic.md)里记录，供后续决策快速读取。
+    """
+    if not tactic_file.endswith(".md"):
+        tactic_file += ".md"
+    src = os.path.join(KB_DIR, tactic_file)
+    if not os.path.exists(src):
+        return f"知识库中没有这份战术文档: {tactic_file}"
+    with open(src, "r", encoding="utf-8") as f:
+        content = f.read()
+    mark = os.path.join(KB_DIR, "_current_tactic.md")
+    with open(mark, "w", encoding="utf-8") as f:
+        f.write(f"# 当前战术: {tactic_file}\n\n来自: {tactic_file}\n\n{content[:2000]}")
+    return f"已切换当前战术为: {tactic_file}"
 
 
 # ---------------------------------------------------------------------------

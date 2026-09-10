@@ -19,9 +19,35 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
+import config
+
 # ---------------------------------------------------------------------------
-# 常量
+# 常量（v0.5：全部来自 config.yaml，改参数不用改源码）
+# 热加载：agent_main 检测到 config.yaml 变化后调用 reload_config()
 # ---------------------------------------------------------------------------
+def reload_config():
+    """从 config.yaml 重新读取全部常量（热加载入口）。"""
+    global JITTER_BASE, JITTER_MAX, CHASE_MAX_DISTANCE, CHASE_MIN_CATEGORY
+    global EVAL_DEBOUNCE_INTERVAL, CATEGORY_THREAT
+    global SAFE_ZONE_MARGIN, SAFE_ZONE_W, SAFE_ZONE_H
+
+    JITTER_BASE = config.get("combat.jitter_base", 8)
+    JITTER_MAX = config.get("combat.jitter_max", 15)
+    CHASE_MAX_DISTANCE = config.get("combat.chase_max_distance", 400)
+    CHASE_MIN_CATEGORY = config.get("combat.chase_min_category", "elite")
+    EVAL_DEBOUNCE_INTERVAL = config.get("combat.eval_debounce_interval", 0.7)
+    SAFE_ZONE_MARGIN = config.get("combat.safe_zone_margin", 100)
+    SAFE_ZONE_W = config.get("combat.safe_zone_w", 1920)
+    SAFE_ZONE_H = config.get("combat.safe_zone_h", 1080)
+
+    CATEGORY_THREAT = dict(config.get("predictor.threat", {
+        "highest_boss": 1000, "boss": 400, "elite": 120, "normal": 15,
+        "player_enemy": 150, "player_ally": 0, "unknown": 5,
+    }))
+
+
+reload_config()  # 首次加载
+
 # 决策结果
 DECISION_FIGHT = "fight"
 DECISION_CAUTIOUS = "cautious_fight"
@@ -34,35 +60,10 @@ SET_RETREAT = "retreat"         # 跑路逃生套
 SET_CHASE = "chase"             # 追击套（v0.3：追杀高价值目标时用）
 SET_TEAM_SUPPORT = "team"       # 组队辅助套
 
-# 追击判定：至少精英级才追杀（复用下方有限追杀常量）
-CHASE_MIN_CATEGORY = "elite"
-
 # 心态模式
 MINDSET_CONSERVATIVE = "conservative"   # 保守：血量偏低就跑
 MINDSET_BALANCED = "balanced"           # 均衡：中等血量可冒险
 MINDSET_AGGRESSIVE = "aggressive"       # 激进：低血也搏输出
-
-# 移动抖动参数（固定小范围，模拟真人）
-JITTER_BASE = 8              # 基础抖动像素
-JITTER_MAX = 15              # 最大抖动像素
-
-# 有限追杀参数
-CHASE_MAX_DISTANCE = 400     # 最多追杀距离（像素）
-CHASE_MIN_CATEGORY = "elite"  # 至少精英级才追杀
-
-# 评估防抖间隔（秒）
-EVAL_DEBOUNCE_INTERVAL = 0.7  # v0.2：实力评估每 0.7s 一次
-
-# 威胁分数（与 predictor 保持一致；按游戏可替换）
-CATEGORY_THREAT = {
-    "highest_boss": 1000,
-    "boss": 400,
-    "elite": 120,
-    "normal": 15,
-    "player_enemy": 150,   # 敌对玩家：威胁较高、难预判
-    "player_ally": 0,      # 队友：不构成威胁
-    "unknown": 5,
-}
 
 
 # ---------------------------------------------------------------------------
@@ -305,21 +306,20 @@ def should_chase(entity: dict, player: PlayerState,
 
 
 # ---------------------------------------------------------------------------
-# 安全区钳制（v0.3）
+# 安全区钳制（v0.3；边距/尺寸由 config.yaml 提供）
 # ---------------------------------------------------------------------------
-SAFE_ZONE_MARGIN = 100   # 距离屏幕边缘 100 像素内视为安全区外（避开四角暂停区）
-SAFE_ZONE_W = 1920
-SAFE_ZONE_H = 1080
-
-
 def clamp_to_safe_zone(x: float, y: float,
-                       screen_w: int = SAFE_ZONE_W,
-                       screen_h: int = SAFE_ZONE_H,
-                       margin: int = SAFE_ZONE_MARGIN) -> tuple:
+                       screen_w: int = None,
+                       screen_h: int = None,
+                       margin: int = None) -> tuple:
     """
     把走位目标点限制在安全区内，防止无脑贴墙/贴四角卡死。
     距离屏幕边缘小于 margin 的坐标会被拉回安全区。
+    默认取 config.yaml 里的 combat.safe_zone_*。
     """
+    screen_w = screen_w or SAFE_ZONE_W
+    screen_h = screen_h or SAFE_ZONE_H
+    margin = margin if margin is not None else SAFE_ZONE_MARGIN
     x = max(margin, min(screen_w - margin, float(x)))
     y = max(margin, min(screen_h - margin, float(y)))
     return round(x, 1), round(y, 1)
