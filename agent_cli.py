@@ -2,37 +2,38 @@
 """
 FlorrVLM-Agent 交互式入口 agent_cli.py
 =======================================
-v0.6 —— 让 Agent 从"后台脚本"变成"能对话、能汇报、能编排"的 Agent。
+v0.6 —— 从"后台脚本"变成"能对话、能汇报、能编排"的 Agent。
+v1.0 —— 界面美化 + 开玩前"了解游戏"问答流程(brief)。
 
-核心概念：
-- 统一生命周期：detect(这是什么游戏) → research(去查) → ensure(确认能玩)
-                 → play(执行) → report(汇报)
-- 每个阶段是一个命令，既可由你对话触发，也可整条链路自动跑
-- 会话状态持久化到 agent_state.json，重启不丢上下文
-- describe_capabilities：随时问"你能做什么"
+生命周期：
+  detect(这是什么游戏) → research(去查) → ensure(确认能玩) → play(玩) → report(汇报)
+开玩前适应项：play 前若还没做过"游戏了解(brief)"，会先问你几个问题，
+再把答案归档，之后 research/ensure 才知道要重点关注什么。
 
-v0.7(v0.8) 之后：capabilities() 会自动追加"已连接的外部 MCP 工具"
-和"已加载的 Skill"，让这份能力清单越来越满。
+命令：help 查看全部；quit 退出。会话状态持久化到 agent_state.json。
 """
 import argparse
 import asyncio
 import json
 import os
 import sys
-from datetime import datetime
 
 import config
-
+from cli_ui import banner, panel, chip, bold, cyan, green, magenta, dim, yellow, red
 from skill_manager import SkillManager
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(BASE_DIR, "agent_state.json")
 
-# 全局技能管理器（v0.8）
-SKILLS = SkillManager()
+SKILLS = SkillManager()                       # v0.8
+ACTIVE_GAME = os.getenv("AGENT_GAME", "florr")  # v0.9 由游戏档案读取
 
-# 当前激活的游戏（v0.9 之后改为从 game_profiles/ 读取）
-ACTIVE_GAME = os.getenv("AGENT_GAME", "florr")
+# v1.0 开玩前"了解游戏"问答
+BRIEF_QUESTIONS = [
+    ("game_type", "这是什么类型/玩法？(如: 网页对战、RPG、卡牌、策略)"),
+    ("focus", "这一局你最看重什么？(保命优先 / 刷分升级 / 打Boss / 组队配合)"),
+    ("watch_out", "有什么规则或坑要特别注意？(没有可直接回车)"),
+]
 
 
 # ---------------------------------------------------------------------------
@@ -41,29 +42,28 @@ ACTIVE_GAME = os.getenv("AGENT_GAME", "florr")
 def _default_state() -> dict:
     return {
         "game": ACTIVE_GAME,
-        "status": "idle",            # idle / researching / playing / done / error
-        "last_played": None,         # 上次游玩时间
-        "last_rounds": 0,            # 上次运行回合数
-        "last_report": "",           # 上次汇报内容
-        "started_at": datetime.now().isoformat(timespec="seconds"),
+        "status": "idle",            # idle / researching / ensure / playing / done / error
+        "last_played": None,
+        "last_rounds": 0,
+        "last_report": "",
+        "brief": None,               # v1.0 开玩前的游戏了解答案 {key: 回答}
+        "started_at": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
     }
 
 
 def load_state() -> dict:
-    """读取会话状态；不存在或损坏则返回默认。"""
+    """读取会话状态；不存在或损坏返回默认，并补齐新字段。"""
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             st = json.load(f)
-            # 补齐新字段
-            d = _default_state()
-            d.update(st)
-            return d
+        d = _default_state()
+        d.update(st)
+        return d
     except Exception:
         return _default_state()
 
 
 def save_state(state: dict):
-    """写回会话状态。"""
     try:
         with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
@@ -72,10 +72,38 @@ def save_state(state: dict):
 
 
 # ---------------------------------------------------------------------------
-# 能力清单
+# 开玩前了解（v1.0 适应项）
+# ---------------------------------------------------------------------------
+def _collect_brief(answers: dict = None) -> dict:
+    """
+    交互式问你几个问题，返回 {key: 回答} 存档。
+    answers 为空时逐条提问；已存在时补问缺的。
+    关键：只在真正终端里提问；被管道调用时用环境变量/已有答案兜底。
+    """
+    brief = dict(answers or {})
+    for key, prompt in BRIEF_QUESTIONS:
+        if key in brief and brief[key]:
+            continue
+        try:
+            val = input(dim(f"  ? {prompt} ") + green("> ")).strip()
+        except (EOFError, KeyboardInterrupt):
+            val = ""
+        brief[key] = val
+    return brief
+
+
+def _format_brief(brief: dict) -> str:
+    if not brief:
+        return chip("尚未做过游戏了解(brief)，输入 brief 可查看，play 前会自动引导一次", "info")
+    return "\n".join(
+        f"  {green(bold(k)):<26} {v or '(未填写)'}" for k, v in brief.items()
+    )
+
+
+# ---------------------------------------------------------------------------
+# 能力清单 / 组件
 # ---------------------------------------------------------------------------
 def _configured_connectors() -> list:
-    """读取 mcp_connectors.yaml 里已配置的外部 MCP 名称（仅展示，不实际连接）。"""
     try:
         import yaml
         with open(os.path.join(BASE_DIR, "mcp_connectors.yaml"), "r",
@@ -87,183 +115,190 @@ def _configured_connectors() -> list:
 
 
 def _inspected_components() -> list:
-    """检测当前已具备的组件。"""
     parts = [f"游戏档案: {ACTIVE_GAME}"]
     parts.append("MCP Server(对外提供工具): mcp_server.py")
     ext = _configured_connectors()
-    if ext:
-        parts.append(f"外部 MCP(可主动连接): {', '.join(ext)}")
-    else:
-        parts.append("外部 MCP(可主动连接): 暂无(见 mcp_connectors.yaml)")
-    # v0.8：在此追加已加载的 Skill
+    parts.append(f"外部 MCP(可主动连接): {', '.join(ext) if ext else '暂无(见 mcp_connectors.yaml)'}")
     return parts
 
 
 def describe_capabilities() -> str:
-    """输出"我会干什么"，供对话或 LLM 随时查询。"""
     lines = [
-        f"{'=' * 44}",
-        "FlorrVLM-Agent 能力清单",
-        f"{'=' * 44}",
-        "生命周期阶段(可用命令):",
+        "生命周期(命令):",
         "  detect   —— 确认/切换当前游戏",
-        "  research —— 去查该游戏资料(依赖外部 MCP/Skill)",
+        "  brief    —— 开玩前了解游戏(问答)",
+        "  research —— 按 brief 去查该游戏资料",
         "  ensure   —— 确认能力足够再开玩",
         "  play     —— 进入游戏主循环(自动打/跑/追/复盘)",
-        "  report   —— 汇报当前进度与最近战况",
-        "其他命令: capabilities / state / help / quit",
+        "  report   —— 汇报进度与最近战况",
         "",
-        "已具备组件:",
+        "其他: capabilities / state / skills / load / unload / run_skill / help / quit",
     ]
-    lines += [f"  - {x}" for x in _inspected_components()]
+    lines = [f"  {x}" for x in lines]
     lines.append("")
-    lines.append(SKILLS.summary())
-    lines.append("=" * 44)
-    return "\n".join(lines)
+    lines += [f"  · {x}" for x in _inspected_components()]
+    return panel("FlorrVLM-Agent 能力清单(可随时输入 capabilities 查看)", lines)
+
+
+HELP_LINES = [
+    ("detect <游戏>", "确认/切换游戏(默认 florr)"),
+    ("brief",        "开玩前了解游戏，问答后存档"),
+    ("reset_brief",  "重新做一次问答"),
+    ("research <词>", "去查该游戏资料(依赖外部 MCP/Skill)"),
+    ("ensure",       "确认能否开玩"),
+    ("play [回合]",   "进入主循环(0=无限；未了解过会先引导问答)"),
+    ("report",       "汇报进度/战况"),
+    ("skills",       "列出可用 Skill"),
+    ("load/unload/run_skill", "加载/卸载/运行 Skill"),
+    ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
+    ("quit/exit/q",  "退出"),
+]
 
 
 # ---------------------------------------------------------------------------
-# 生命周期阶段对应动作
+# 各命令动作
 # ---------------------------------------------------------------------------
 def _cmd_detect(game: str) -> str:
-    """切换并确认当前游戏。"""
     st = load_state()
     st["game"] = game.strip().lower() or ACTIVE_GAME
     st["status"] = "idle"
     save_state(st)
-    return f"[detect] 当前游戏已设为: {st['game']}"
+    return chip(f"当前游戏已设为: {bold(st['game'])}", "ok")
 
 
-def _cmd_research(query: str) -> str:
-    """
-    查资料。优先用已连接的外部 MCP 工具去查；没有可用的外部连接时，
-    诚实占位：能借用本地视频学习时用之，否则明确告知。
-    """
+def _cmd_brief() -> str:
     st = load_state()
-    if query:
-        st["status"] = "researching"
-        save_state(st)
+    brief = _collect_brief(st.get("brief"))
+    st["brief"] = brief
+    st["status"] = "researching"
+    save_state(st)
+    return panel("游戏了解(brief)——已归档", _format_brief(brief))
 
+
+def _cmd_research(query: str = None) -> str:
+    st = load_state()
     if not query:
-        return "[research] 请给出要查的关键词，例如: research florr.io 最强花瓣套"
-    # 1) 尝试通过外部 MCP 查询
+        focus = (st.get("brief") or {}).get("focus", "")
+        query = focus or f"{st['game']} 玩法重点"
+    st["status"] = "researching"
+    save_state(st)
     try:
         from mcp_connector import ExternalConnector
 
-        async def _query():
+        async def _q():
             ec = await ExternalConnector.create()
             try:
                 tools = ec.tool_catalog()
                 if not tools:
-                    return (f"未连接外部 MCP，无法联网查询「{query}」\n"
-                             f"  (在 mcp_connectors.yaml 配置外部 MCP 后即可用)")
-                return f"已连接外部工具: {', '.join(tools)}\n查询「{query}」请由 LLM 决策层调用对应工具。"
+                    return (chip(f"未连接外部 MCP，无法联网查询「{query}」。", "warn") + "\n"
+                            + dim("  提示: 先在 mcp_connectors.yaml 配置外部 MCP 即可联网查资料"))
+                return panel(f"已连接外部工具（“{query}”由 LLM 决策层调用对应工具查询）",
+                             [f"· {t}" for t in tools])
             finally:
                 await ec.close()
 
-        return asyncio.run(_query())
+        return asyncio.run(_q())
     except Exception as e:
-        return f"[research] 外部 MCP 查询不可用: {e}"
+        return chip(f"research 不可用: {e}", "err")
 
 
 def _cmd_ensure() -> str:
-    """确认能力是否足够开玩。"""
     st = load_state()
     es = os.path.exists(os.path.join(BASE_DIR, "perception_server.py"))
     ms = os.path.exists(os.path.join(BASE_DIR, "mcp_server.py"))
-    if es and ms:
-        st["status"] = "done"
-        save_state(st)
-        return ("[ensure] 检测到 感知服务 与 MCP Server 均存在，具备开玩条件 ✓\n"
-                "  可执行: play 进入游戏主循环（需先手动启动各服务，见 README）")
-    return ("[ensure] 组件不完整：缺少 perception_server.py 或 mcp_server.py，"
-            "无法开玩 ✗")
+    brief_ok = bool(st.get("brief"))
+    ok = es and ms
+    lines = [f"感知服务: {'✓ 存在' if es else '✗ 缺失'}",
+             f"MCP Server: {'✓ 存在' if ms else '✗ 缺失'}",
+             f"游戏了解(brief): {'✓ 已完成' if brief_ok else '⚠ 未做(play 前会自动引导)'}"]
+    st["status"] = "done" if ok else "idle"
+    save_state(st)
+    lines.append("可执行: play 进入主循环" if ok else "先补全缺失组件再 ensure")
+    return panel("开玩前检查(ensure)", lines)
 
 
 def _cmd_play(max_rounds: int = 0) -> str:
-    """进入游戏主循环（复用 agent_main.run_agent）。"""
+    st = load_state()
+    # v1.0 适应项：play 前必须做过 brief
+    if not st.get("brief"):
+        st["brief"] = _collect_brief(st.get("brief"))
+        st["status"] = "researching"
+        save_state(st)
+        print(panel("检测到还没了解该游戏，已先引导你回答下列问题", _format_brief(st["brief"])))
     try:
         import agent_main
     except ImportError as e:
-        st = load_state(); st["status"] = "error"; save_state(st)
-        return f"[play] 无法导入 agent_main: {e}"
-    st = load_state()
+        st["status"] = "error"; save_state(st)
+        return chip(f"无法导入 agent_main: {e}", "err")
     st["status"] = "playing"
-    st["last_played"] = datetime.now().isoformat(timespec="seconds")
+    st["last_played"] = __import__("datetime").datetime.now().isoformat(timespec="seconds")
     save_state(st)
-    # 复用主循环；Ctrl+C 后返回，再补齐批次信息
     asyncio.run(agent_main.run_agent(max_rounds=max_rounds))
-    st = load_state()
-    st["status"] = "done"
-    save_state(st)
-    return "[play] 游戏主循环已结束"
+    st = load_state(); st["status"] = "done"; save_state(st)
+    return chip("游戏主循环已结束", "ok")
 
 
 def _cmd_report() -> str:
-    """汇报当前进度与最近战况。"""
     st = load_state()
-    lines = [
-        f"[report] 当前游戏: {st['game']}",
-        f"  状态: {st['status']}",
-        f"  上次游玩: {st['last_played'] or '从未'}",
-        f"  上次回合数: {st['last_rounds']}",
-    ]
-    # 读当天日志尾部，作为战况摘要
-    import glob
-    today = datetime.now().strftime("%Y%m%d")
+    lines = [f"当前游戏: {green(bold(st['game']))}",
+             f"状态: {yellow(st['status'])}",
+             f"上次游玩: {st['last_played'] or '从未'}",
+             f"上次回合数: {st['last_rounds']}",
+             "",
+             "游戏了解(brief):"]
+    lines += list(_format_brief(st.get("brief")).split("\n"))
+    today = __import__("datetime").datetime.now().strftime("%Y%m%d")
     log_dir = os.path.join(BASE_DIR, config.get("paths.run_logs", "run_logs"))
     cand = os.path.join(log_dir, f"agent_{today}.log")
     if os.path.exists(cand):
         try:
             with open(cand, "r", encoding="utf-8") as f:
                 tail = f.read().splitlines()[-15:]
-            lines.append("  最近日志(尾部):")
-            lines += [f"    {x}" for x in tail]
+            lines.append("最近日志(尾部):")
+            lines += [dim("  " + x) for x in tail]
         except OSError:
-            lines.append("  日志读取失败")
+            lines.append("日志读取失败")
     else:
-        lines.append("  暂无运行日志")
-    return "\n".join(lines)
-
-
-# ---------------------------------------------------------------------------
-# 对话主循环
-# ---------------------------------------------------------------------------
-HELP_TEXT = """可用命令:
-  detect <游戏名>     切换/确认当前游戏
-  research <关键词>   去查游戏资料
-  ensure              确认能否开玩
-  play [回合数]       进入游戏主循环(0=无限)
-  report              汇报当前进度与最近战况
-  capabilities        查看能力清单
-  state               查看会话状态
-  skills              查看可用 Skill
-  load <技能名>       加载一个 Skill
-  unload <技能名>     卸载一个 Skill
-  run_skill <技能名>  运行一个已加载的 Skill
-  auto                自动跑完整条链路: detect→research→ensure→play
-  help                显示本帮助
-  quit / exit         退出"""
+        lines.append("暂无运行日志")
+    return panel("汇报(report)", lines)
 
 
 def _run_auto(game: str) -> str:
-    """整条生命周期自动执行（Flow）。"""
-    parts = [_cmd_detect(game), _cmd_research(game)]
+    """全链路自动：detect → brief(若无) → research → ensure。"""
+    st = load_state()
+    parts = [_cmd_detect(game)]
+    if not st.get("brief"):
+        st["brief"] = _collect_brief(st.get("brief"))
+        st["status"] = "researching"
+        save_state(st)
+        parts.append(panel("已按引导完成游戏了解(brief)", _format_brief(st["brief"])))
+    parts.append(_cmd_research())
     parts.append(_cmd_ensure())
     return "\n".join(parts)
 
 
-def interactive():
-    """交互式对话。传入 -c 命令则只执行一次后退出。"""
-    import readline  # 启用终端方向键/历史（仅 Linux/macOS 生效）
-    print(describe_capabilities())
-    print(HELP_TEXT)
+# ---------------------------------------------------------------------------
+# 交互主循环
+# ---------------------------------------------------------------------------
+def _prompt_text() -> str:
     st = load_state()
+    flag = cyan("●") if st.get("brief") else yellow("○")  # 是否已了解游戏
+    return f"[{cyan(st['game'])}]{flag}> "
+
+
+def interactive():
+    import readline  # 终端方向键/历史（仅 Linux/macOS）
+    print(banner())
+    print(cyan("命令提示: 输入 help 查看全部命令；回答要换游戏前先 detect。"))
+    print()
+    # 首次进入在交互前展示能力清单
+    print(describe_capabilities())
+    print(panel("可用命令", [f"  {green(bold(c)):<22} {d}" for c, d in HELP_LINES]))
     while True:
         try:
-            raw = input(f"[{st['game']}]> ").strip()
+            raw = input(_prompt_text()).strip()
         except (EOFError, KeyboardInterrupt):
-            print("\n再见 👋")
+            print(dim("\n再见 👋"))
             break
         if not raw:
             continue
@@ -271,16 +306,21 @@ def interactive():
         arg = arg.strip()
 
         if cmd in ("quit", "exit", "q"):
-            print("再见 👋")
+            print(dim("再见 👋"))
             break
         elif cmd in ("help", "h", "?"):
-            print(HELP_TEXT)
+            print(panel("可用命令", [f"  {green(bold(c)):<22} {d}" for c, d in HELP_LINES]))
         elif cmd == "capabilities":
             print(describe_capabilities())
         elif cmd == "state":
             print(json.dumps(load_state(), ensure_ascii=False, indent=2))
         elif cmd == "detect":
             print(_cmd_detect(arg or "florr"))
+        elif cmd == "brief":
+            print(_cmd_brief())
+        elif cmd == "reset_brief":
+            st = load_state(); st["brief"] = _collect_brief(None); save_state(st)
+            print(panel("已重新了解(brief)", _format_brief(st["brief"])))
         elif cmd == "research":
             print(_cmd_research(arg))
         elif cmd == "ensure":
@@ -301,8 +341,8 @@ def interactive():
             print(_run_auto(arg or "florr"))
             print(_cmd_play(0))
         else:
-            print(f"未知命令: {cmd}（输入 help 查看）")
-        st = load_state()
+            print(red(f"未知命令: {cmd}（输入 help 查看）"))
+        # 循环内不做事件，交给用户
 
 
 # ---------------------------------------------------------------------------
@@ -310,16 +350,18 @@ def interactive():
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="FlorrVLM-Agent 交互式入口")
-    parser.add_argument("-c", "--command", help="执行单条命令后退出(如 report / capabilities)")
+    parser.add_argument("-c", "--command", help="执行单条命令后退出(如 report / skills)")
     args = parser.parse_args()
 
     if args.command:
         cmd, _, arg = args.command.partition(" ")
         arg = arg.strip()
-        fn = {
+        fns = {
             "capabilities": lambda: describe_capabilities(),
             "state": lambda: json.dumps(load_state(), ensure_ascii=False, indent=2),
             "detect": lambda: _cmd_detect(arg or "florr"),
+            "brief": lambda: _cmd_brief(),
+            "reset_brief": lambda: (s := load_state(), s.update(brief=_collect_brief(None)), save_state(s)) and _format_brief(s["brief"]),
             "research": lambda: _cmd_research(arg),
             "ensure": lambda: _cmd_ensure(),
             "report": lambda: _cmd_report(),
@@ -327,14 +369,15 @@ def main():
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),
             "run_skill": lambda: SKILLS.call(arg),
-        }.get(cmd)
+        }
+        fn = fns.get(cmd)
         print(fn() if fn else f"未知命令: {cmd}")
         return
 
     try:
         interactive()
     except KeyboardInterrupt:
-        print("\n再见 👋")
+        print(dim("\n再见 👋"))
 
 
 if __name__ == "__main__":

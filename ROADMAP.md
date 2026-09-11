@@ -220,6 +220,7 @@
 > - `watchdog.sh` + `florr-agent.service.example` —— 崩溃自动重启 + 内存上限 + systemd 7×24 守护
 > - `kb_maintainer.py` —— 知识库体积上限归档 + 重复笔记合并（agent_main 启动时自动跑）
 > - `Dockerfile` —— 一键部署（Xvfb 虚拟屏 + 看门狗）
+> - `cli_ui.py` + `agent_cli.py` 重写 —— 彩色面板界面；开玩前 `brief` 问答了解游戏，play 前自动引导
 
 ### 1. 完整基础自主闭环
 ```
