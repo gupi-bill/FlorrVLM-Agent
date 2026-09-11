@@ -19,6 +19,7 @@ import os
 import sys
 
 import config
+import session  # v1.4 会话记忆 & 断点续玩
 from cli_ui import banner, panel, chip, bold, cyan, green, magenta, dim, yellow, red
 from report_notifier import notify  # v1.2 自动汇报
 from skill_manager import SkillManager
@@ -150,6 +151,8 @@ HELP_LINES = [
     ("play [回合]",   "进入主循环(0=无限；未了解过会先引导问答)"),
     ("report",       "汇报进度/战况"),
     ("notify",       "生成并推送一份报告(本地文件/Webhook)"),
+    ("session",      "查看会话记忆(场次/回合/死亡/技能，v1.4)"),
+    ("resume",       "查看待续玩的上次进度"),
     ("skills",       "列出可用 Skill"),
     ("load/unload/run_skill", "加载/卸载/运行 Skill"),
     ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
@@ -232,16 +235,29 @@ def _cmd_play(max_rounds: int = 0) -> str:
     except ImportError as e:
         st["status"] = "error"; save_state(st)
         return chip(f"无法导入 agent_main: {e}", "err")
+    # v1.4 断点续玩：开玩前记下"从哪续"，检测到上次进度就提示并汇报续玩
+    skills = SKILLS.loaded()
+    if session.record_start(st["game"], skills):
+        info = session.resume_info()
+        if info:
+            print(panel("断点续玩（会话记忆）", [info]))
+        session.mark_resumed()
     st["status"] = "playing"
     st["last_played"] = __import__("datetime").datetime.now().isoformat(timespec="seconds")
     save_state(st)
     asyncio.run(agent_main.run_agent(max_rounds=max_rounds))
-    st = load_state(); st["status"] = "done"; st["last_rounds"] = max_rounds; save_state(st)
+    # v1.4 结束后：真实回合/死亡取自主监控快照，并累加场次/技能
+    rounds, deaths = session.snapshot_rounds_deaths()
+    if max_rounds and rounds < max_rounds:
+        rounds = max_rounds  # 自定义轮回合以用户设定为准
+    st = load_state(); st["status"] = "done"; save_state(st)
     # v1.2 每局结束自动汇报
     try:
         acts = notify()
+        session.record_end(st["game"], rounds, deaths, skills, report="\n".join(acts))
         return chip("游戏主循环已结束", "ok") + "\n" + "\n".join(dim(a) for a in acts)
     except Exception as e:
+        session.record_end(st["game"], rounds, deaths, skills, report=f"汇报失败: {e}")
         return chip(f"游戏主循环已结束（自动汇报失败: {e}）", "ok")
 
 
@@ -347,6 +363,11 @@ def interactive():
             print(_cmd_report())
         elif cmd == "notify":
             print(_cmd_notify())
+        elif cmd == "session":
+            print(panel("会话记忆(session)", session.describe().split("\n")))
+        elif cmd == "resume":
+            info = session.resume_info()
+            print(panel("上次进度(可续玩)", [info]) if info else chip("无待续玩进度", "info"))
         elif cmd == "skills":
             print(SKILLS.summary())
         elif cmd == "load":
@@ -384,6 +405,8 @@ def main():
             "ensure": lambda: _cmd_ensure(),
             "report": lambda: _cmd_report(),
             "notify": lambda: _cmd_notify(),
+            "session": lambda: session.describe(),
+            "resume": lambda: session.resume_info() or "无待续玩进度",
             "skills": lambda: SKILLS.summary(),
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),
