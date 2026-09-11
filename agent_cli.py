@@ -20,6 +20,7 @@ import sys
 
 import config
 from cli_ui import banner, panel, chip, bold, cyan, green, magenta, dim, yellow, red
+from report_notifier import notify  # v1.2 自动汇报
 from skill_manager import SkillManager
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -148,6 +149,7 @@ HELP_LINES = [
     ("ensure",       "确认能否开玩"),
     ("play [回合]",   "进入主循环(0=无限；未了解过会先引导问答)"),
     ("report",       "汇报进度/战况"),
+    ("notify",       "生成并推送一份报告(本地文件/Webhook)"),
     ("skills",       "列出可用 Skill"),
     ("load/unload/run_skill", "加载/卸载/运行 Skill"),
     ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
@@ -234,8 +236,22 @@ def _cmd_play(max_rounds: int = 0) -> str:
     st["last_played"] = __import__("datetime").datetime.now().isoformat(timespec="seconds")
     save_state(st)
     asyncio.run(agent_main.run_agent(max_rounds=max_rounds))
-    st = load_state(); st["status"] = "done"; save_state(st)
-    return chip("游戏主循环已结束", "ok")
+    st = load_state(); st["status"] = "done"; st["last_rounds"] = max_rounds; save_state(st)
+    # v1.2 每局结束自动汇报
+    try:
+        acts = notify()
+        return chip("游戏主循环已结束", "ok") + "\n" + "\n".join(dim(a) for a in acts)
+    except Exception as e:
+        return chip(f"游戏主循环已结束（自动汇报失败: {e}）", "ok")
+
+
+def _cmd_notify() -> str:
+    """v1.2 手动触发一次报告。"""
+    try:
+        acts = notify()
+        return "\n".join(acts)
+    except Exception as e:
+        return chip(f"汇报失败: {e}", "err")
 
 
 def _cmd_report() -> str:
@@ -329,6 +345,8 @@ def interactive():
             print(_cmd_play(int(arg) if arg.isdigit() else 0))
         elif cmd == "report":
             print(_cmd_report())
+        elif cmd == "notify":
+            print(_cmd_notify())
         elif cmd == "skills":
             print(SKILLS.summary())
         elif cmd == "load":
@@ -365,6 +383,7 @@ def main():
             "research": lambda: _cmd_research(arg),
             "ensure": lambda: _cmd_ensure(),
             "report": lambda: _cmd_report(),
+            "notify": lambda: _cmd_notify(),
             "skills": lambda: SKILLS.summary(),
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),

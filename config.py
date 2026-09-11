@@ -55,6 +55,7 @@ DEFAULT = {
 
     "agent.loop_interval": 0.5,
     "agent.game": "florr",
+    "agent.webhook_url": "",
     "agent.death_frame_threshold": 8,
     "agent.boss_memory_interval": 12,
     "agent.boss_sample_max": 120,

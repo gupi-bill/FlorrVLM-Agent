@@ -42,6 +42,7 @@ combat:
 agent:
   game: florr                # 当前激活的游戏档案(game_profiles/<name>.yaml)
   loop_interval: 0.5           # 主循环间隔秒
+  webhook_url: ""             # v1.2 报告推送地址(留空只写本地文件)
   death_frame_threshold: 8     # 连续死亡帧阈值
   boss_memory_interval: 12     # BOSS 记忆写入间隔秒
   boss_sample_max: 120         # 每种 BOSS 最大样本数
