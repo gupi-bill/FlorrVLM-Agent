@@ -18,6 +18,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import config
+import session  # v1.6 会话记忆 & 多局战绩
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(BASE_DIR, config.get("paths.run_logs", "run_logs"))
@@ -107,6 +108,7 @@ def _status() -> dict:
     st = _state()
     kb = _kb_info()
     res = _resources()
+    sts = session.stats()  # v1.6 多局战绩汇总
     return {
         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "has_snap": bool(snap),
@@ -125,6 +127,13 @@ def _status() -> dict:
         "cpu": res["cpu"],
         "mem_mb": res["mem_mb"],
         "log": _late_log(),
+        # v1.6 会话记忆 & 战绩
+        "sess_total": st.get("total_deaths", 0),   # 累计死亡(跨重启)
+        "session_count": sts["sessions"],
+        "total_rounds": sts["total_rounds"],
+        "avg_rounds": sts["avg_rounds"],
+        "best_rounds": sts["best_rounds"],
+        "recent": sts["recent"],
     }
 
 
@@ -164,6 +173,7 @@ PAGE = """<!DOCTYPE html><html lang="zh"><meta charset="utf-8">
   <div class="card"><div class="lab">累计死亡</div><div class="val warn" id="deaths">—</div></div>
   <div class="card"><div class="lab">知识库</div><div class="val" id="kb">—</div></div>
   <div class="card"><div class="lab">CPU / 内存</div><div class="val" id="res">—</div></div>
+  <div class="card"><div class="lab">累计场次 / 回合(v1.5)</div><div class="val" id="sess">—</div></div>
 </div>
 <div class="row">
   <div class="box">
@@ -176,6 +186,10 @@ PAGE = """<!DOCTYPE html><html lang="zh"><meta charset="utf-8">
     <h2>运行日志（最新在前）</h2>
     <div id="log"></div>
   </div>
+</div>
+<div class="box">
+  <h2>多局战绩（最多 5 局，新→旧）</h2>
+  <div id="hist"><div class="muted">暂无战绩</div></div>
 </div>
 <script>
 const CAT={'highest_boss':'c-boss','boss':'c-boss','elite':'c-elite','normal':'c-normal','player':'c-player'};
@@ -190,6 +204,11 @@ async function refresh(){
   document.getElementById('deaths').textContent=d.deaths;
   document.getElementById('kb').textContent=d.kb_count+' 篇 / '+d.kb_mb+' MB';
   document.getElementById('res').textContent=(d.cpu>=0?d.cpu+'%':'—')+' / '+d.mem_mb+'MB';
+  document.getElementById('sess').textContent=d.session_count+' 场 / '+d.total_rounds+' 回(均 '+d.avg_rounds+' · 最高 '+d.best_rounds+')';
+  document.getElementById('hist').innerHTML=d.recent.map(h=>
+    '<div class="thr"><span>'+(h.at||'')+'</span>'
+    +'<span class="muted">'+h.game+' · 回合 '+h.rounds+' · 死亡 '+h.deaths+'</span></div>'
+  ).join('')||'<div class="muted">暂无战绩</div>';
   document.getElementById('threats').innerHTML=d.threats.map(t=>
     '<div class="thr"><span><span class="dot '+ (CAT[t.cat]||'c-normal') +'"></span>'
     +(t.name||t.cat)+'</span><span class="muted">威胁 '+t.threat+'　('+t.x+', '+t.y+')</span></div>'
