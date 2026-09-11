@@ -153,6 +153,7 @@ HELP_LINES = [
     ("notify",       "生成并推送一份报告(本地文件/Webhook)"),
     ("session",      "查看会话记忆(场次/回合/死亡/技能，v1.4)"),
     ("resume",       "查看待续玩的上次进度"),
+    ("stats",        "多局战绩汇总与最近战绩(v1.5)"),
     ("skills",       "列出可用 Skill"),
     ("load/unload/run_skill", "加载/卸载/运行 Skill"),
     ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
@@ -368,6 +369,8 @@ def interactive():
         elif cmd == "resume":
             info = session.resume_info()
             print(panel("上次进度(可续玩)", [info]) if info else chip("无待续玩进度", "info"))
+        elif cmd == "stats":
+            print(panel("多局战绩统计(stats)", session.stats_text().split("\n")))
         elif cmd == "skills":
             print(SKILLS.summary())
         elif cmd == "load":
@@ -407,6 +410,7 @@ def main():
             "notify": lambda: _cmd_notify(),
             "session": lambda: session.describe(),
             "resume": lambda: session.resume_info() or "无待续玩进度",
+            "stats": lambda: session.stats_text(),
             "skills": lambda: SKILLS.summary(),
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),

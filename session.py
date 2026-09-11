@@ -21,11 +21,14 @@ import config  # 读取 paths.run_logs，取监控快照里的真实回合/死�
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(BASE_DIR, "agent_state.json")
+HISTORY_FILE = os.path.join(BASE_DIR, "session_history.json")  # v1.5 多局战绩历史
 SNAP_PATH = os.path.join(
     BASE_DIR,
     config.get("paths.run_logs", "run_logs"),
     "agent_snapshot.json",
 )
+# v1.5 战绩历史最多保留 N 条，防文件无限膨胀
+HISTORY_MAX = int(config.get("session.history_max", 100) or 100)
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +115,7 @@ def record_start(game: str, skills: list) -> bool:
 
 
 def record_end(game: str, rounds: int, deaths: int, skills: list, report: str = ""):
-    """主循环结束后调用：累加场次/死亡，存真实回合、技能与本次汇报。"""
+    """主循环结束后调用：累加场次/死亡，存真实回合、技能与本次汇报，并写入战绩历史。"""
     st = load()
     st["game"] = game
     st["status"] = "done"
@@ -126,6 +129,13 @@ def record_end(game: str, rounds: int, deaths: int, skills: list, report: str = 
     st["resumed"] = False          # 本轮已结束，"续玩"标记复位
     st["resume_point"] = None
     save(st)
+    _append_history({
+        "at": st["last_played"],
+        "game": game,
+        "rounds": rounds,
+        "deaths": deaths,
+        "skills": sorted(set(skills)),
+    })
 
 
 def mark_resumed():
@@ -133,6 +143,59 @@ def mark_resumed():
     st = load()
     st["resumed"] = True
     save(st)
+
+
+# ---------------------------------------------------------------------------
+# v1.5 多局战绩历史 & 汇总统计
+# ---------------------------------------------------------------------------
+def _append_history(record: dict):
+    """把一局的战绩追加进 session_history.json，超出上限删最早。"""
+    try:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                h = json.load(f)
+            if not isinstance(h, list):
+                h = []
+        else:
+            h = []
+        h.append(record)
+        if len(h) > HISTORY_MAX:
+            h = h[-HISTORY_MAX:]
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(h, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+
+def history() -> list:
+    """读战绩历史（新→旧排序）。"""
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            h = json.load(f)
+        return h if isinstance(h, list) else []
+    except Exception:
+        return []
+
+
+def stats() -> dict:
+    """汇总战绩：总场次/总回合/死亡/均值/最佳，供 stats 命令与大盘用。"""
+    h = history()
+    if not h:
+        return {"sessions": 0, "total_rounds": 0, "total_deaths": 0,
+                "avg_rounds": 0, "best_rounds": 0, "recent": []}
+    total_rounds = sum(int(r.get("rounds", 0) or 0) for r in h)
+    total_deaths = sum(int(r.get("deaths", 0) or 0) for r in h)
+    best_rounds = max(int(r.get("rounds", 0) or 0) for r in h)
+    return {
+        "sessions": len(h),
+        "total_rounds": total_rounds,
+        "total_deaths": total_deaths,
+        "avg_rounds": round(total_rounds / len(h), 1),
+        "best_rounds": best_rounds,
+        "recent": h[-5:][::-1],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -179,11 +242,31 @@ def describe() -> str:
     return "\n".join(lines)
 
 
+def stats_text() -> str:
+    """'stats' 命令看到的汇总统计文本。"""
+    s = stats()
+    head = [f"累计场次   : {s['sessions']}",
+            f"累计回合   : {s['total_rounds']}",
+            f"累计死亡   : {s['total_deaths']}",
+            f"场均回合   : {s['avg_rounds']}",
+            f"单局最高回合: {s['best_rounds']}"]
+    if s["recent"]:
+        head.append("最近战绩(新→旧):")
+        head += [f"  {r['at'][:16]} · {r['game']} · 回合 {r['rounds']} · 死亡 {r['deaths']}"
+                 for r in s["recent"]]
+    else:
+        head.append("暂无战绩(打完 play 后自动记录)")
+    return "\n".join(head)
+
+
 def __main__():
     """手动测试：python session.py"""
     print("record_start →", record_start("florr", ["report"]))
     print("resume_info  →", resume_info() or "(无)")
     print(describe())
+    print()
+    print("stats_text:")
+    print(stats_text())
 
 
 if __name__ == "__main__":
