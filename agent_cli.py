@@ -154,6 +154,7 @@ HELP_LINES = [
     ("session",      "查看会话记忆(场次/回合/死亡/技能，v1.4)"),
     ("resume",       "查看待续玩的上次进度"),
     ("stats",        "多局战绩汇总与最近战绩(v1.5)"),
+    ("validate <游戏>", "游戏档案自检(投bo前用，v1.8)"),
     ("skills",       "列出可用 Skill"),
     ("load/unload/run_skill", "加载/卸载/运行 Skill"),
     ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
@@ -296,6 +297,23 @@ def _cmd_report() -> str:
     return panel("汇报(report)", lines)
 
 
+def _cmd_validate(game: str) -> str:
+    """v1.8 游戏档案自检。"""
+    try:
+        import game_profile_check
+        name = (game or "").strip() or None
+        if name is None:
+            name = ACTIVE_GAME
+        ok, problems = game_profile_check.check_one(name)
+        lines = [f"[{'✅' if ok else '❌'}] 档案自检: {name}"] + \
+                [f"  - {p}" for p in problems]
+        lines.append("  ✓ 档案完整，可以 play" if ok
+                     else "  ✗ 请先修复或用 tools/add_game.py 重新登记")
+        return "\n".join(lines)
+    except Exception as e:
+        return chip(f"自检不可用: {e}", "err")
+
+
 def _run_auto(game: str) -> str:
     """全链路自动：detect → brief(若无) → research → ensure。"""
     st = load_state()
@@ -371,6 +389,8 @@ def interactive():
             print(panel("上次进度(可续玩)", [info]) if info else chip("无待续玩进度", "info"))
         elif cmd == "stats":
             print(panel("多局战绩统计(stats)", session.stats_text().split("\n")))
+        elif cmd == "validate":
+            print(_cmd_validate(arg))
         elif cmd == "skills":
             print(SKILLS.summary())
         elif cmd == "load":
@@ -411,6 +431,7 @@ def main():
             "session": lambda: session.describe(),
             "resume": lambda: session.resume_info() or "无待续玩进度",
             "stats": lambda: session.stats_text(),
+            "validate": lambda: _cmd_validate(arg),
             "skills": lambda: SKILLS.summary(),
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),

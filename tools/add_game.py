@@ -142,6 +142,16 @@ def main():
     with open(out, "w", encoding="utf-8") as f:
         f.write(render_yaml(data))
     print(f"\n  ✅ 已生成: {out}")
+    # v1.8 生成后立即自检，保证档案零错误
+    sys.path.insert(0, BASE_DIR)
+    from game_profile_check import check_one
+    ok, problems = check_one(data["name"])
+    if ok:
+        print(f"  ✅ 自检通过: {data['name']} 档案完整")
+    else:
+        print(f"  ⚠ 生成成功但自检发现问题:")
+        for p in problems:
+            print(f"     - {p}")
     print(f"  ✅ {activate_game(data['name'])}")
     print("      之后启动即自动读取该档案，核心零改动。\n")
 
