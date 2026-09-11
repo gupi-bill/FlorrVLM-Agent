@@ -7,7 +7,8 @@ FlorrVLM-Agent 配置加载 config.py
 加载优先级（低 → 高）：
   1. 代码内置 DEFAULT（兜底）
   2. config.yaml（通用项）
-  3. 游戏档案 game_profiles/<agent.game>.yaml（游戏专属项，覆盖上面两层）
+  3. 游戏档案 game_profiles/<agent.game>.yaml（游戏专属项）
+  4. tuned_overrides.yaml（v1.0 自动调参产生的覆盖，最优先）
 
 特色：
 - 配置以"嵌套 dict 树"保存
@@ -20,6 +21,7 @@ import os
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
 PROFILE_DIR = os.path.join(os.path.dirname(CONFIG_PATH), "game_profiles")
+TUNED_PATH = os.path.join(os.path.dirname(CONFIG_PATH), "tuned_overrides.yaml")
 
 # 兜底默认值（扁平点分键）。仅当 yaml 一路都没有时使用。
 DEFAULT = {
@@ -46,6 +48,7 @@ DEFAULT = {
     "combat.jitter_max": 15,
     "combat.chase_max_distance": 400,
     "combat.chase_min_category": "elite",
+    "combat.retreat_ratio": 1.0,        # v1.0 自动调参：越高越敢打，越低越早跑
     "combat.safe_zone_margin": 100,
     "combat.safe_zone_w": 1920,
     "combat.safe_zone_h": 1080,
@@ -112,12 +115,13 @@ def _flatten_default() -> dict:
 
 
 def _reload():
-    """按优先级合并三份配置：DEFAULT < config.yaml < 游戏档案。"""
+    """按优先级合并（低→高）：DEFAULT < config.yaml < 游戏档案 < tuned_overrides。"""
     tree = _flatten_default()
     _merge(tree, _read_yaml(CONFIG_PATH))
     game = tree.get("agent", {}).get("game", "florr")
     profile_path = os.path.join(PROFILE_DIR, f"{game}.yaml")
     _merge(tree, _read_yaml(profile_path))
+    _merge(tree, _read_yaml(TUNED_PATH))  # v1.0 自动调参覆盖
     global _CFG
     _CFG = tree
 
@@ -146,7 +150,7 @@ def reload_if_changed() -> bool:
     """检测 config.yaml 或当前游戏档案是否变化，变了就热加载。"""
     last = getattr(reload_if_changed, "_mtime", None)
     game = _CFG.get("agent", {}).get("game", "florr")
-    paths = [CONFIG_PATH, os.path.join(PROFILE_DIR, f"{game}.yaml")]
+    paths = [CONFIG_PATH, os.path.join(PROFILE_DIR, f"{game}.yaml"), TUNED_PATH]
     mtimes = []
     for p in paths:
         try:

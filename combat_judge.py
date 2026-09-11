@@ -28,7 +28,7 @@ import config
 def reload_config():
     """从 config.yaml 重新读取全部常量（热加载入口）。"""
     global JITTER_BASE, JITTER_MAX, CHASE_MAX_DISTANCE, CHASE_MIN_CATEGORY
-    global EVAL_DEBOUNCE_INTERVAL, CATEGORY_THREAT
+    global EVAL_DEBOUNCE_INTERVAL, CATEGORY_THREAT, RETREAT_RATIO
     global SAFE_ZONE_MARGIN, SAFE_ZONE_W, SAFE_ZONE_H
 
     JITTER_BASE = config.get("combat.jitter_base", 8)
@@ -36,6 +36,7 @@ def reload_config():
     CHASE_MAX_DISTANCE = config.get("combat.chase_max_distance", 400)
     CHASE_MIN_CATEGORY = config.get("combat.chase_min_category", "elite")
     EVAL_DEBOUNCE_INTERVAL = config.get("combat.eval_debounce_interval", 0.7)
+    RETREAT_RATIO = config.get("combat.retreat_ratio", 1.0)  # v1.0 自动调参
     SAFE_ZONE_MARGIN = config.get("combat.safe_zone_margin", 100)
     SAFE_ZONE_W = config.get("combat.safe_zone_w", 1920)
     SAFE_ZONE_H = config.get("combat.safe_zone_h", 1080)
@@ -181,12 +182,12 @@ def judge_combat(context: CombatContext) -> dict:
 
     # ---- highest_boss 动态避险 ----
     if has_highest:
-        if ratio > 1.0:
+        if ratio > RETREAT_RATIO:
             # 实力不足，全力避险
             decision = DECISION_RETREAT
             recommended_set = SET_RETREAT
             retreat_reason = "highest_boss 出现且实力不足，全力避险"
-        elif ratio > 0.6:
+        elif ratio > RETREAT_RATIO * 0.6:
             # 实力接近，谨慎周旋
             decision = DECISION_CAUTIOUS
             recommended_set = SET_TANK
@@ -198,11 +199,11 @@ def judge_combat(context: CombatContext) -> dict:
             retreat_reason = "highest_boss 出现但实力充足，可对抗"
 
     # ---- 普通威胁评估 ----
-    elif ratio >= 1.4:
+    elif ratio >= RETREAT_RATIO * 1.4:
         decision = DECISION_RETREAT
         recommended_set = SET_RETREAT
         retreat_reason = f"敌方威胁({enemy_threat:.0f})远超自身实力({context.player.power_score:.0f})"
-    elif ratio >= 0.8:
+    elif ratio >= RETREAT_RATIO * 0.8:
         decision = DECISION_CAUTIOUS
         recommended_set = SET_TANK
     else:

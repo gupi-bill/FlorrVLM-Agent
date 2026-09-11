@@ -21,6 +21,10 @@ run_logs/
 # 会话状态（运行时生成，不入库）
 agent_state.json
 
+# v1.0 自动调参覆盖 + 知识库归档目录（运行时生成）
+tuned_overrides.yaml
+knowledge_archive/
+
 # 临时截图
 /tmp/florr_frame.png
 *.png

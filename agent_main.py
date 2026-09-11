@@ -415,6 +415,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
             boss_samples = {}         # v0.3：BOSS 坐标样本，累积归纳习性
             current_set = "combat"    # 当前套装，用于换套去抖
             learn_stats = []          # v0.4 学习命中统计：[("战术", True/False), ...]
+            death_count_this_cycle = 0  # v1.0 本统计周期内死亡数（喂给自动调参）
             paused = False
             evaluator = combat_judge.CombatEvaluator()  # v0.2 评估防抖
 
@@ -465,6 +466,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                     if not player.get("alive", True):
                         death_streak += 1
                         if death_streak >= DEATH_FRAME_THRESHOLD:
+                            death_count_this_cycle += 1  # v1.0 计入死亡
                             # 判定真实死亡，复盘（过滤普通小怪局）
                             has_teammate = bool(state_data.get("teammates", []))
                             if _should_review(state_data, has_teammate):
@@ -613,6 +615,16 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                             ),
                         })
                         learn_stats = []
+                        # v1.0 基础自动调参：按命中率 + 本周期死亡数微调阈值
+                        try:
+                            import auto_tuner
+                            hits = sum(col[1] for col in weak.values())
+                            attempts = sum(col[0] for col in weak.values())
+                            log(auto_tuner.tune(hits=hits, attempts=attempts,
+                                                deaths_extra=death_count_this_cycle))
+                        except Exception as e:
+                            log(f"[调参] 自动调参失败: {e}")
+                        death_count_this_cycle = 0
 
                     # 日志
                     log(f"[回合 {round_count}] HP={player.get('hp')} "
