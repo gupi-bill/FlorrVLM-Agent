@@ -7,4 +7,5 @@ opencv-python>=4.8.0
 numpy>=1.24.0
 python-dotenv>=1.0.0
 pyyaml>=6.0.0
+psutil>=5.9.0      # 可选：监控大盘的 CPU 占用显示
 mcp>=1.0.0

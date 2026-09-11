@@ -386,6 +386,44 @@ def _is_mouse_in_corner(screen_w: int = 1920, screen_h: int = 1080) -> bool:
         return False
 
 
+# v1.1 监控大盘快照：每 N 回合把关键状态写到 run_logs/agent_snapshot.json
+SNAPSHOT_EVERY = 2
+_snap_last_round = [0]  # 记录上一次写入的回合，避免重复写
+
+
+def write_snapshot(round_count, total_deaths, player, predictions, combat_eval, game):
+    """轻量快照，供 admin_panel(监控大盘)读取；令牌昂贵字段只存摘要。"""
+    try:
+        import json as _json
+        snap_dir = os.path.join(BASE_DIR, config.get("paths.run_logs", "run_logs"))
+        os.makedirs(snap_dir, exist_ok=True)
+        # 只保留前若干条威胁摘要，避免快照过大
+        threats = []
+        try:
+            import json as _j  # noqa
+            pred = _j.loads(predictions) if isinstance(predictions, str) and predictions.startswith("[") else []
+            for t in pred[:6]:
+                threats.append({
+                    "cat": t.get("category", "?"), "name": t.get("name", ""),
+                    "threat": t.get("threat_score", 0), "x": t.get("x", 0), "y": t.get("y", 0),
+                })
+        except Exception:
+            threats = []
+        data = {
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "round": round_count, "deaths": total_deaths,
+            "hp": player.get("hp"), "max_hp": player.get("max_hp"),
+            "decision": combat_eval.get("decision"), "mindset": combat_eval.get("mindset"),
+            "set": combat_eval.get("recommended_set"), "game": game,
+            "threats": threats,
+        }
+        with open(os.path.join(snap_dir, "agent_snapshot.json"), "w", encoding="utf-8") as f:
+            _json.dump(data, f, ensure_ascii=False)
+        _snap_last_round[0] = round_count
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # 主循环
 # ---------------------------------------------------------------------------
@@ -408,6 +446,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
 
             # 运行状态
             round_count = 0
+            total_deaths = 0          # v1.1 累计死亡数（供监控大盘）
             game_state = "{}"
             death_streak = 0          # 连续死亡帧数
             last_boss_memory_time = 0
@@ -467,6 +506,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                         death_streak += 1
                         if death_streak >= DEATH_FRAME_THRESHOLD:
                             death_count_this_cycle += 1  # v1.0 计入死亡
+                            total_deaths += 1            # v1.1 累计死亡
                             # 判定真实死亡，复盘（过滤普通小怪局）
                             has_teammate = bool(state_data.get("teammates", []))
                             if _should_review(state_data, has_teammate):
@@ -514,6 +554,12 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                     )
                     combat_eval = evaluator.evaluate(ctx)
                     combat_eval_str = json.dumps(combat_eval, ensure_ascii=False)
+
+                    # v1.1 监控快照：每 N 回合写一次 run_logs/agent_snapshot.json
+                    if round_count - _snap_last_round[0] >= SNAPSHOT_EVERY:
+                        write_snapshot(round_count, total_deaths, player,
+                                       predictions, combat_eval,
+                                       config.get("agent.game", "florr"))
 
                     # 5. 套装自动切换 + 战术记忆（v0.3）
                     recommended_set = combat_eval.get("recommended_set")
