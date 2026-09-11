@@ -58,11 +58,29 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MCP_SERVER_SCRIPT = os.path.join(BASE_DIR, "mcp_server.py")
 
 
+def _late_report(round_count, total_deaths):
+    """v1.7 局中进度汇报：写单文件 + 可选 Webhook，在后台线程跑，不阻塞主循环。"""
+    import report_notifier
+    game = config.get("agent.game", "florr")
+
+    def _run():
+        actions = report_notifier.notify_progress(round_count, total_deaths, game)
+        log(f"[汇报] 局中进度(回合 {round_count}, 死亡 {total_deaths}): "
+            + " | ".join(actions))
+
+    try:
+        import threading
+        threading.Thread(target=_run, daemon=True).start()
+    except Exception as e:
+        log(f"[汇报] 局中进度上报启动失败: {e}")
+
+
 def reload_config():
     """从 config.yaml 重读参数（热加载入口）。"""
     global LOG_DIR, DEATH_FRAME_THRESHOLD, BOSS_MEMORY_INTERVAL
     global LOG_MAX_SIZE, CORNER_MARGIN
     global BOSS_SAMPLE_MAX, BOSS_CLOSE_DIST, LEARNING_STATS_INTERVAL
+    global REPORT_EVERY
 
     LOG_DIR = os.path.join(BASE_DIR, config.get("paths.run_logs", "run_logs"))
     DEATH_FRAME_THRESHOLD = config.get("agent.death_frame_threshold", 2)
@@ -72,6 +90,7 @@ def reload_config():
     BOSS_SAMPLE_MAX = config.get("agent.boss_sample_max", 120)
     BOSS_CLOSE_DIST = config.get("agent.boss_close_dist", 120)
     LEARNING_STATS_INTERVAL = config.get("agent.learning_stats_interval", 24)
+    REPORT_EVERY = int(config.get("agent.report_every", 0) or 0)  # v1.7 局中定时汇报间隔(轮)
 
 
 reload_config()
@@ -560,6 +579,13 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                         write_snapshot(round_count, total_deaths, player,
                                        predictions, combat_eval,
                                        config.get("agent.game", "florr"))
+
+                    # v1.7 局中定时汇报：每 REPORT_EVERY 轮上报一次进度（0=关闭）
+                    if REPORT_EVERY and round_count % REPORT_EVERY == 0:
+                        try:
+                            _late_report(round_count, total_deaths)
+                        except Exception as e:  # 汇报失败绝不影响主循环
+                            log(f"[汇报] 局中进度上报失败: {e}")
 
                     # 5. 套装自动切换 + 战术记忆（v0.3）
                     recommended_set = combat_eval.get("recommended_set")

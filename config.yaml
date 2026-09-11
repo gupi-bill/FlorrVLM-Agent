@@ -48,6 +48,7 @@ agent:
   boss_sample_max: 120         # 每种 BOSS 最大样本数
   boss_close_dist: 120         # BOSS 接近判定像素
   learning_stats_interval: 24  # 学习命中统计落盘轮数
+  report_every: 0              # v1.7 局中定时汇报间隔(轮数，0=关闭；>0 则每 N 轮上报一次进度)
 
 mcp:
   streamable_http: false       # 是否启用 streamable HTTP 传输

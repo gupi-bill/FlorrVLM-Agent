@@ -143,6 +143,43 @@ def notify() -> list:
     return actions
 
 
+# ---------------------------------------------------------------------------
+# v1.7 局中定时汇报：轻量进度，不叠加报告文件，只覆盖单文件 + 可选 Webhook
+# ---------------------------------------------------------------------------
+def notify_progress(rounds: int, deaths: int, game: str = "florr") -> list:
+    """
+    主循环里按 report_every 轮间隔调用。
+    生成一段简短的实时进度文本，写入 run_logs/progress_report.md（覆盖），
+    并在配置了 webhook 时 POST。返回动作清单（供日志/测试）。
+    """
+    text = _progress_text(rounds, deaths, game)
+    actions = []
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        path = os.path.join(LOG_DIR, "progress_report.md")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        actions.append(f"进度已更新: {path}")
+    except OSError as e:
+        actions.append(f"写进度失败: {e}")
+    if _webhook_url():
+        actions.append("已推送 Webhook" if push_webhook(text) else "Webhook 推送失败")
+    return actions
+
+
+def _progress_text(rounds: int, deaths: int, game: str = "florr") -> str:
+    snap = _read_json(SNAP_PATH)
+    return (
+        f"# FlorrVLM-Agent 局中进度\n\n"
+        f"- 更新：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"- 游戏：{game}\n"
+        f"- 回合：{rounds}\n"
+        f"- 死亡：{deaths}\n"
+        f"- HP：{snap.get('hp')}/{snap.get('max_hp')}\n"
+        f"- 决策：{snap.get('decision')} / 心态：{snap.get('mindset')} / 套装：{snap.get('set')}\n"
+    )
+
+
 if __name__ == "__main__":
     print(generate_report())
     print("---")
