@@ -155,6 +155,7 @@ HELP_LINES = [
     ("resume",       "查看待续玩的上次进度"),
     ("stats",        "多局战绩汇总与最近战绩(v1.5)"),
     ("validate <游戏>", "游戏档案自检(投bo前用，v1.8)"),
+    ("package [类型]",  "打系统安装包(deb/portable/all；Windows/APK见packaging)，v1.9"),
     ("skills",       "列出可用 Skill"),
     ("load/unload/run_skill", "加载/卸载/运行 Skill"),
     ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
@@ -314,6 +315,28 @@ def _cmd_validate(game: str) -> str:
         return chip(f"自检不可用: {e}", "err")
 
 
+def _cmd_package(kind: str) -> str:
+    """v1.9 打系统安装包；本地打 deb/portable，其余平台看 packaging/。"""
+    try:
+        import importlib
+        build_dist = importlib.import_module("tools.build_dist")
+    except ImportError:
+        return chip("缺少 tools/build_dist.py，无法打包", "err")
+    kind = (kind or "all").strip().lower()
+    if kind in ("exe", "apk", "windows", "android"):
+        return chip(
+            f"「{kind}」需在对应系统上构建：Windows 跑 packaging/build_windows.bat，"
+            "APK 用 buildozer，详见 packaging/README.md", "info")
+    import io, contextlib
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            build_dist.main([kind])
+    except Exception as e:
+        return chip(f"打包失败: {e}", "err")
+    return (buf.getvalue() + "\nWindows EXE/便携 & Android APK 见 packaging/README.md")
+
+
 def _run_auto(game: str) -> str:
     """全链路自动：detect → brief(若无) → research → ensure。"""
     st = load_state()
@@ -391,6 +414,8 @@ def interactive():
             print(panel("多局战绩统计(stats)", session.stats_text().split("\n")))
         elif cmd == "validate":
             print(_cmd_validate(arg))
+        elif cmd == "package":
+            print(_cmd_package(arg))
         elif cmd == "skills":
             print(SKILLS.summary())
         elif cmd == "load":
@@ -432,6 +457,7 @@ def main():
             "resume": lambda: session.resume_info() or "无待续玩进度",
             "stats": lambda: session.stats_text(),
             "validate": lambda: _cmd_validate(arg),
+            "package": lambda: _cmd_package(arg),
             "skills": lambda: SKILLS.summary(),
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),

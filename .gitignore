@@ -24,6 +24,12 @@ agent_state.json
 # v1.5 多局战绩历史（运行时生成，不入库）
 session_history.json
 
+# v1.9 打包产物（dist_win 是 Windows 构建目录）
+dist/
+dist_win/
+build/
+*.spec~
+
 # v1.0 自动调参覆盖 + 知识库归档目录（运行时生成）
 tuned_overrides.yaml
 knowledge_archive/
