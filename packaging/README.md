@@ -10,6 +10,14 @@
 | Windows EXE / 便携 | `dist_win/florrvlm-agent.exe` + `-portable.zip` | Windows | 需在 Windows 跑 bat |
 | Android APK | `florrvlm-agent-1.9.0-*.apk` | 任意装 buildozer 的机器 | 需 buildozer |
 
+## 沙箱内构建状态（自动化环境实测）
+- `deb` / `portable`：✅ 已在沙箱内真实产出并运行。
+- `buildozer` APK：❌ 沙箱出网连 `skia.googlesource.com`（Kivy 编译需拉 skcms 子模块）
+  会 TLS 握手失败，被防火墙阻挡。构建工程本身已就绪，请在有外网直连该主机的地方跑：
+  `cd packaging/androidapp && yes | buildozer -v android debug`。
+- `wine` EXE：✅ 已在沙箱用 Wine + Windows Python + PyInstaller 交叉产出
+  `dist_win/florrvlm-agent.exe`，并已验证能启动、能跑命令、中文正常。
+
 ---
 
 ## 1. Linux .deb（推荐，一键装）

@@ -436,6 +436,12 @@ def interactive():
 # 入口
 # ---------------------------------------------------------------------------
 def main():
+    # Windows 控制台默认 cp1252 会吞中文，统一改 UTF-8（Linux 下不受影响）
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     parser = argparse.ArgumentParser(description="FlorrVLM-Agent 交互式入口")
     parser.add_argument("-c", "--command", help="执行单条命令后退出(如 report / skills)")
     args = parser.parse_args()
