@@ -160,6 +160,7 @@ HELP_LINES = [
     ("kb_export",      "导出整个知识库为备份包(tar.gz)，v2.0"),
     ("kb_import <包>",  "从备份包恢复知识库(同名覆盖)，v2.0"),
     ("resource",       "查看内存/CPU占用并触发超限检查，v2.0"),
+    ("tricks",         "玩家套路检测自测(假撤退/诱骗/包围)，v2.0"),
     ("skills",       "列出可用 Skill"),
     ("load/unload/run_skill", "加载/卸载/运行 Skill"),
     ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
@@ -371,6 +372,33 @@ def _cmd_resource() -> str:
         return chip(f"资源检查失败: {e}", "err")
 
 
+def _cmd_tricks() -> str:
+    """v2.0 跑一遍玩家套路检测自测数据（演示三类套路）。"""
+    import player_trick
+    dt = player_trick.PlayerTrickDetector()
+    lines = ["套路检测自测（喂入模拟轨迹）:"]
+    # 假撤退
+    for i, (x, y) in enumerate([(100, 0), (120, 20), (150, 50), (120, 40), (300, 90)]):
+        dt.update(0, 0, [{"uid": "A", "x_now": x, "y_now": y}])
+    # 诱骗
+    for _ in range(4):
+        dt.update(0, 0, [
+            {"uid": "W", "x_now": 80, "y_now": 0, "threat_score": 10},
+            {"uid": "B", "x_now": 300, "y_now": 0, "threat_score": 400},
+        ])
+    # 包围
+    dt.update(0, 0, [
+        {"uid": "L", "x_now": -150, "y_now": 0},
+        {"uid": "R", "x_now": 150, "y_now": 0},
+    ])
+    for r in dt.detect(0, 0):
+        lines.append(f"  异常: {r['tactic']} —— {r['detail']}")
+        lines.append(f"        建议: {r['advice']}")
+    if len(lines) == 1:
+        lines.append("  未检测到套路")
+    return panel("玩家套路检测(tricks)", lines)
+
+
 def _run_auto(game: str) -> str:
     """全链路自动：detect → brief(若无) → research → ensure。"""
     st = load_state()
@@ -456,6 +484,8 @@ def interactive():
             print(_cmd_kb_import(arg))
         elif cmd == "resource":
             print(_cmd_resource())
+        elif cmd == "tricks":
+            print(_cmd_tricks())
         elif cmd == "skills":
             print(SKILLS.summary())
         elif cmd == "load":
@@ -507,6 +537,7 @@ def main():
             "kb_export": lambda: _cmd_kb_export(),
             "kb_import": lambda: _cmd_kb_import(arg),
             "resource": lambda: _cmd_resource(),
+            "tricks": lambda: _cmd_tricks(),
             "skills": lambda: SKILLS.summary(),
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),

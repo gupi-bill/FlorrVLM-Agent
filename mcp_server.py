@@ -183,6 +183,27 @@ def kb_import(backup_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 玩家套路检测工具（v2.0）
+# ---------------------------------------------------------------------------
+@mcp.tool()
+def detect_player_tricks(players: list = None, me_x: float = None, me_y: float = None) -> str:
+    """
+    识破敌方玩家套路：假撤退 / 诱骗 / 包围（v2.0）。
+    players: 敌方玩家实体列表（含 uid/x_now/y_now/threat_score）。
+    me_x/me_y: 我方坐标（可选；在时会把 players 喂进轨迹再做检测，否则检测已有轨迹）。
+    返回检测结果 JSON 列表。
+    """
+    from player_trick import get_detector
+    det = get_detector()
+    if players and me_x is not None and me_y is not None:
+        det.update(float(me_x), float(me_y), players)
+    results = det.detect()
+    if not results:
+        return "未检测到玩家套路（可能需要先积累几帧玩家轨迹）"
+    return json.dumps(results, ensure_ascii=False, indent=2)
+
+
+# ---------------------------------------------------------------------------
 # 游戏感知与预判工具
 # ---------------------------------------------------------------------------
 @mcp.tool()
