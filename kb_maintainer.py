@@ -91,6 +91,68 @@ def compress_duplicates(kb: str, ratio: float = 0.9) -> int:
     return removed
 
 
+def export(kb: str, arch: str, out_dir: str = None) -> str:
+    """把整个知识库(活跃 + 归档)打包成带时间戳的压缩包，返回包路径(不含则不建)。
+
+    v2.0 知识库导入导出：满足"知识本地化可迁移"——备份 / 换机迁移用。
+    """
+    import tarfile
+    import time
+
+    out_dir = out_dir or os.path.join(BASE_DIR, "kb_backups")
+    os.makedirs(out_dir, exist_ok=True)
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    path = os.path.join(out_dir, f"kb_backup_{stamp}.tar.gz")
+
+    with tarfile.open(path, "w:gz") as tar:
+        for name, src in [("knowledge_md", kb), ("knowledge_archive", arch)]:
+            if not os.path.isdir(src):
+                continue
+            for root, _, files in os.walk(src):
+                for fn in files:
+                    if not fn.endswith(".md"):
+                        continue
+                    full = os.path.join(root, fn)
+                    # 包内路径统一为 <name>/<文件名>，避免绝对路径被外部读取
+                    arc = f"{name}/{os.path.basename(full)}"
+                    tar.add(full, arcname=arc)
+    size = os.path.getsize(path) / 1024
+    return f"已导出知识库到: {path}（{size:.1f} KB）"
+
+
+def import_backup(kb: str, arch: str, backup: str) -> str:
+    """从 export 生成的 .tar.gz 恢复知识库。同名文件覆盖，页码不冲突即合并。
+
+    安全注意：backup 允许为绝对/相对路径，包内文件名会做 basename 清洗，
+    防止「.. / 斜杠」路径穿越写到 knowledge_md 之外。
+    """
+    import tarfile
+
+    if not os.path.isfile(backup):
+        return f"找不到备份文件: {backup}"
+    os.makedirs(kb, exist_ok=True)
+    os.makedirs(arch, exist_ok=True)
+    imported = 0
+    with tarfile.open(backup, "r:gz") as tar:
+        for member in tar.getmembers():
+            if not member.isfile() or not member.name.endswith(".md"):
+                continue
+            name = os.path.basename(member.name)
+            if name in ("", ".", "..") or "/" in name or "\\" in name:
+                continue
+            dest = os.path.join(kb, name)
+            try:
+                f = tar.extractfile(member)
+                if f is None:
+                    continue
+                with open(dest, "wb") as out:
+                    out.write(f.read())
+                imported += 1
+            except (OSError, tarfile.TarError):
+                continue
+    return f"已从备份恢复 {imported} 个知识库文件到 {os.path.basename(kb)}/"
+
+
 def archive_oldest(kb: str, arch: str, max_mb: float) -> int:
     """活跃库超上限时，把最旧的笔记移到归档目录。返回归档文件数。"""
     os.makedirs(arch, exist_ok=True)
@@ -135,5 +197,13 @@ def run(max_mb: float = None, do_compress: bool = True, report: bool = False) ->
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--report", action="store_true", help="只打印统计，不做改动")
+    ap.add_argument("--export", action="store_true", help="导出整个知识库为 tar.gz 备份")
+    ap.add_argument("--import-from", help="从指定 tar.gz 备份恢复知识库")
     args = ap.parse_args()
-    print(run(report=args.report))
+    kb, arch = _paths()
+    if args.export:
+        print(export(kb, arch))
+    elif args.import_from:
+        print(import_backup(kb, arch, args.import_from))
+    else:
+        print(run(report=args.report))

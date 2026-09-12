@@ -156,6 +156,33 @@ def kb_append(filename: str, markdown_content: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 知识库导入导出工具（v2.0）
+# ---------------------------------------------------------------------------
+def _kb_dirs():
+    kb = os.path.join(BASE_DIR, config.get("paths.knowledge_md", "knowledge_md"))
+    arch = os.path.join(BASE_DIR, config.get("agent.kb_archive_dir", "knowledge_archive"))
+    return kb, arch
+
+
+@mcp.tool()
+def kb_export() -> str:
+    """把整个知识库(活跃 + 归档)打包成 tar.gz 备份，用于本地备份 / 换机迁移。"""
+    import kb_maintainer
+    kb, arch = _kb_dirs()
+    return kb_maintainer.export(kb, arch)
+
+
+@mcp.tool()
+def kb_import(backup_path: str) -> str:
+    """从 kb_export 生成的 tar.gz 备份恢复知识库（同名文件覆盖）。backup_path 为绝对路径或相对项目根的路径。"""
+    import kb_maintainer
+    kb, arch = _kb_dirs()
+    if not os.path.isabs(backup_path):
+        backup_path = os.path.join(BASE_DIR, backup_path)
+    return kb_maintainer.import_backup(kb, arch, backup_path)
+
+
+# ---------------------------------------------------------------------------
 # 游戏感知与预判工具
 # ---------------------------------------------------------------------------
 @mcp.tool()

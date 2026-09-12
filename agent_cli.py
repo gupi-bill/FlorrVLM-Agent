@@ -23,6 +23,7 @@ import session  # v1.4 会话记忆 & 断点续玩
 from cli_ui import banner, panel, chip, bold, cyan, green, magenta, dim, yellow, red
 from report_notifier import notify  # v1.2 自动汇报
 from skill_manager import SkillManager
+import kb_maintainer  # v2.0 知识库导入导出
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(BASE_DIR, "agent_state.json")
@@ -156,6 +157,8 @@ HELP_LINES = [
     ("stats",        "多局战绩汇总与最近战绩(v1.5)"),
     ("validate <游戏>", "游戏档案自检(投bo前用，v1.8)"),
     ("package [类型]",  "打系统安装包(deb/portable/all；Windows/APK见packaging)，v1.9"),
+    ("kb_export",      "导出整个知识库为备份包(tar.gz)，v2.0"),
+    ("kb_import <包>",  "从备份包恢复知识库(同名覆盖)，v2.0"),
     ("skills",       "列出可用 Skill"),
     ("load/unload/run_skill", "加载/卸载/运行 Skill"),
     ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
@@ -337,6 +340,27 @@ def _cmd_package(kind: str) -> str:
     return (buf.getvalue() + "\nWindows EXE/便携 & Android APK 见 packaging/README.md")
 
 
+def _cmd_kb_export() -> str:
+    """v2.0 导出整个知识库为备份包(与 kb_maintainer 共用路径)。"""
+    kb, arch = kb_maintainer._paths()
+    try:
+        return kb_maintainer.export(kb, arch)
+    except Exception as e:
+        return chip(f"导出失败: {e}", "err")
+
+
+def _cmd_kb_import(backup: str) -> str:
+    """v2.0 从备份包恢复知识库(同名覆盖)。"""
+    if not backup:
+        return chip("用法: kb_import <备份包路径>（如 kb_backups/kb_backup_....tar.gz）", "info")
+    backup = os.path.join(BASE_DIR, backup) if not os.path.isabs(backup) else backup
+    kb, arch = kb_maintainer._paths()
+    try:
+        return kb_maintainer.import_backup(kb, arch, backup)
+    except Exception as e:
+        return chip(f"恢复失败: {e}", "err")
+
+
 def _run_auto(game: str) -> str:
     """全链路自动：detect → brief(若无) → research → ensure。"""
     st = load_state()
@@ -416,6 +440,10 @@ def interactive():
             print(_cmd_validate(arg))
         elif cmd == "package":
             print(_cmd_package(arg))
+        elif cmd == "kb_export":
+            print(_cmd_kb_export())
+        elif cmd == "kb_import":
+            print(_cmd_kb_import(arg))
         elif cmd == "skills":
             print(SKILLS.summary())
         elif cmd == "load":
@@ -464,6 +492,8 @@ def main():
             "stats": lambda: session.stats_text(),
             "validate": lambda: _cmd_validate(arg),
             "package": lambda: _cmd_package(arg),
+            "kb_export": lambda: _cmd_kb_export(),
+            "kb_import": lambda: _cmd_kb_import(arg),
             "skills": lambda: SKILLS.summary(),
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),
