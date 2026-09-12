@@ -69,6 +69,39 @@ def _late_log(n: int = 40) -> list:
     return lines[-n:][::-1]
 
 
+def _resource_info() -> dict:
+    """读资源调度器的最后一条检查记录（未运行则空）。"""
+    fpath = os.path.join(LOG_DIR, "resource.log")
+    if not os.path.exists(fpath):
+        return {}
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            lines = [l for l in f.read().splitlines() if l.strip()]
+    except OSError:
+        return {}
+    if not lines:
+        return {}
+    line = lines[-1]
+    import re
+    m = re.search(r"内存 ([\d.]+)MB.*?CPU ([\d.]+)%", line)
+    if not m:
+        return {"raw": line[-120:]}
+    return {"mem_mb": m.group(1), "cpu": m.group(2), "raw": line[-160:]}
+
+
+def _tricks_info() -> dict:
+    """读最近一次玩家套路检测快照（由 agent_cli tricks / agent_main 写入）。"""
+    fpath = os.path.join(LOG_DIR, "tricks_snapshot.json")
+    if not os.path.exists(fpath):
+        return {}
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
 def _kb_info() -> dict:
     if not os.path.isdir(KB_DIR):
         return {"count": 0, "bytes": 0}
@@ -134,6 +167,9 @@ def _status() -> dict:
         "avg_rounds": sts["avg_rounds"],
         "best_rounds": sts["best_rounds"],
         "recent": sts["recent"],
+        # v2.0 资源调度 + 玩家套路
+        "resource": _resource_info(),
+        "tricks": _tricks_info(),
     }
 
 
@@ -174,6 +210,11 @@ PAGE = """<!DOCTYPE html><html lang="zh"><meta charset="utf-8">
   <div class="card"><div class="lab">知识库</div><div class="val" id="kb">—</div></div>
   <div class="card"><div class="lab">CPU / 内存</div><div class="val" id="res">—</div></div>
   <div class="card"><div class="lab">累计场次 / 回合(v1.5)</div><div class="val" id="sess">—</div></div>
+  <div class="card"><div class="lab">资源调度(v2.0)</div><div class="val" id="resguard">—</div></div>
+</div>
+<div class="box" style="margin-bottom:14px">
+  <h2>玩家套路检测（v2.0）</h2>
+  <div id="tricks"><div class="muted">暂无检测数据（agent_cli 里跑 `tricks` 或 agent_main 运行后可见）</div></div>
 </div>
 <div class="row">
   <div class="box">
@@ -205,6 +246,15 @@ async function refresh(){
   document.getElementById('kb').textContent=d.kb_count+' 篇 / '+d.kb_mb+' MB';
   document.getElementById('res').textContent=(d.cpu>=0?d.cpu+'%':'—')+' / '+d.mem_mb+'MB';
   document.getElementById('sess').textContent=d.session_count+' 场 / '+d.total_rounds+' 回(均 '+d.avg_rounds+' · 最高 '+d.best_rounds+')';
+  const rg=d.resource||{};
+  document.getElementById('resguard').textContent=(rg.mem_mb?'mem '+rg.mem_mb+'MB':'—')+' / '+(rg.cpu?rg.cpu+'%':'—');
+  document.getElementById('resguard').className='val '+(rg.raw&&rg.raw.indexOf('STRONG')>=0?'err':'ok');
+  const tr=d.tricks||{};
+  const tl=tr.finds||tr.results||[];
+  document.getElementById('tricks').innerHTML=(tr.ts?'<div class="muted" style="margin-bottom:4px">最近检测 '+tr.ts+'：</div>':'')
+    +(tl.map(t=>'<div class="thr"><span><span class="dot '+(t.tactic==='ambush'?'c-elite':'c-player')+'"></span>'
+      +'<b>'+t.tactic+'</b> — '+t.detail+'</span><span class="muted">'+t.advice+'</span></div>').join('')
+      ||'<div class="muted">未检测到玩家套路</div>');
   document.getElementById('hist').innerHTML=d.recent.map(h=>
     '<div class="thr"><span>'+(h.at||'')+'</span>'
     +'<span class="muted">'+h.game+' · 回合 '+h.rounds+' · 死亡 '+h.deaths+'</span></div>'

@@ -373,8 +373,9 @@ def _cmd_resource() -> str:
 
 
 def _cmd_tricks() -> str:
-    """v2.0 跑一遍玩家套路检测自测数据（演示三类套路）。"""
+    """v2.0 跑一遍玩家套路检测自测数据（演示三类套路），并写快照供大盘显示。"""
     import player_trick
+    from datetime import datetime as _dt
     dt = player_trick.PlayerTrickDetector()
     lines = ["套路检测自测（喂入模拟轨迹）:"]
     # 假撤退
@@ -391,11 +392,22 @@ def _cmd_tricks() -> str:
         {"uid": "L", "x_now": -150, "y_now": 0},
         {"uid": "R", "x_now": 150, "y_now": 0},
     ])
-    for r in dt.detect(0, 0):
+    results = dt.detect(0, 0)
+    for r in results:
         lines.append(f"  异常: {r['tactic']} —— {r['detail']}")
         lines.append(f"        建议: {r['advice']}")
     if len(lines) == 1:
         lines.append("  未检测到套路")
+    # 写快照给监控大盘（v2.0#4）
+    try:
+        os.makedirs(os.path.join(BASE_DIR, "run_logs"), exist_ok=True)
+        with open(os.path.join(BASE_DIR, "run_logs", "tricks_snapshot.json"),
+                  "w", encoding="utf-8") as f:
+            json.dump({"ts": _dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+                       "finds": results}, f, ensure_ascii=False)
+        lines.append("  已写入快照 run_logs/tricks_snapshot.json（大盘可见）")
+    except OSError as e:
+        lines.append(f"  快照写入失败: {e}")
     return panel("玩家套路检测(tricks)", lines)
 
 
