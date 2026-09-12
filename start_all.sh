@@ -25,4 +25,12 @@ $PY agent_main.py &         echo $! > .agent.pid
 echo "==> 启动简易面板 (http://127.0.0.1:$(grep panel_port config.yaml))..."
 $PY admin_panel.py &        echo $! > .panel.pid
 
+# v2.0 资源调度器：低配机器 7×24 稳定（超内存自动降级清理）
+if $PY resource_guard.py --once >/dev/null 2>&1; then
+    echo "==> 启动资源调度器 (每30s自检，日志 run_logs/resource.log)..."
+    nohup $PY resource_guard.py > /dev/null 2>&1 &  echo $! > .resource.pid
+else
+    echo "==> 资源调度器不可用，跳过（不影响其他服务）"
+fi
+
 echo "全部已后台启动。用 stop_all.sh 停止。"

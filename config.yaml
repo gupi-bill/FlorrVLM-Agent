@@ -62,3 +62,11 @@ paths:
 logs:
   retention_days: 7            # 日志保留天数，超期删除
   max_size_mb: 20              # 单个日志文件超过该大小先压缩
+
+# v2.0 资源调度器：J1900 低配 7×24 稳定用
+resource:
+  enabled: true                # 是否启用（start_all 会自动拉起守护）
+  check_interval: 30           # 检查间隔秒
+  mem_limit_mb: 500            # 软内存上限 MB，超了触发降级清理
+  cpu_limit_pct: 80            # CPU 占用上限 %，超了记录告警
+  mem_hard_mb: 1000            # 硬上限 MB，超了这个给出强告警(不自杀，交给 watchdog)

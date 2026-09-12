@@ -4,7 +4,7 @@
 cd "$(dirname "$0")"
 PY=python
 
-for name in agent panel mcp perception; do
+for name in agent panel mcp perception resource; do
   if [ -f .$name.pid ]; then
     pid=$(cat .$name.pid)
     kill "$pid" 2>/dev/null && echo "已停止 $name (pid $pid)" || echo "$name 未在运行"

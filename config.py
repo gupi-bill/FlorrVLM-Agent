@@ -73,6 +73,12 @@ DEFAULT = {
 
     "logs.retention_days": 7,
     "logs.max_size_mb": 20,
+
+    "resource.enabled": True,
+    "resource.check_interval": 30,
+    "resource.mem_limit_mb": 500,
+    "resource.cpu_limit_pct": 80,
+    "resource.mem_hard_mb": 1000,
 }
 
 _CFG: dict = {}

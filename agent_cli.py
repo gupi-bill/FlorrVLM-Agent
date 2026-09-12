@@ -159,6 +159,7 @@ HELP_LINES = [
     ("package [类型]",  "打系统安装包(deb/portable/all；Windows/APK见packaging)，v1.9"),
     ("kb_export",      "导出整个知识库为备份包(tar.gz)，v2.0"),
     ("kb_import <包>",  "从备份包恢复知识库(同名覆盖)，v2.0"),
+    ("resource",       "查看内存/CPU占用并触发超限检查，v2.0"),
     ("skills",       "列出可用 Skill"),
     ("load/unload/run_skill", "加载/卸载/运行 Skill"),
     ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
@@ -361,6 +362,15 @@ def _cmd_kb_import(backup: str) -> str:
         return chip(f"恢复失败: {e}", "err")
 
 
+def _cmd_resource() -> str:
+    """v2.0 查看资源占用并触发一次超限检查。"""
+    import resource_guard
+    try:
+        return resource_guard.check_once()
+    except Exception as e:
+        return chip(f"资源检查失败: {e}", "err")
+
+
 def _run_auto(game: str) -> str:
     """全链路自动：detect → brief(若无) → research → ensure。"""
     st = load_state()
@@ -444,6 +454,8 @@ def interactive():
             print(_cmd_kb_export())
         elif cmd == "kb_import":
             print(_cmd_kb_import(arg))
+        elif cmd == "resource":
+            print(_cmd_resource())
         elif cmd == "skills":
             print(SKILLS.summary())
         elif cmd == "load":
@@ -494,6 +506,7 @@ def main():
             "package": lambda: _cmd_package(arg),
             "kb_export": lambda: _cmd_kb_export(),
             "kb_import": lambda: _cmd_kb_import(arg),
+            "resource": lambda: _cmd_resource(),
             "skills": lambda: SKILLS.summary(),
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),
