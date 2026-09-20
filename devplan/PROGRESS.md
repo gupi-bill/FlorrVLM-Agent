@@ -10,7 +10,7 @@
 | S0 | 前置：核心文件恢复 + venv | ✅ 完成 | 手动 | 17 个文件从 git HEAD 恢复；隔离 venv |
 | S1 | 仓库基线修复与卫生清理 | ✅ 完成 | 01:31~01:40 (B线) | `.gitattributes`、`.gitignore` 增补、`requirements.txt` 三段分组、`requirements-dev.txt`；移除 8 个构建产物（含 1 个 31MB tar.gz）出版本库 |
 | S2 | 静态依赖与接口审计 | ✅ 完成 | 02:01~02:45 (A线) | `tools/static_audit.py`、`devplan/AUDIT.md`、`devplan/audit_data.json`；`requirements.txt` 收敛 `mcp<2`、`mcp_server.py` v1/v2 兼容、`video_learner.py` cv2 软依赖 |
-| S3 | 预判引擎实测定型 | ⬜ 待执行 | | |
+| S3 | 预判引擎实测定型 | ✅ 完成 | 02:41~02:55 (B线) | `tests/test_predictor.py`（46 用例全绿）、`tests/conftest.py`；`predictor.py` 抖动惩罚 + NaN 防御 + 分类逐帧重算；`config.yaml`/`config.py` 新增 4 个置信度曲线配置项 |
 | S4 | 战斗评估与自动调参校验 | ⬜ 待执行 | | |
 | S5 | 会话/汇报/技能模块校验 | ⬜ 待执行 | | |
 | S6 | 感知服务离线化 | ⬜ 待执行 | | |
@@ -103,3 +103,24 @@
     - W1（agent_cli 的 session 降级 shim 含 4 个不存在 API）、I4（skills/report/skill.py 仅 9 行）移交 **S5**。
     - W2/W3（PyQt6、streamlit 未安装）与 I5（4 套前端并存）移交 **S11** 收敛。
     - I1 副作用：`import mcp_server` 会自动向 `knowledge_md/` 写 4 个模板文件（审计时被触发，属既有行为）。
+
+- **2026-09-21 02:55 · S3 · 预判引擎 predictor.py 实测定型**
+  - 做了什么：
+    1. 核对 `predictor.py` 读取的 11 个配置键与 `config.yaml` / `config.py DEFAULT` 三方完全一致（predict_seconds / min_frames / entity_timeout / max_output_entities / history_maxlen / confidence_threshold / rarity_*4 / threat），无漂移。
+    2. 新建 `tests/test_predictor.py`（15 个测试函数 / 46 个用例，含 parametrize 展开）+ `tests/conftest.py`（注入项目根路径 + 无头环境 pyautogui/cv2/PIL stub）。
+    3. 测试用 FakeClock（monkeypatch `predictor.time`）替代真实时钟，速度与超时完全确定性复现，不依赖 sleep、不 flaky。
+    4. **修复缺陷 1（抖动不降置信）**：原置信度只按首尾两点算速度，来回抖动的轨迹会被平均掉，与直线冲刺拿到同样高的分。新增 `_trajectory_linearity()`（净位移 / 累计路程）作为抖动惩罚因子，下限 `predictor.jitter_floor=0.35`。
+    5. **修复缺陷 2（NaN 坐标污染）**：`_is_valid_coord` 用 `float()` 后比较，`float('nan')` 能穿过所有 `<0` / `>100000` 判断进入追踪器，后续速度与预判全变 NaN。改用 `math.isfinite()` 拦截 NaN/Inf。
+    6. **修复缺陷 3（分类不随稀有度刷新）**：`update_frame_entities` 原先只在创建时算 category，怪物从 Common 升到 Super 后威胁分永远停在 15。改为逐帧按 role/rarity 重算。
+    7. 置信度曲线 3 个硬编码参数（8 帧满分 / 2000px·s⁻¹ 参考速度 / 0.3 惩罚下限）提到配置层：`predictor.frame_full_frames` / `speed_ref` / `speed_penalty_floor`，并同步进 `config.yaml` 与 `config.py DEFAULT`。
+    8. 防御性加固：同名怪最近距离匹配时 history 为空会 IndexError，改为 0 距离兜底。
+  - 产物：`tests/test_predictor.py`、`tests/conftest.py`、`predictor.py`(M)、`config.yaml`(M)、`config.py`(M)
+  - 测试结果：
+    - `python -m pytest tests/test_predictor.py -q` → **46 passed**（0 failed）✅
+    - 覆盖：匀速外推 / 帧数不足降级 / 帧数-置信度单调 / 高速阈值锁 / 抖动降置信 / 超时剔除（0.2s 保留、0.5s 剔除）/ 威胁五档排序 / top-8 截断 / 稀有度分级 15 组 / 非法坐标 8 组 / 同名双怪不串号 / 角色识别 8 组 / reset / 配置热加载 / 历史窗口上限
+    - `compileall` predictor.py + config.py + tests/ 退出码 0 ✅
+    - `import mcp_server`（predictor 唯一跨模块调用方）成功，配置新键生效：`jitter_floor=0.35 speed_ref=2000 frame_full=8` ✅
+  - 遗留：
+    - 阈值锁偏保守：`confidence_threshold=0.65` 需 ≥6 帧且近乎直线才可能采信预判（3 帧上限仅 0.375）。属设计选择，交由 **S4** 的 `auto_tuner` 实测后再决定是否下调。
+    - 同名怪匹配无距离上限，实体瞬移跨屏时仍可能张冠李戴（未修，避免与 v0.2 既有策略冲突）。
+    - `combat_judge` 复用 `predictor.threat` 表但自身另有默认值分支，**S4** 需核对两处是否漂移。

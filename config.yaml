@@ -14,6 +14,11 @@ predictor:
   max_output_entities: 8       # 最多输出前 N 个威胁最高实体
   history_maxlen: 10           # 每个实体保留帧数
   confidence_threshold: 0.65   # 置信度阈值锁
+  # 置信度曲线（v2.0 从源码提到配置层）
+  frame_full_frames: 8         # 攒够多少帧，帧数置信度打满
+  speed_ref: 2000              # 速度惩罚参考值(px/s)，到该速度惩罚触底
+  speed_penalty_floor: 0.3     # 速度惩罚下限
+  jitter_floor: 0.35           # 抖动惩罚下限（轨迹越绕，置信越低）
   # 稀有度体系（Florr.io 原生，按游戏可换）
   rarity_highest_boss: ["Unique", "Eternal"]
   rarity_boss: ["Super"]

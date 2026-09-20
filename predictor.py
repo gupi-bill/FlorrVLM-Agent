@@ -22,6 +22,7 @@ FlorrVLM-Agent 预判模块 predictor.py
   elite        : Ultra, Mythic, Legendary, Epic
   normal       : Rare, Unusual, Common
 """
+import math
 import time
 from collections import deque
 from typing import Optional
@@ -37,6 +38,7 @@ def reload_config():
     global PREDICT_SECONDS, MIN_FRAMES, ENTITY_TIMEOUT, MAX_OUTPUT_ENTITIES
     global HISTORY_MAXLEN, CONFIDENCE_THRESHOLD, CATEGORY_THREAT
     global RARITY_HIGHEST_BOSS, RARITY_BOSS, RARITY_ELITE, RARITY_NORMAL
+    global FRAME_FULL_FRAMES, SPEED_REF, SPEED_PENALTY_FLOOR, JITTER_FLOOR
 
     PREDICT_SECONDS = config.get("predictor.predict_seconds", 1.2)
     MIN_FRAMES = config.get("predictor.min_frames", 3)
@@ -44,6 +46,12 @@ def reload_config():
     MAX_OUTPUT_ENTITIES = config.get("predictor.max_output_entities", 8)
     HISTORY_MAXLEN = config.get("predictor.history_maxlen", 10)
     CONFIDENCE_THRESHOLD = config.get("predictor.confidence_threshold", 0.65)
+
+    # 置信度曲线参数（v2.0：原先硬编码在 predict() 里，现统一提到配置层）
+    FRAME_FULL_FRAMES = config.get("predictor.frame_full_frames", 8)
+    SPEED_REF = config.get("predictor.speed_ref", 2000.0)
+    SPEED_PENALTY_FLOOR = config.get("predictor.speed_penalty_floor", 0.3)
+    JITTER_FLOOR = config.get("predictor.jitter_floor", 0.35)
 
     RARITY_HIGHEST_BOSS = set(config.get("predictor.rarity_highest_boss", ["Unique", "Eternal"]))
     RARITY_BOSS = set(config.get("predictor.rarity_boss", ["Super"]))
@@ -98,12 +106,36 @@ def classify_by_rarity(rarity: str) -> str:
     return "unknown"
 
 
+def _trajectory_linearity(history) -> float:
+    """
+    轨迹线性度 = 净位移 / 累计路程，范围 (0, 1]。
+    直线匀速 = 1.0；来回抖动/绕圈 → 接近 0。
+    用于抖动惩罚：只按首尾算速度时，抖动会被平均掉，
+    导致"原地乱窜"的实体拿到和"直线冲刺"一样高的置信度。
+    """
+    if len(history) < 2:
+        return 1.0
+    path_len = 0.0
+    prev = history[0]
+    for cur in list(history)[1:]:
+        path_len += ((cur["x"] - prev["x"]) ** 2 + (cur["y"] - prev["y"]) ** 2) ** 0.5
+        prev = cur
+    if path_len <= 1e-6:  # 静止目标：不存在抖动，不惩罚
+        return 1.0
+    first, last = history[0], history[-1]
+    net = ((last["x"] - first["x"]) ** 2 + (last["y"] - first["y"]) ** 2) ** 0.5
+    return max(0.0, min(1.0, net / path_len))
+
+
 def _is_valid_coord(x, y) -> bool:
-    """过滤非法坐标：None、负数、非数字。"""
+    """过滤非法坐标：None、负数、非数字、越界、NaN/Inf。"""
     try:
         x = float(x)
         y = float(y)
     except (TypeError, ValueError):
+        return False
+    # NaN / Inf 会让后续所有比较静默为 False 并污染速度与预判结果，必须在这里拦掉
+    if not (math.isfinite(x) and math.isfinite(y)):
         return False
     if x < 0 or y < 0:
         return False
@@ -164,11 +196,12 @@ class EntityTracker:
         pred_x = latest["x"] + vx * PREDICT_SECONDS
         pred_y = latest["y"] + vy * PREDICT_SECONDS
 
-        # 置信度：帧数越多越高；速度越快（瞬移）越低
-        frame_conf = min(1.0, len(self.history) / 8.0)
+        # 置信度：帧数越多越高；速度越快（瞬移）越低；轨迹越抖越低
+        frame_conf = min(1.0, len(self.history) / max(1.0, float(FRAME_FULL_FRAMES)))
         speed = (vx ** 2 + vy ** 2) ** 0.5
-        speed_penalty = max(0.3, 1.0 - speed / 2000.0)
-        confidence = round(frame_conf * speed_penalty, 3)
+        speed_penalty = max(float(SPEED_PENALTY_FLOOR), 1.0 - speed / float(SPEED_REF))
+        jitter_penalty = max(float(JITTER_FLOOR), _trajectory_linearity(self.history))
+        confidence = round(frame_conf * speed_penalty * jitter_penalty, 3)
 
         # 置信度阈值锁：低于阈值不采信预判，置空坐标
         trusted = confidence >= CONFIDENCE_THRESHOLD
@@ -236,21 +269,27 @@ def update_frame_entities(entity_list: list):
             if tracker.raw_id == raw_id and existing_uid not in seen_uids
         ]
         if candidates:
-            # 选上一帧坐标距离最近的那个 tracker
-            best_uid, best_t = min(
-                candidates,
-                key=lambda it: ((it[1].history[-1]["x"] - x) ** 2 +
-                                (it[1].history[-1]["y"] - y) ** 2)
-            )
+            # 选上一帧坐标距离最近的那个 tracker（history 为空时退化为 0 距离，防御性处理）
+            def _dist(it):
+                h = it[1].history
+                if not h:
+                    return 0.0
+                return (h[-1]["x"] - x) ** 2 + (h[-1]["y"] - y) ** 2
+
+            best_uid, best_t = min(candidates, key=_dist)
             uid = best_uid
         else:
             uid = _make_uid(raw_id)
             _trackers[uid] = EntityTracker(raw_id, rarity, role)
 
-        # 更新角色（玩家身份可能变化，逐帧刷新）
-        _trackers[uid].role = role
-        _trackers[uid].category = role if role != "monster" else _trackers[uid].category
-        _trackers[uid].update(x, y)
+        # 更新角色 / 稀有度（v2.0 修复：稀有度或身份逐帧变化时，分类必须跟着重算，
+        # 否则一只 Common 升级成 Super 后会永远停留在 normal 威胁分）
+        tracker = _trackers[uid]
+        tracker.role = role
+        if tracker.rarity != rarity:
+            tracker.rarity = rarity
+        tracker.category = role if role != "monster" else classify_by_rarity(rarity)
+        tracker.update(x, y)
         seen_uids.add(uid)
 
     # 清理过期实体
