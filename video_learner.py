@@ -25,9 +25,17 @@ import sys
 import time
 from datetime import datetime
 
-import cv2
 import requests
 from dotenv import load_dotenv
+
+# cv2 改为软依赖（S2 审计 B3）：无 opencv 的头环境也必须能导入本模块。
+# 真实抽帧需要 cv2；缺失时 extract_frames() 走 offline 分支返回空列表并给出明确提示。
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:  # pragma: no cover - 取决于运行环境
+    cv2 = None
+    CV2_AVAILABLE = False
 
 import video_sources
 
@@ -79,7 +87,15 @@ signal.signal(signal.SIGTERM, _signal_handler)
 # 核心函数
 # ---------------------------------------------------------------------------
 def extract_frames(video_path: str, skip: int = 25) -> list:
-    """从视频中按间隔抽帧，返回帧文件路径列表。"""
+    """从视频中按间隔抽帧，返回帧文件路径列表。
+
+    offline 降级：未安装 opencv（CV2_AVAILABLE=False）时不抛 ImportError，
+    而是打印提示并返回空列表，保证上层调用链在头环境可继续走 dry-run。
+    """
+    if not CV2_AVAILABLE:
+        print("[offline] 未安装 opencv（cv2），跳过抽帧：extract_frames() 返回空列表。"
+              "有显卡/显示器的机器请安装 opencv-python-headless 后重试。")
+        return []
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print(f"错误: 无法打开视频 {video_path}")

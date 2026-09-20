@@ -9,7 +9,7 @@
 |---|---|---|---|---|
 | S0 | 前置：核心文件恢复 + venv | ✅ 完成 | 手动 | 17 个文件从 git HEAD 恢复；隔离 venv |
 | S1 | 仓库基线修复与卫生清理 | ✅ 完成 | 01:31~01:40 (B线) | `.gitattributes`、`.gitignore` 增补、`requirements.txt` 三段分组、`requirements-dev.txt`；移除 8 个构建产物（含 1 个 31MB tar.gz）出版本库 |
-| S2 | 静态依赖与接口审计 | ⬜ 待执行 | | |
+| S2 | 静态依赖与接口审计 | ✅ 完成 | 02:01~02:45 (A线) | `tools/static_audit.py`、`devplan/AUDIT.md`、`devplan/audit_data.json`；`requirements.txt` 收敛 `mcp<2`、`mcp_server.py` v1/v2 兼容、`video_learner.py` cv2 软依赖 |
 | S3 | 预判引擎实测定型 | ⬜ 待执行 | | |
 | S4 | 战斗评估与自动调参校验 | ⬜ 待执行 | | |
 | S5 | 会话/汇报/技能模块校验 | ⬜ 待执行 | | |
@@ -81,3 +81,25 @@
   - 遗留：
     - 历史 pack 仍含 31MB 对象（`.git` 125MB）。按 PLAN 约束不跑 `git gc --aggressive`，待磁盘宽裕时再说。
     - `.gitignore` 中 `*.png` `*.jpg` 为宽泛规则，若将来需入库图片素材需 `git add -f` 或收窄规则（记录备查）。
+
+- **2026-09-21 02:45 · S2 · 静态依赖与接口审计**
+  - 做了什么：
+    1. 新建审计工具 `tools/static_audit.py`（619 行，纯标准库）：ast 解析 27 个模块生成 import 图 / 顶层符号表；子进程 + 超时 + stub 注入的导入探针；跨模块缺失符号 / 属性 / kwargs 三项交叉核对；requirements 对账；命名空间遮蔽检测。
+    2. 全量导入探针（stub）24/26 成功；裸环境（不注入 stub）23/25 成功。
+    3. 定位并**修复**两个阻断级：`mcp_server` 与 mcp 2.x SDK 不兼容（FastMCP→MCPServer 改名）、`video_learner` 顶层硬依赖 cv2。
+    4. `requirements.txt`：`mcp` 上界收敛 `<2.0.0`；新增第 3 段「可选但默认不装」注释登记 PyQt6/streamlit/chromadb/sentence-transformers/kivy。
+    5. 顺手修 `mcp_server._path_perturb_move()` 缺失的 pyautogui 降级（W6）。
+  - 产物：`devplan/AUDIT.md`（含依赖表 / 缺失符号清单 / 占位清单 / 风险分级）、`devplan/audit_data.json`、`tools/static_audit.py`、`requirements.txt`(M)、`mcp_server.py`(M)、`video_learner.py`(M)
+  - 测试结果：
+    - `python tools/static_audit.py` 退出码 0；跨模块缺失符号 0、kwargs 不匹配 0 ✅
+    - 导入探针 22 → 24 / 26（修复 mcp_server、video_learner）✅
+    - 裸环境 `import mcp_server` 成功且 `MCP_SDK_VERSION=2` ✅
+    - 裸环境 `import video_learner` 成功，`CV2_AVAILABLE=False`、`extract_frames()` 返回 `[]` ✅
+    - `packaging/` 遮蔽变通方案实测通过（`sys.path` 含 packaging 后 `import android_main` 成功，导出 FlorrApp/Root 等）✅
+    - `AUDIT.md` 含阻断级 3 / 警告级 8 / 建议级 5，每条阻断级均有修复方案 ✅
+  - 遗留（已移交，未在本轮处理）：
+    - B2 `packaging/` 被 PyPI 同名包遮蔽 —— 刻意不改目录结构/不加 `__init__.py`（会反向遮蔽 pip 依赖），按变通方案处理。
+    - B1 仅验证到 import 层，mcp 2.x 工具注册可用性移交 **S9** 实测。
+    - W1（agent_cli 的 session 降级 shim 含 4 个不存在 API）、I4（skills/report/skill.py 仅 9 行）移交 **S5**。
+    - W2/W3（PyQt6、streamlit 未安装）与 I5（4 套前端并存）移交 **S11** 收敛。
+    - I1 副作用：`import mcp_server` 会自动向 `knowledge_md/` 写 4 个模板文件（审计时被触发，属既有行为）。

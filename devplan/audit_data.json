@@ -1,0 +1,5680 @@
+{
+  "generated_at": "2026-09-21 02:19:57",
+  "python": "3.13.12",
+  "root": "/home/g-bill/文档/Default Project/Universal-Game-Framework",
+  "modules": {
+    "admin_panel": {
+      "path": "admin_panel.py",
+      "loc": 245,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 15
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 16
+        },
+        {
+          "kind": "from",
+          "module": "datetime",
+          "names": [
+            "datetime"
+          ],
+          "level": 0,
+          "line": 17
+        },
+        {
+          "kind": "from",
+          "module": "http.server",
+          "names": [
+            "BaseHTTPRequestHandler",
+            "ThreadingHTTPServer"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 20
+        },
+        {
+          "kind": "import",
+          "module": "session",
+          "names": [
+            "session"
+          ],
+          "level": 0,
+          "line": 21
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "psutil",
+          "names": [
+            "psutil"
+          ],
+          "level": 0,
+          "line": 31
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 23
+        },
+        "LOG_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 24
+        },
+        "KB_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 25
+        },
+        "SNAP_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 26
+        },
+        "STATE_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 27
+        },
+        "PANEL_PORT": {
+          "kind": "const",
+          "args": [],
+          "line": 28
+        },
+        "PROC": {
+          "kind": "const",
+          "args": [],
+          "line": 29
+        },
+        "_snapshot": {
+          "kind": "def",
+          "args": [],
+          "line": 37
+        },
+        "_state": {
+          "kind": "def",
+          "args": [],
+          "line": 48
+        },
+        "_late_log": {
+          "kind": "def",
+          "args": [
+            "n"
+          ],
+          "line": 58
+        },
+        "_kb_info": {
+          "kind": "def",
+          "args": [],
+          "line": 72
+        },
+        "_resources": {
+          "kind": "def",
+          "args": [],
+          "line": 88
+        },
+        "_status": {
+          "kind": "def",
+          "args": [],
+          "line": 106
+        },
+        "PAGE": {
+          "kind": "const",
+          "args": [],
+          "line": 140
+        },
+        "Handler": {
+          "kind": "class",
+          "args": [],
+          "line": 223
+        }
+      },
+      "methods": [
+        "Handler.do_GET",
+        "Handler.log_message"
+      ],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 240,
+          "text": "pass  # 不打印每次访问，保持日志干净"
+        },
+        {
+          "type": "pass",
+          "line": 102,
+          "text": "pass"
+        },
+        {
+          "type": "pass",
+          "line": 84,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "agent_cli": {
+      "path": "agent_cli.py",
+      "loc": 712,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "argparse",
+          "names": [
+            "argparse"
+          ],
+          "level": 0,
+          "line": 15
+        },
+        {
+          "kind": "import",
+          "module": "asyncio",
+          "names": [
+            "asyncio"
+          ],
+          "level": 0,
+          "line": 16
+        },
+        {
+          "kind": "import",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 17
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 21
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 22
+        },
+        {
+          "kind": "from",
+          "module": "cli_ui",
+          "names": [
+            "banner",
+            "panel",
+            "chip",
+            "bold",
+            "cyan",
+            "green",
+            "magenta",
+            "dim",
+            "yellow",
+            "red"
+          ],
+          "level": 0,
+          "line": 36
+        },
+        {
+          "kind": "from",
+          "module": "report_notifier",
+          "names": [
+            "notify"
+          ],
+          "level": 0,
+          "line": 37
+        },
+        {
+          "kind": "from",
+          "module": "skill_manager",
+          "names": [
+            "SkillManager"
+          ],
+          "level": 0,
+          "line": 38
+        },
+        {
+          "kind": "import",
+          "module": "kb_maintainer",
+          "names": [
+            "kb_maintainer"
+          ],
+          "level": 0,
+          "line": 39
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "session",
+          "names": [
+            "session"
+          ],
+          "level": 0,
+          "line": 24
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "io",
+          "names": [
+            "io"
+          ],
+          "level": 0,
+          "line": 346
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "contextlib",
+          "names": [
+            "contextlib"
+          ],
+          "level": 0,
+          "line": 346
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "readline",
+          "names": [
+            "readline"
+          ],
+          "level": 0,
+          "line": 583
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "types",
+          "names": [
+            "types"
+          ],
+          "level": 0,
+          "line": 27
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "yaml",
+          "names": [
+            "yaml"
+          ],
+          "level": 0,
+          "line": 124
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "mcp_connector",
+          "names": [
+            "ExternalConnector"
+          ],
+          "level": 0,
+          "line": 210
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "agent_main",
+          "names": [
+            "agent_main"
+          ],
+          "level": 0,
+          "line": 253
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "game_profile_check",
+          "names": [
+            "game_profile_check"
+          ],
+          "level": 0,
+          "line": 320
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "importlib",
+          "names": [
+            "importlib"
+          ],
+          "level": 0,
+          "line": 337
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 41
+        },
+        "STATE_FILE": {
+          "kind": "const",
+          "args": [],
+          "line": 42
+        },
+        "SKILLS": {
+          "kind": "const",
+          "args": [],
+          "line": 44
+        },
+        "ACTIVE_GAME": {
+          "kind": "const",
+          "args": [],
+          "line": 45
+        },
+        "BRIEF_QUESTIONS": {
+          "kind": "const",
+          "args": [],
+          "line": 48
+        },
+        "_default_state": {
+          "kind": "def",
+          "args": [],
+          "line": 58
+        },
+        "load_state": {
+          "kind": "def",
+          "args": [],
+          "line": 70
+        },
+        "save_state": {
+          "kind": "def",
+          "args": [
+            "state"
+          ],
+          "line": 82
+        },
+        "_collect_brief": {
+          "kind": "def",
+          "args": [
+            "answers"
+          ],
+          "line": 93
+        },
+        "_format_brief": {
+          "kind": "def",
+          "args": [
+            "brief"
+          ],
+          "line": 111
+        },
+        "_configured_connectors": {
+          "kind": "def",
+          "args": [],
+          "line": 122
+        },
+        "_inspected_components": {
+          "kind": "def",
+          "args": [],
+          "line": 133
+        },
+        "describe_capabilities": {
+          "kind": "def",
+          "args": [],
+          "line": 141
+        },
+        "HELP_LINES": {
+          "kind": "const",
+          "args": [],
+          "line": 159
+        },
+        "_cmd_detect": {
+          "kind": "def",
+          "args": [
+            "game"
+          ],
+          "line": 185
+        },
+        "_cmd_brief": {
+          "kind": "def",
+          "args": [],
+          "line": 193
+        },
+        "_cmd_research": {
+          "kind": "def",
+          "args": [
+            "query"
+          ],
+          "line": 202
+        },
+        "_cmd_ensure": {
+          "kind": "def",
+          "args": [],
+          "line": 229
+        },
+        "_cmd_play": {
+          "kind": "def",
+          "args": [
+            "max_rounds"
+          ],
+          "line": 244
+        },
+        "_cmd_notify": {
+          "kind": "def",
+          "args": [],
+          "line": 283
+        },
+        "_cmd_report": {
+          "kind": "def",
+          "args": [],
+          "line": 292
+        },
+        "_cmd_validate": {
+          "kind": "def",
+          "args": [
+            "game"
+          ],
+          "line": 317
+        },
+        "_cmd_package": {
+          "kind": "def",
+          "args": [
+            "kind"
+          ],
+          "line": 334
+        },
+        "_cmd_kb_export": {
+          "kind": "def",
+          "args": [],
+          "line": 356
+        },
+        "_cmd_kb_import": {
+          "kind": "def",
+          "args": [
+            "backup"
+          ],
+          "line": 365
+        },
+        "KB_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 377
+        },
+        "_cmd_kb_list": {
+          "kind": "def",
+          "args": [
+            "game_name"
+          ],
+          "line": 380
+        },
+        "_cmd_kb_search": {
+          "kind": "def",
+          "args": [
+            "keyword",
+            "game_name"
+          ],
+          "line": 407
+        },
+        "_cmd_kb_write": {
+          "kind": "def",
+          "args": [
+            "filename",
+            "game_name"
+          ],
+          "line": 449
+        },
+        "_cmd_kb_append": {
+          "kind": "def",
+          "args": [
+            "filename",
+            "game_name"
+          ],
+          "line": 499
+        },
+        "_run_auto": {
+          "kind": "def",
+          "args": [
+            "game"
+          ],
+          "line": 548
+        },
+        "_prompt_text": {
+          "kind": "def",
+          "args": [],
+          "line": 576
+        },
+        "interactive": {
+          "kind": "def",
+          "args": [],
+          "line": 582
+        },
+        "main": {
+          "kind": "def",
+          "args": [],
+          "line": 661
+        }
+      },
+      "methods": [],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 667,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "agent_main": {
+      "path": "agent_main.py",
+      "loc": 742,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "argparse",
+          "names": [
+            "argparse"
+          ],
+          "level": 0,
+          "line": 31
+        },
+        {
+          "kind": "import",
+          "module": "asyncio",
+          "names": [
+            "asyncio"
+          ],
+          "level": 0,
+          "line": 32
+        },
+        {
+          "kind": "import",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 33
+        },
+        {
+          "kind": "import",
+          "module": "math",
+          "names": [
+            "math"
+          ],
+          "level": 0,
+          "line": 34
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 35
+        },
+        {
+          "kind": "import",
+          "module": "random",
+          "names": [
+            "random"
+          ],
+          "level": 0,
+          "line": 36
+        },
+        {
+          "kind": "import",
+          "module": "shutil",
+          "names": [
+            "shutil"
+          ],
+          "level": 0,
+          "line": 37
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 38
+        },
+        {
+          "kind": "import",
+          "module": "time",
+          "names": [
+            "time"
+          ],
+          "level": 0,
+          "line": 39
+        },
+        {
+          "kind": "from",
+          "module": "datetime",
+          "names": [
+            "datetime"
+          ],
+          "level": 0,
+          "line": 40
+        },
+        {
+          "kind": "import",
+          "module": "requests",
+          "names": [
+            "requests"
+          ],
+          "level": 0,
+          "line": 42
+        },
+        {
+          "kind": "import",
+          "module": "gzip",
+          "names": [
+            "gzip"
+          ],
+          "level": 0,
+          "line": 43
+        },
+        {
+          "kind": "from",
+          "module": "dotenv",
+          "names": [
+            "load_dotenv"
+          ],
+          "level": 0,
+          "line": 44
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 46
+        },
+        {
+          "kind": "import",
+          "module": "combat_judge",
+          "names": [
+            "combat_judge"
+          ],
+          "level": 0,
+          "line": 107
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "report_notifier",
+          "names": [
+            "report_notifier"
+          ],
+          "level": 0,
+          "line": 63
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "mcp",
+          "names": [
+            "ClientSession",
+            "StdioServerParameters"
+          ],
+          "level": 0,
+          "line": 100
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "mcp.client.stdio",
+          "names": [
+            "stdio_client"
+          ],
+          "level": 0,
+          "line": 101
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "threading",
+          "names": [
+            "threading"
+          ],
+          "level": 0,
+          "line": 72
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "kb_maintainer",
+          "names": [
+            "kb_maintainer"
+          ],
+          "level": 0,
+          "line": 180
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "pyautogui",
+          "names": [
+            "pyautogui"
+          ],
+          "level": 0,
+          "line": 400
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 416
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 422
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "auto_tuner",
+          "names": [
+            "auto_tuner"
+          ],
+          "level": 0,
+          "line": 692
+        }
+      ],
+      "defs": {
+        "LLM_API_URL": {
+          "kind": "const",
+          "args": [],
+          "line": 53
+        },
+        "LLM_API_KEY": {
+          "kind": "const",
+          "args": [],
+          "line": 54
+        },
+        "LLM_MODEL": {
+          "kind": "const",
+          "args": [],
+          "line": 55
+        },
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 57
+        },
+        "MCP_SERVER_SCRIPT": {
+          "kind": "const",
+          "args": [],
+          "line": 58
+        },
+        "_late_report": {
+          "kind": "def",
+          "args": [
+            "round_count",
+            "total_deaths"
+          ],
+          "line": 61
+        },
+        "reload_config": {
+          "kind": "def",
+          "args": [],
+          "line": 78
+        },
+        "SERVER_PARAMS": {
+          "kind": "const",
+          "args": [],
+          "line": 109
+        },
+        "_log_cleanup": {
+          "kind": "def",
+          "args": [
+            "days"
+          ],
+          "line": 115
+        },
+        "_maybe_rotate": {
+          "kind": "def",
+          "args": [],
+          "line": 128
+        },
+        "log": {
+          "kind": "def",
+          "args": [
+            "msg"
+          ],
+          "line": 139
+        },
+        "startup_cleanup": {
+          "kind": "def",
+          "args": [],
+          "line": 156
+        },
+        "SYSTEM_PROMPT": {
+          "kind": "const",
+          "args": [],
+          "line": 189
+        },
+        "llm_decide": {
+          "kind": "def",
+          "args": [
+            "game_state",
+            "predictions",
+            "combat_eval",
+            "kb_tactics"
+          ],
+          "line": 201
+        },
+        "_fallback_decide": {
+          "kind": "def",
+          "args": [
+            "game_state_str",
+            "combat_eval_str"
+          ],
+          "line": 239
+        },
+        "_should_review": {
+          "kind": "def",
+          "args": [
+            "state_data",
+            "has_teammate"
+          ],
+          "line": 265
+        },
+        "review_round": {
+          "kind": "async def",
+          "args": [
+            "session",
+            "survived",
+            "note",
+            "state"
+          ],
+          "line": 278
+        },
+        "_analyze_boss_behavior": {
+          "kind": "def",
+          "args": [
+            "samples"
+          ],
+          "line": 335
+        },
+        "write_boss_memory": {
+          "kind": "async def",
+          "args": [
+            "session",
+            "boss_observations",
+            "boss_samples"
+          ],
+          "line": 373
+        },
+        "_is_mouse_in_corner": {
+          "kind": "def",
+          "args": [
+            "screen_w",
+            "screen_h"
+          ],
+          "line": 397
+        },
+        "SNAPSHOT_EVERY": {
+          "kind": "const",
+          "args": [],
+          "line": 409
+        },
+        "_snap_last_round": {
+          "kind": "const",
+          "args": [],
+          "line": 410
+        },
+        "write_snapshot": {
+          "kind": "def",
+          "args": [
+            "round_count",
+            "total_deaths",
+            "player",
+            "predictions",
+            "combat_eval",
+            "game"
+          ],
+          "line": 413
+        },
+        "run_agent": {
+          "kind": "async def",
+          "args": [
+            "interval",
+            "max_rounds"
+          ],
+          "line": 449
+        },
+        "main": {
+          "kind": "def",
+          "args": [],
+          "line": 726
+        }
+      },
+      "methods": [],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 125,
+          "text": "pass"
+        },
+        {
+          "type": "pass",
+          "line": 149,
+          "text": "pass"
+        },
+        {
+          "type": "pass",
+          "line": 297,
+          "text": "pass"
+        },
+        {
+          "type": "pass",
+          "line": 443,
+          "text": "pass"
+        },
+        {
+          "type": "pass",
+          "line": 176,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "auto_tuner": {
+      "path": "auto_tuner.py",
+      "loc": 126,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 21
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 119
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "yaml",
+          "names": [
+            "yaml"
+          ],
+          "level": 0,
+          "line": 37
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "yaml",
+          "names": [
+            "yaml"
+          ],
+          "level": 0,
+          "line": 49
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 23
+        },
+        "TUNED_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 24
+        },
+        "CONF_DEFAULT": {
+          "kind": "const",
+          "args": [],
+          "line": 29
+        },
+        "HOLD": {
+          "kind": "const",
+          "args": [],
+          "line": 32
+        },
+        "_read": {
+          "kind": "def",
+          "args": [],
+          "line": 35
+        },
+        "_write": {
+          "kind": "def",
+          "args": [
+            "data"
+          ],
+          "line": 47
+        },
+        "current": {
+          "kind": "def",
+          "args": [],
+          "line": 56
+        },
+        "tune": {
+          "kind": "def",
+          "args": [
+            "hits",
+            "attempts",
+            "deaths_extra"
+          ],
+          "line": 67
+        },
+        "reset": {
+          "kind": "def",
+          "args": [],
+          "line": 103
+        },
+        "status": {
+          "kind": "def",
+          "args": [],
+          "line": 112
+        }
+      },
+      "methods": [],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 43,
+          "text": "pass"
+        },
+        {
+          "type": "pass",
+          "line": 53,
+          "text": "pass"
+        },
+        {
+          "type": "pass",
+          "line": 108,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "boot_check": {
+      "path": "boot_check.py",
+      "loc": 144,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "importlib",
+          "names": [
+            "importlib"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 20
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 113
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 22
+        },
+        "REQUIRED_LIBS": {
+          "kind": "const",
+          "args": [],
+          "line": 25
+        },
+        "NEEDED_DIRS": {
+          "kind": "const",
+          "args": [],
+          "line": 35
+        },
+        "_check": {
+          "kind": "def",
+          "args": [],
+          "line": 38
+        },
+        "_active_game": {
+          "kind": "def",
+          "args": [],
+          "line": 106
+        },
+        "run": {
+          "kind": "def",
+          "args": [
+            "fail_fast"
+          ],
+          "line": 119
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    },
+    "cli_ui": {
+      "path": "cli_ui.py",
+      "loc": 85,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 14
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 15
+        }
+      ],
+      "defs": {
+        "RESET": {
+          "kind": "const",
+          "args": [],
+          "line": 18
+        },
+        "BOLD": {
+          "kind": "const",
+          "args": [],
+          "line": 19
+        },
+        "DIM": {
+          "kind": "const",
+          "args": [],
+          "line": 20
+        },
+        "CYAN": {
+          "kind": "const",
+          "args": [],
+          "line": 21
+        },
+        "GREEN": {
+          "kind": "const",
+          "args": [],
+          "line": 22
+        },
+        "YELLOW": {
+          "kind": "const",
+          "args": [],
+          "line": 23
+        },
+        "RED": {
+          "kind": "const",
+          "args": [],
+          "line": 24
+        },
+        "MAGENTA": {
+          "kind": "const",
+          "args": [],
+          "line": 25
+        },
+        "BLUE": {
+          "kind": "const",
+          "args": [],
+          "line": 26
+        },
+        "_COLOR": {
+          "kind": "const",
+          "args": [],
+          "line": 29
+        },
+        "_c": {
+          "kind": "def",
+          "args": [
+            "code",
+            "text"
+          ],
+          "line": 32
+        },
+        "cyan": {
+          "kind": "def",
+          "args": [
+            "t"
+          ],
+          "line": 36
+        },
+        "green": {
+          "kind": "def",
+          "args": [
+            "t"
+          ],
+          "line": 37
+        },
+        "yellow": {
+          "kind": "def",
+          "args": [
+            "t"
+          ],
+          "line": 38
+        },
+        "red": {
+          "kind": "def",
+          "args": [
+            "t"
+          ],
+          "line": 39
+        },
+        "magenta": {
+          "kind": "def",
+          "args": [
+            "t"
+          ],
+          "line": 40
+        },
+        "blue": {
+          "kind": "def",
+          "args": [
+            "t"
+          ],
+          "line": 41
+        },
+        "bold": {
+          "kind": "def",
+          "args": [
+            "t"
+          ],
+          "line": 42
+        },
+        "dim": {
+          "kind": "def",
+          "args": [
+            "t"
+          ],
+          "line": 43
+        },
+        "banner": {
+          "kind": "def",
+          "args": [
+            "title",
+            "subtitle",
+            "width"
+          ],
+          "line": 46
+        },
+        "panel": {
+          "kind": "def",
+          "args": [
+            "title",
+            "lines",
+            "width"
+          ],
+          "line": 64
+        },
+        "chip": {
+          "kind": "def",
+          "args": [
+            "text",
+            "kind"
+          ],
+          "line": 76
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    },
+    "combat_judge": {
+      "path": "combat_judge.py",
+      "loc": 410,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "random",
+          "names": [
+            "random"
+          ],
+          "level": 0,
+          "line": 17
+        },
+        {
+          "kind": "import",
+          "module": "time",
+          "names": [
+            "time"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "from",
+          "module": "dataclasses",
+          "names": [
+            "dataclass",
+            "field"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "from",
+          "module": "typing",
+          "names": [
+            "Optional"
+          ],
+          "level": 0,
+          "line": 20
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 22
+        }
+      ],
+      "defs": {
+        "reload_config": {
+          "kind": "def",
+          "args": [],
+          "line": 28
+        },
+        "DECISION_FIGHT": {
+          "kind": "const",
+          "args": [],
+          "line": 53
+        },
+        "DECISION_CAUTIOUS": {
+          "kind": "const",
+          "args": [],
+          "line": 54
+        },
+        "DECISION_RETREAT": {
+          "kind": "const",
+          "args": [],
+          "line": 55
+        },
+        "SET_COMBAT": {
+          "kind": "const",
+          "args": [],
+          "line": 58
+        },
+        "SET_TANK": {
+          "kind": "const",
+          "args": [],
+          "line": 59
+        },
+        "SET_RETREAT": {
+          "kind": "const",
+          "args": [],
+          "line": 60
+        },
+        "SET_CHASE": {
+          "kind": "const",
+          "args": [],
+          "line": 61
+        },
+        "SET_TEAM_SUPPORT": {
+          "kind": "const",
+          "args": [],
+          "line": 62
+        },
+        "MINDSET_CONSERVATIVE": {
+          "kind": "const",
+          "args": [],
+          "line": 65
+        },
+        "MINDSET_BALANCED": {
+          "kind": "const",
+          "args": [],
+          "line": 66
+        },
+        "MINDSET_AGGRESSIVE": {
+          "kind": "const",
+          "args": [],
+          "line": 67
+        },
+        "PlayerState": {
+          "kind": "class",
+          "args": [],
+          "line": 74
+        },
+        "Teammate": {
+          "kind": "class",
+          "args": [],
+          "line": 86
+        },
+        "CombatContext": {
+          "kind": "class",
+          "args": [],
+          "line": 95
+        },
+        "calc_enemy_threat": {
+          "kind": "def",
+          "args": [
+            "enemies"
+          ],
+          "line": 107
+        },
+        "calc_threat_ratio": {
+          "kind": "def",
+          "args": [
+            "player_power",
+            "enemy_threat"
+          ],
+          "line": 116
+        },
+        "decide_mindset": {
+          "kind": "def",
+          "args": [
+            "context"
+          ],
+          "line": 123
+        },
+        "judge_combat": {
+          "kind": "def",
+          "args": [
+            "context"
+          ],
+          "line": 158
+        },
+        "_team_set_adjust": {
+          "kind": "def",
+          "args": [
+            "teammates",
+            "current_rec"
+          ],
+          "line": 241
+        },
+        "CombatEvaluator": {
+          "kind": "class",
+          "args": [],
+          "line": 263
+        },
+        "should_chase": {
+          "kind": "def",
+          "args": [
+            "entity",
+            "player",
+            "chased_distance"
+          ],
+          "line": 291
+        },
+        "clamp_to_safe_zone": {
+          "kind": "def",
+          "args": [
+            "x",
+            "y",
+            "screen_w",
+            "screen_h",
+            "margin"
+          ],
+          "line": 312
+        },
+        "apply_jitter": {
+          "kind": "def",
+          "args": [
+            "x",
+            "y"
+          ],
+          "line": 332
+        },
+        "calc_retreat_position": {
+          "kind": "def",
+          "args": [
+            "context",
+            "threat_entity"
+          ],
+          "line": 349
+        },
+        "_achievements": {
+          "kind": "const",
+          "args": [],
+          "line": 397
+        },
+        "unlock_achievement": {
+          "kind": "def",
+          "args": [
+            "name"
+          ],
+          "line": 400
+        },
+        "get_achievements": {
+          "kind": "def",
+          "args": [],
+          "line": 405
+        },
+        "clear_achievements": {
+          "kind": "def",
+          "args": [],
+          "line": 409
+        }
+      },
+      "methods": [
+        "CombatEvaluator.__init__",
+        "CombatEvaluator.evaluate",
+        "CombatEvaluator.invalidate"
+      ],
+      "placeholders": [],
+      "markers": []
+    },
+    "config": {
+      "path": "config.py",
+      "loc": 176,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "copy",
+          "names": [
+            "copy"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 20
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "yaml",
+          "names": [
+            "yaml"
+          ],
+          "level": 0,
+          "line": 94
+        }
+      ],
+      "defs": {
+        "CONFIG_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 22
+        },
+        "PROFILE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 23
+        },
+        "TUNED_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 24
+        },
+        "DEFAULT": {
+          "kind": "const",
+          "args": [],
+          "line": 27
+        },
+        "_merge": {
+          "kind": "def",
+          "args": [
+            "dst",
+            "src"
+          ],
+          "line": 81
+        },
+        "_read_yaml": {
+          "kind": "def",
+          "args": [
+            "path"
+          ],
+          "line": 91
+        },
+        "_flatten_default": {
+          "kind": "def",
+          "args": [],
+          "line": 106
+        },
+        "_reload": {
+          "kind": "def",
+          "args": [],
+          "line": 118
+        },
+        "get": {
+          "kind": "def",
+          "args": [
+            "path",
+            "default"
+          ],
+          "line": 130
+        },
+        "all": {
+          "kind": "def",
+          "args": [],
+          "line": 143
+        },
+        "reload_if_changed": {
+          "kind": "def",
+          "args": [],
+          "line": 150
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    },
+    "game_profile_check": {
+      "path": "game_profile_check.py",
+      "loc": 124,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 15
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 16
+        },
+        {
+          "kind": "import",
+          "module": "yaml",
+          "names": [
+            "yaml"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 110
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 20
+        },
+        "PROFILE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 21
+        },
+        "REQUIRED_THREATS": {
+          "kind": "const",
+          "args": [],
+          "line": 24
+        },
+        "VALID_CHASE": {
+          "kind": "const",
+          "args": [],
+          "line": 28
+        },
+        "_profile_path": {
+          "kind": "def",
+          "args": [
+            "name"
+          ],
+          "line": 31
+        },
+        "check_one": {
+          "kind": "def",
+          "args": [
+            "name"
+          ],
+          "line": 35
+        },
+        "report_all": {
+          "kind": "def",
+          "args": [],
+          "line": 75
+        },
+        "main": {
+          "kind": "def",
+          "args": [],
+          "line": 96
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    },
+    "kb_maintainer": {
+      "path": "kb_maintainer.py",
+      "loc": 209,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "argparse",
+          "names": [
+            "argparse"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import",
+          "module": "difflib",
+          "names": [
+            "difflib"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 20
+        },
+        {
+          "kind": "import",
+          "module": "shutil",
+          "names": [
+            "shutil"
+          ],
+          "level": 0,
+          "line": 21
+        },
+        {
+          "kind": "import",
+          "module": "time",
+          "names": [
+            "time"
+          ],
+          "level": 0,
+          "line": 22
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 24
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "tarfile",
+          "names": [
+            "tarfile"
+          ],
+          "level": 0,
+          "line": 99
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "time",
+          "names": [
+            "time"
+          ],
+          "level": 0,
+          "line": 100
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "tarfile",
+          "names": [
+            "tarfile"
+          ],
+          "level": 0,
+          "line": 129
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 26
+        },
+        "_paths": {
+          "kind": "def",
+          "args": [],
+          "line": 29
+        },
+        "_dir_size_mb": {
+          "kind": "def",
+          "args": [
+            "path"
+          ],
+          "line": 37
+        },
+        "_iter_md_files": {
+          "kind": "def",
+          "args": [
+            "kb",
+            "prefix"
+          ],
+          "line": 48
+        },
+        "compress_duplicates": {
+          "kind": "def",
+          "args": [
+            "kb",
+            "ratio"
+          ],
+          "line": 56
+        },
+        "export": {
+          "kind": "def",
+          "args": [
+            "kb",
+            "arch",
+            "out_dir"
+          ],
+          "line": 94
+        },
+        "import_backup": {
+          "kind": "def",
+          "args": [
+            "kb",
+            "arch",
+            "backup"
+          ],
+          "line": 123
+        },
+        "archive_oldest": {
+          "kind": "def",
+          "args": [
+            "kb",
+            "arch",
+            "max_mb"
+          ],
+          "line": 156
+        },
+        "run": {
+          "kind": "def",
+          "args": [
+            "max_mb",
+            "do_compress",
+            "report"
+          ],
+          "line": 176
+        }
+      },
+      "methods": [],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 44,
+          "text": "pass"
+        },
+        {
+          "type": "pass",
+          "line": 86,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "mcp_connector": {
+      "path": "mcp_connector.py",
+      "loc": 152,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "asyncio",
+          "names": [
+            "asyncio"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 20
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 22
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "yaml",
+          "names": [
+            "yaml"
+          ],
+          "level": 0,
+          "line": 35
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "mcp",
+          "names": [
+            "ClientSession",
+            "StdioServerParameters"
+          ],
+          "level": 0,
+          "line": 62
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "mcp.client.stdio",
+          "names": [
+            "stdio_client"
+          ],
+          "level": 0,
+          "line": 63
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 24
+        },
+        "CONNECTORS_FILE": {
+          "kind": "const",
+          "args": [],
+          "line": 25
+        },
+        "_FALLBACK_CONNECTORS": {
+          "kind": "const",
+          "args": [],
+          "line": 27
+        },
+        "_load_connectors": {
+          "kind": "def",
+          "args": [],
+          "line": 32
+        },
+        "ExternalConnector": {
+          "kind": "class",
+          "args": [],
+          "line": 43
+        },
+        "_self_test": {
+          "kind": "async def",
+          "args": [],
+          "line": 144
+        }
+      },
+      "methods": [
+        "ExternalConnector.__init__",
+        "ExternalConnector.create",
+        "ExternalConnector.connect_all",
+        "ExternalConnector.summary",
+        "ExternalConnector.tool_catalog",
+        "ExternalConnector.call",
+        "ExternalConnector.close"
+      ],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 140,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "mcp_server": {
+      "path": "mcp_server.py",
+      "loc": 464,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 20
+        },
+        {
+          "kind": "import",
+          "module": "random",
+          "names": [
+            "random"
+          ],
+          "level": 0,
+          "line": 21
+        },
+        {
+          "kind": "import",
+          "module": "shutil",
+          "names": [
+            "shutil"
+          ],
+          "level": 0,
+          "line": 22
+        },
+        {
+          "kind": "import",
+          "module": "time",
+          "names": [
+            "time"
+          ],
+          "level": 0,
+          "line": 23
+        },
+        {
+          "kind": "from",
+          "module": "typing",
+          "names": [
+            "Optional"
+          ],
+          "level": 0,
+          "line": 24
+        },
+        {
+          "kind": "import",
+          "module": "requests",
+          "names": [
+            "requests"
+          ],
+          "level": 0,
+          "line": 26
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 42
+        },
+        {
+          "kind": "import",
+          "module": "predictor",
+          "names": [
+            "predictor"
+          ],
+          "level": 0,
+          "line": 43
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "mcp.server.fastmcp",
+          "names": [
+            "FastMCP"
+          ],
+          "level": 0,
+          "line": 32
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "kb_maintainer",
+          "names": [
+            "kb_maintainer"
+          ],
+          "level": 0,
+          "line": 232
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "kb_maintainer",
+          "names": [
+            "kb_maintainer"
+          ],
+          "level": 0,
+          "line": 240
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "chromadb",
+          "names": [
+            "chromadb"
+          ],
+          "level": 0,
+          "line": 156
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "sentence_transformers",
+          "names": [
+            "SentenceTransformer"
+          ],
+          "level": 0,
+          "line": 157
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "pyautogui",
+          "names": [
+            "pyautogui"
+          ],
+          "level": 0,
+          "line": 308
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "pyautogui",
+          "names": [
+            "pyautogui"
+          ],
+          "level": 0,
+          "line": 332
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "pyautogui",
+          "names": [
+            "pyautogui"
+          ],
+          "level": 0,
+          "line": 378
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "mcp.server.mcpserver",
+          "names": [
+            "MCPServer"
+          ],
+          "level": 0,
+          "line": 36
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 48
+        },
+        "KB_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 49
+        },
+        "PERCEPTION_URL": {
+          "kind": "const",
+          "args": [],
+          "line": 52
+        },
+        "USE_VECTOR_SEARCH": {
+          "kind": "const",
+          "args": [],
+          "line": 56
+        },
+        "mcp": {
+          "kind": "const",
+          "args": [],
+          "line": 58
+        },
+        "KB_TEMPLATES": {
+          "kind": "const",
+          "args": [],
+          "line": 64
+        },
+        "ensure_kb_templates": {
+          "kind": "def",
+          "args": [],
+          "line": 72
+        },
+        "kb_list": {
+          "kind": "def",
+          "args": [
+            "game_name"
+          ],
+          "line": 92
+        },
+        "kb_search": {
+          "kind": "def",
+          "args": [
+            "keyword",
+            "game_name"
+          ],
+          "line": 110
+        },
+        "_text_search": {
+          "kind": "def",
+          "args": [
+            "keyword",
+            "search_base"
+          ],
+          "line": 131
+        },
+        "_vector_search": {
+          "kind": "def",
+          "args": [
+            "keyword"
+          ],
+          "line": 153
+        },
+        "kb_write": {
+          "kind": "def",
+          "args": [
+            "filename",
+            "markdown_content",
+            "game_name"
+          ],
+          "line": 166
+        },
+        "kb_append": {
+          "kind": "def",
+          "args": [
+            "filename",
+            "markdown_content",
+            "game_name"
+          ],
+          "line": 194
+        },
+        "_kb_dirs": {
+          "kind": "def",
+          "args": [],
+          "line": 223
+        },
+        "kb_export": {
+          "kind": "def",
+          "args": [],
+          "line": 230
+        },
+        "kb_import": {
+          "kind": "def",
+          "args": [
+            "backup_path"
+          ],
+          "line": 238
+        },
+        "perceive_game": {
+          "kind": "def",
+          "args": [],
+          "line": 251
+        },
+        "predict_all_entities": {
+          "kind": "def",
+          "args": [],
+          "line": 276
+        },
+        "reset_predictor": {
+          "kind": "def",
+          "args": [],
+          "line": 294
+        },
+        "_path_perturb_move": {
+          "kind": "def",
+          "args": [
+            "x",
+            "y"
+          ],
+          "line": 305
+        },
+        "game_action": {
+          "kind": "def",
+          "args": [
+            "action_type",
+            "x",
+            "y"
+          ],
+          "line": 322
+        },
+        "SET_TO_KEY": {
+          "kind": "const",
+          "args": [],
+          "line": 361
+        },
+        "switch_set": {
+          "kind": "def",
+          "args": [
+            "set_name"
+          ],
+          "line": 371
+        },
+        "handle_afk": {
+          "kind": "def",
+          "args": [],
+          "line": 390
+        },
+        "query_boss_history": {
+          "kind": "def",
+          "args": [
+            "boss_name"
+          ],
+          "line": 400
+        },
+        "clean_cache": {
+          "kind": "def",
+          "args": [
+            "target"
+          ],
+          "line": 421
+        },
+        "switch_tactic": {
+          "kind": "def",
+          "args": [
+            "tactic_file"
+          ],
+          "line": 439
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    },
+    "packaging.android_main": {
+      "path": "packaging/android_main.py",
+      "loc": 38,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "from",
+          "module": "kivy.app",
+          "names": [
+            "App"
+          ],
+          "level": 0,
+          "line": 7
+        },
+        {
+          "kind": "from",
+          "module": "kivy.uix.boxlayout",
+          "names": [
+            "BoxLayout"
+          ],
+          "level": 0,
+          "line": 8
+        },
+        {
+          "kind": "from",
+          "module": "kivy.uix.label",
+          "names": [
+            "Label"
+          ],
+          "level": 0,
+          "line": 9
+        },
+        {
+          "kind": "from",
+          "module": "kivy.clock",
+          "names": [
+            "Clock"
+          ],
+          "level": 0,
+          "line": 10
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 25
+        }
+      ],
+      "defs": {
+        "Root": {
+          "kind": "class",
+          "args": [],
+          "line": 13
+        },
+        "FlorrApp": {
+          "kind": "class",
+          "args": [],
+          "line": 31
+        }
+      },
+      "methods": [
+        "Root.__init__",
+        "Root.on_touch_down",
+        "FlorrApp.build"
+      ],
+      "placeholders": [],
+      "markers": []
+    },
+    "perception_server": {
+      "path": "perception_server.py",
+      "loc": 240,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 15
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 16
+        },
+        {
+          "kind": "import",
+          "module": "subprocess",
+          "names": [
+            "subprocess"
+          ],
+          "level": 0,
+          "line": 17
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import",
+          "module": "time",
+          "names": [
+            "time"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "from",
+          "module": "flask",
+          "names": [
+            "Flask",
+            "jsonify"
+          ],
+          "level": 0,
+          "line": 21
+        }
+      ],
+      "defs": {
+        "app": {
+          "kind": "const",
+          "args": [],
+          "line": 23
+        },
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 28
+        },
+        "FLORR_TOOLS_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 29
+        },
+        "SCREENSHOT_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 30
+        },
+        "YOLO_TIMEOUT": {
+          "kind": "const",
+          "args": [],
+          "line": 31
+        },
+        "SKIP_ON_TIMEOUT": {
+          "kind": "const",
+          "args": [],
+          "line": 32
+        },
+        "SCREEN_W": {
+          "kind": "const",
+          "args": [],
+          "line": 35
+        },
+        "SCREEN_H": {
+          "kind": "const",
+          "args": [],
+          "line": 36
+        },
+        "_find_detect_script": {
+          "kind": "def",
+          "args": [],
+          "line": 42
+        },
+        "_run_yolo": {
+          "kind": "def",
+          "args": [
+            "image_path"
+          ],
+          "line": 52
+        },
+        "_is_valid_entity": {
+          "kind": "def",
+          "args": [
+            "ent"
+          ],
+          "line": 84
+        },
+        "_normalize_entities": {
+          "kind": "def",
+          "args": [
+            "raw"
+          ],
+          "line": 102
+        },
+        "_normalize_player": {
+          "kind": "def",
+          "args": [
+            "raw"
+          ],
+          "line": 118
+        },
+        "_is_teammate_ent": {
+          "kind": "def",
+          "args": [
+            "ent"
+          ],
+          "line": 134
+        },
+        "_normalize_teammates": {
+          "kind": "def",
+          "args": [
+            "raw",
+            "all_raw"
+          ],
+          "line": 142
+        },
+        "perceive": {
+          "kind": "def",
+          "args": [],
+          "line": 166
+        },
+        "health": {
+          "kind": "def",
+          "args": [],
+          "line": 230
+        }
+      },
+      "methods": [],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 198,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "predictor": {
+      "path": "predictor.py",
+      "loc": 319,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "time",
+          "names": [
+            "time"
+          ],
+          "level": 0,
+          "line": 25
+        },
+        {
+          "kind": "from",
+          "module": "collections",
+          "names": [
+            "deque"
+          ],
+          "level": 0,
+          "line": 26
+        },
+        {
+          "kind": "from",
+          "module": "typing",
+          "names": [
+            "Optional"
+          ],
+          "level": 0,
+          "line": 27
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 29
+        }
+      ],
+      "defs": {
+        "reload_config": {
+          "kind": "def",
+          "args": [],
+          "line": 35
+        },
+        "PLAYER_ENEMY_MARKERS": {
+          "kind": "const",
+          "args": [],
+          "line": 62
+        },
+        "PLAYER_ALLY_MARKERS": {
+          "kind": "const",
+          "args": [],
+          "line": 63
+        },
+        "detect_role": {
+          "kind": "def",
+          "args": [
+            "raw_id",
+            "explicit"
+          ],
+          "line": 66
+        },
+        "classify_by_rarity": {
+          "kind": "def",
+          "args": [
+            "rarity"
+          ],
+          "line": 85
+        },
+        "_is_valid_coord": {
+          "kind": "def",
+          "args": [
+            "x",
+            "y"
+          ],
+          "line": 101
+        },
+        "EntityTracker": {
+          "kind": "class",
+          "args": [],
+          "line": 118
+        },
+        "_trackers": {
+          "kind": "const",
+          "args": [],
+          "line": 198
+        },
+        "_uid_counter": {
+          "kind": "const",
+          "args": [],
+          "line": 199
+        },
+        "_make_uid": {
+          "kind": "def",
+          "args": [
+            "raw_id"
+          ],
+          "line": 202
+        },
+        "update_frame_entities": {
+          "kind": "def",
+          "args": [
+            "entity_list"
+          ],
+          "line": 209
+        },
+        "predict_all_entities": {
+          "kind": "def",
+          "args": [],
+          "line": 262
+        },
+        "get_highest_threat": {
+          "kind": "def",
+          "args": [],
+          "line": 298
+        },
+        "reset": {
+          "kind": "def",
+          "args": [],
+          "line": 304
+        },
+        "get_status": {
+          "kind": "def",
+          "args": [],
+          "line": 311
+        }
+      },
+      "methods": [
+        "EntityTracker.__init__",
+        "EntityTracker.update",
+        "EntityTracker.is_expired",
+        "EntityTracker.predict"
+      ],
+      "placeholders": [],
+      "markers": []
+    },
+    "report_notifier": {
+      "path": "report_notifier.py",
+      "loc": 187,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 15
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 16
+        },
+        {
+          "kind": "from",
+          "module": "datetime",
+          "names": [
+            "datetime"
+          ],
+          "level": 0,
+          "line": 17
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "auto_tuner",
+          "names": [
+            "auto_tuner"
+          ],
+          "level": 0,
+          "line": 54
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "requests",
+          "names": [
+            "requests"
+          ],
+          "level": 0,
+          "line": 120
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 21
+        },
+        "STATE_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 22
+        },
+        "SNAP_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 23
+        },
+        "LOG_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 24
+        },
+        "_read_json": {
+          "kind": "def",
+          "args": [
+            "path"
+          ],
+          "line": 27
+        },
+        "_tail_log": {
+          "kind": "def",
+          "args": [
+            "n"
+          ],
+          "line": 36
+        },
+        "generate_report": {
+          "kind": "def",
+          "args": [],
+          "line": 48
+        },
+        "_DEFAULT_WEBHOOK": {
+          "kind": "const",
+          "args": [],
+          "line": 97
+        },
+        "_webhook_url": {
+          "kind": "def",
+          "args": [],
+          "line": 100
+        },
+        "write_report_file": {
+          "kind": "def",
+          "args": [
+            "text"
+          ],
+          "line": 104
+        },
+        "push_webhook": {
+          "kind": "def",
+          "args": [
+            "text"
+          ],
+          "line": 114
+        },
+        "notify": {
+          "kind": "def",
+          "args": [],
+          "line": 127
+        },
+        "notify_progress": {
+          "kind": "def",
+          "args": [
+            "rounds",
+            "deaths",
+            "game"
+          ],
+          "line": 149
+        },
+        "_progress_text": {
+          "kind": "def",
+          "args": [
+            "rounds",
+            "deaths",
+            "game"
+          ],
+          "line": 170
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    },
+    "session": {
+      "path": "session.py",
+      "loc": 273,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 16
+        },
+        {
+          "kind": "import",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 17
+        },
+        {
+          "kind": "from",
+          "module": "datetime",
+          "names": [
+            "datetime"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import",
+          "module": "config",
+          "names": [
+            "config"
+          ],
+          "level": 0,
+          "line": 20
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 22
+        },
+        "STATE_FILE": {
+          "kind": "const",
+          "args": [],
+          "line": 23
+        },
+        "HISTORY_FILE": {
+          "kind": "const",
+          "args": [],
+          "line": 24
+        },
+        "SNAP_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 25
+        },
+        "HISTORY_MAX": {
+          "kind": "const",
+          "args": [],
+          "line": 31
+        },
+        "_default": {
+          "kind": "def",
+          "args": [],
+          "line": 37
+        },
+        "load": {
+          "kind": "def",
+          "args": [],
+          "line": 54
+        },
+        "save": {
+          "kind": "def",
+          "args": [
+            "state"
+          ],
+          "line": 66
+        },
+        "snapshot_rounds_deaths": {
+          "kind": "def",
+          "args": [],
+          "line": 77
+        },
+        "record_start": {
+          "kind": "def",
+          "args": [
+            "game",
+            "skills"
+          ],
+          "line": 92
+        },
+        "record_end": {
+          "kind": "def",
+          "args": [
+            "game",
+            "rounds",
+            "deaths",
+            "skills",
+            "report"
+          ],
+          "line": 117
+        },
+        "mark_resumed": {
+          "kind": "def",
+          "args": [],
+          "line": 141
+        },
+        "_append_history": {
+          "kind": "def",
+          "args": [
+            "record"
+          ],
+          "line": 151
+        },
+        "history": {
+          "kind": "def",
+          "args": [],
+          "line": 170
+        },
+        "stats": {
+          "kind": "def",
+          "args": [],
+          "line": 182
+        },
+        "resume_info": {
+          "kind": "def",
+          "args": [],
+          "line": 204
+        },
+        "describe": {
+          "kind": "def",
+          "args": [],
+          "line": 230
+        },
+        "stats_text": {
+          "kind": "def",
+          "args": [],
+          "line": 245
+        },
+        "__main__": {
+          "kind": "def",
+          "args": [],
+          "line": 262
+        }
+      },
+      "methods": [],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 167,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "skill_manager": {
+      "path": "skill_manager.py",
+      "loc": 131,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "importlib.util",
+          "names": [
+            "importlib.util"
+          ],
+          "level": 0,
+          "line": 21
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 22
+        },
+        {
+          "kind": "import",
+          "module": "re",
+          "names": [
+            "re"
+          ],
+          "level": 0,
+          "line": 23
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 25
+        },
+        "SKILLS_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 26
+        },
+        "_parse_meta": {
+          "kind": "def",
+          "args": [
+            "text"
+          ],
+          "line": 29
+        },
+        "scan": {
+          "kind": "def",
+          "args": [],
+          "line": 39
+        },
+        "SkillManager": {
+          "kind": "class",
+          "args": [],
+          "line": 57
+        }
+      },
+      "methods": [
+        "SkillManager.__init__",
+        "SkillManager._find_entry",
+        "SkillManager.load",
+        "SkillManager.unload",
+        "SkillManager.loaded",
+        "SkillManager.call",
+        "SkillManager.summary"
+      ],
+      "placeholders": [],
+      "markers": []
+    },
+    "skills.report.skill": {
+      "path": "skills/report/skill.py",
+      "loc": 9,
+      "syntax_error": null,
+      "imports": [],
+      "defs": {
+        "report_run": {
+          "kind": "def",
+          "args": [
+            "game",
+            "note"
+          ],
+          "line": 4
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    },
+    "tools.add_game": {
+      "path": "tools/add_game.py",
+      "loc": 160,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 13
+        },
+        {
+          "kind": "import",
+          "module": "re",
+          "names": [
+            "re"
+          ],
+          "level": 0,
+          "line": 14
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 15
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "game_profile_check",
+          "names": [
+            "check_one"
+          ],
+          "level": 0,
+          "line": 147
+        }
+      ],
+      "defs": {
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 17
+        },
+        "PROFILE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 18
+        },
+        "CONFIG_PATH": {
+          "kind": "const",
+          "args": [],
+          "line": 19
+        },
+        "REFERENCE": {
+          "kind": "const",
+          "args": [],
+          "line": 22
+        },
+        "_ask": {
+          "kind": "def",
+          "args": [
+            "label",
+            "default",
+            "echoes"
+          ],
+          "line": 25
+        },
+        "_split_csv": {
+          "kind": "def",
+          "args": [
+            "text"
+          ],
+          "line": 36
+        },
+        "_parse_floats": {
+          "kind": "def",
+          "args": [
+            "text"
+          ],
+          "line": 40
+        },
+        "collect": {
+          "kind": "def",
+          "args": [
+            "game_name"
+          ],
+          "line": 44
+        },
+        "_fmt_num": {
+          "kind": "def",
+          "args": [
+            "v"
+          ],
+          "line": 92
+        },
+        "render_yaml": {
+          "kind": "def",
+          "args": [
+            "data"
+          ],
+          "line": 97
+        },
+        "activate_game": {
+          "kind": "def",
+          "args": [
+            "name"
+          ],
+          "line": 122
+        },
+        "main": {
+          "kind": "def",
+          "args": [],
+          "line": 137
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    },
+    "tools.build_dist": {
+      "path": "tools/build_dist.py",
+      "loc": 188,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 17
+        },
+        {
+          "kind": "import",
+          "module": "shutil",
+          "names": [
+            "shutil"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import",
+          "module": "subprocess",
+          "names": [
+            "subprocess"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 20
+        },
+        {
+          "kind": "import",
+          "module": "tempfile",
+          "names": [
+            "tempfile"
+          ],
+          "level": 0,
+          "line": 21
+        }
+      ],
+      "defs": {
+        "ROOT": {
+          "kind": "const",
+          "args": [],
+          "line": 23
+        },
+        "OUT": {
+          "kind": "const",
+          "args": [],
+          "line": 24
+        },
+        "PKG": {
+          "kind": "const",
+          "args": [],
+          "line": 25
+        },
+        "VERSION": {
+          "kind": "const",
+          "args": [],
+          "line": 26
+        },
+        "SHIP_DIRS": {
+          "kind": "const",
+          "args": [],
+          "line": 29
+        },
+        "SHIP_FILES": {
+          "kind": "const",
+          "args": [],
+          "line": 30
+        },
+        "ensure_out": {
+          "kind": "def",
+          "args": [],
+          "line": 41
+        },
+        "stage_tree": {
+          "kind": "def",
+          "args": [
+            "dest"
+          ],
+          "line": 45
+        },
+        "build_deb": {
+          "kind": "def",
+          "args": [],
+          "line": 69
+        },
+        "build_portable": {
+          "kind": "def",
+          "args": [],
+          "line": 148
+        },
+        "main": {
+          "kind": "def",
+          "args": [
+            "kinds"
+          ],
+          "line": 171
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    },
+    "tools.static_audit": {
+      "path": "tools/static_audit.py",
+      "loc": 619,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "from",
+          "module": "__future__",
+          "names": [
+            "annotations"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "argparse",
+          "names": [
+            "argparse"
+          ],
+          "level": 0,
+          "line": 21
+        },
+        {
+          "kind": "import",
+          "module": "ast",
+          "names": [
+            "ast"
+          ],
+          "level": 0,
+          "line": 22
+        },
+        {
+          "kind": "import",
+          "module": "json",
+          "names": [
+            "json"
+          ],
+          "level": 0,
+          "line": 23
+        },
+        {
+          "kind": "import",
+          "module": "multiprocessing",
+          "names": [
+            "multiprocessing"
+          ],
+          "level": 0,
+          "line": 24
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 25
+        },
+        {
+          "kind": "import",
+          "module": "subprocess",
+          "names": [
+            "subprocess"
+          ],
+          "level": 0,
+          "line": 26
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 27
+        },
+        {
+          "kind": "import",
+          "module": "sysconfig",
+          "names": [
+            "sysconfig"
+          ],
+          "level": 0,
+          "line": 28
+        },
+        {
+          "kind": "import",
+          "module": "time",
+          "names": [
+            "time"
+          ],
+          "level": 0,
+          "line": 29
+        },
+        {
+          "kind": "from",
+          "module": "pathlib",
+          "names": [
+            "Path"
+          ],
+          "level": 0,
+          "line": 30
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "importlib.util",
+          "names": [
+            "importlib.util"
+          ],
+          "level": 0,
+          "line": 495
+        },
+        {
+          "kind": "from(deferred)",
+          "module": "importlib",
+          "names": [
+            "metadata"
+          ],
+          "level": 0,
+          "line": 483
+        }
+      ],
+      "defs": {
+        "ROOT": {
+          "kind": "const",
+          "args": [],
+          "line": 32
+        },
+        "SKIP_DIRS": {
+          "kind": "const",
+          "args": [],
+          "line": 33
+        },
+        "OPTIONAL_STUBS": {
+          "kind": "const",
+          "args": [],
+          "line": 51
+        },
+        "STDLIB": {
+          "kind": "const",
+          "args": [],
+          "line": 74
+        },
+        "iter_py_files": {
+          "kind": "def",
+          "args": [
+            "root"
+          ],
+          "line": 80
+        },
+        "mod_name_of": {
+          "kind": "def",
+          "args": [
+            "path"
+          ],
+          "line": 88
+        },
+        "ModuleInfo": {
+          "kind": "class",
+          "args": [],
+          "line": 99
+        },
+        "parse_module": {
+          "kind": "def",
+          "args": [
+            "path",
+            "name"
+          ],
+          "line": 116
+        },
+        "build_aliases": {
+          "kind": "def",
+          "args": [
+            "info"
+          ],
+          "line": 185
+        },
+        "collect_attrs": {
+          "kind": "def",
+          "args": [
+            "tree",
+            "info"
+          ],
+          "line": 200
+        },
+        "arg_names": {
+          "kind": "def",
+          "args": [
+            "a"
+          ],
+          "line": 208
+        },
+        "collect_calls": {
+          "kind": "def",
+          "args": [
+            "tree",
+            "info"
+          ],
+          "line": 218
+        },
+        "collect_placeholders": {
+          "kind": "def",
+          "args": [
+            "tree",
+            "src",
+            "info"
+          ],
+          "line": 237
+        },
+        "PROBE_SRC": {
+          "kind": "const",
+          "args": [],
+          "line": 259
+        },
+        "probe_import": {
+          "kind": "def",
+          "args": [
+            "mod",
+            "stubs",
+            "timeout"
+          ],
+          "line": 317
+        },
+        "resolve_local": {
+          "kind": "def",
+          "args": [
+            "target_mod",
+            "registry"
+          ],
+          "line": 341
+        },
+        "lookup_symbol": {
+          "kind": "def",
+          "args": [
+            "info",
+            "sym"
+          ],
+          "line": 352
+        },
+        "cross_check": {
+          "kind": "def",
+          "args": [
+            "registry"
+          ],
+          "line": 360
+        },
+        "check_requirements": {
+          "kind": "def",
+          "args": [
+            "registry"
+          ],
+          "line": 429
+        },
+        "check_namespace_shadow": {
+          "kind": "def",
+          "args": [],
+          "line": 493
+        },
+        "classify_third_party": {
+          "kind": "def",
+          "args": [
+            "mod"
+          ],
+          "line": 517
+        },
+        "main": {
+          "kind": "def",
+          "args": [],
+          "line": 526
+        }
+      },
+      "methods": [
+        "ModuleInfo.__init__"
+      ],
+      "placeholders": [],
+      "markers": [
+        {
+          "type": "TODO",
+          "line": 108,
+          "text": "self.markers: list[dict] = []        # TODO / FIXME"
+        },
+        {
+          "type": "TODO",
+          "line": 250,
+          "text": "for marker in (\"TODO\", \"FIXME\", \"XXX\", \"HACK\"):"
+        }
+      ]
+    },
+    "ui_pyqt": {
+      "path": "ui_pyqt.py",
+      "loc": 167,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 4
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 5
+        },
+        {
+          "kind": "import",
+          "module": "subprocess",
+          "names": [
+            "subprocess"
+          ],
+          "level": 0,
+          "line": 6
+        },
+        {
+          "kind": "import",
+          "module": "yaml",
+          "names": [
+            "yaml"
+          ],
+          "level": 0,
+          "line": 7
+        },
+        {
+          "kind": "from",
+          "module": "pathlib",
+          "names": [
+            "Path"
+          ],
+          "level": 0,
+          "line": 8
+        },
+        {
+          "kind": "from",
+          "module": "PyQt6.QtWidgets",
+          "names": [
+            "QApplication",
+            "QMainWindow",
+            "QWidget",
+            "QVBoxLayout",
+            "QHBoxLayout",
+            "QLabel",
+            "QPushButton",
+            "QComboBox",
+            "QTextEdit",
+            "QGroupBox",
+            "QFrame"
+          ],
+          "level": 0,
+          "line": 9
+        },
+        {
+          "kind": "from",
+          "module": "PyQt6.QtCore",
+          "names": [
+            "Qt",
+            "QThread",
+            "pyqtSignal"
+          ],
+          "level": 0,
+          "line": 13
+        },
+        {
+          "kind": "from",
+          "module": "PyQt6.QtGui",
+          "names": [
+            "QFont",
+            "QTextCursor"
+          ],
+          "level": 0,
+          "line": 14
+        }
+      ],
+      "defs": {
+        "WorkerThread": {
+          "kind": "class",
+          "args": [],
+          "line": 17
+        },
+        "GameFrameworkUI": {
+          "kind": "class",
+          "args": [],
+          "line": 41
+        },
+        "main": {
+          "kind": "def",
+          "args": [],
+          "line": 159
+        }
+      },
+      "methods": [
+        "WorkerThread.__init__",
+        "WorkerThread.run",
+        "GameFrameworkUI.__init__",
+        "GameFrameworkUI.refresh_games",
+        "GameFrameworkUI.on_game_change",
+        "GameFrameworkUI.append_log",
+        "GameFrameworkUI.clear_logs",
+        "GameFrameworkUI.on_detect",
+        "GameFrameworkUI.on_learn",
+        "GameFrameworkUI.on_knowledge"
+      ],
+      "placeholders": [],
+      "markers": []
+    },
+    "ui_streamlit": {
+      "path": "ui_streamlit.py",
+      "loc": 132,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "streamlit",
+          "names": [
+            "streamlit"
+          ],
+          "level": 0,
+          "line": 1
+        },
+        {
+          "kind": "import",
+          "module": "subprocess",
+          "names": [
+            "subprocess"
+          ],
+          "level": 0,
+          "line": 2
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 3
+        },
+        {
+          "kind": "import",
+          "module": "yaml",
+          "names": [
+            "yaml"
+          ],
+          "level": 0,
+          "line": 4
+        },
+        {
+          "kind": "from",
+          "module": "pathlib",
+          "names": [
+            "Path"
+          ],
+          "level": 0,
+          "line": 5
+        }
+      ],
+      "defs": {
+        "recent_logs": {
+          "kind": "const",
+          "args": [],
+          "line": 116
+        }
+      },
+      "methods": [],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 112,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "ui_tkinter": {
+      "path": "ui_tkinter.py",
+      "loc": 398,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "tkinter",
+          "names": [
+            "tkinter"
+          ],
+          "level": 0,
+          "line": 12
+        },
+        {
+          "kind": "from",
+          "module": "tkinter",
+          "names": [
+            "ttk",
+            "scrolledtext",
+            "messagebox",
+            "filedialog"
+          ],
+          "level": 0,
+          "line": 13
+        },
+        {
+          "kind": "import",
+          "module": "subprocess",
+          "names": [
+            "subprocess"
+          ],
+          "level": 0,
+          "line": 14
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 15
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 16
+        },
+        {
+          "kind": "import",
+          "module": "yaml",
+          "names": [
+            "yaml"
+          ],
+          "level": 0,
+          "line": 17
+        },
+        {
+          "kind": "from",
+          "module": "pathlib",
+          "names": [
+            "Path"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import",
+          "module": "shutil",
+          "names": [
+            "shutil"
+          ],
+          "level": 0,
+          "line": 19
+        }
+      ],
+      "defs": {
+        "GameFrameworkUI": {
+          "kind": "class",
+          "args": [],
+          "line": 22
+        },
+        "main": {
+          "kind": "def",
+          "args": [],
+          "line": 355
+        }
+      },
+      "methods": [
+        "GameFrameworkUI.__init__",
+        "GameFrameworkUI._ensure_directories",
+        "GameFrameworkUI._create_widgets",
+        "GameFrameworkUI._scan_game_profiles",
+        "GameFrameworkUI._refresh_games",
+        "GameFrameworkUI._on_game_change",
+        "GameFrameworkUI._append_log",
+        "GameFrameworkUI._clear_logs",
+        "GameFrameworkUI._copy_log",
+        "GameFrameworkUI._on_detect",
+        "GameFrameworkUI._on_auto_learn",
+        "GameFrameworkUI.st_input_dialog",
+        "GameFrameworkUI._on_knowledge_base",
+        "GameFrameworkUI._refresh_knowledge_list"
+      ],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 366,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "video_learner": {
+      "path": "video_learner.py",
+      "loc": 303,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "argparse",
+          "names": [
+            "argparse"
+          ],
+          "level": 0,
+          "line": 17
+        },
+        {
+          "kind": "import",
+          "module": "base64",
+          "names": [
+            "base64"
+          ],
+          "level": 0,
+          "line": 18
+        },
+        {
+          "kind": "import",
+          "module": "difflib",
+          "names": [
+            "difflib"
+          ],
+          "level": 0,
+          "line": 19
+        },
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 20
+        },
+        {
+          "kind": "import",
+          "module": "shutil",
+          "names": [
+            "shutil"
+          ],
+          "level": 0,
+          "line": 21
+        },
+        {
+          "kind": "import",
+          "module": "signal",
+          "names": [
+            "signal"
+          ],
+          "level": 0,
+          "line": 22
+        },
+        {
+          "kind": "import",
+          "module": "subprocess",
+          "names": [
+            "subprocess"
+          ],
+          "level": 0,
+          "line": 23
+        },
+        {
+          "kind": "import",
+          "module": "sys",
+          "names": [
+            "sys"
+          ],
+          "level": 0,
+          "line": 24
+        },
+        {
+          "kind": "import",
+          "module": "time",
+          "names": [
+            "time"
+          ],
+          "level": 0,
+          "line": 25
+        },
+        {
+          "kind": "from",
+          "module": "datetime",
+          "names": [
+            "datetime"
+          ],
+          "level": 0,
+          "line": 26
+        },
+        {
+          "kind": "import",
+          "module": "requests",
+          "names": [
+            "requests"
+          ],
+          "level": 0,
+          "line": 28
+        },
+        {
+          "kind": "from",
+          "module": "dotenv",
+          "names": [
+            "load_dotenv"
+          ],
+          "level": 0,
+          "line": 29
+        },
+        {
+          "kind": "import",
+          "module": "video_sources",
+          "names": [
+            "video_sources"
+          ],
+          "level": 0,
+          "line": 40
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "cv2",
+          "names": [
+            "cv2"
+          ],
+          "level": 0,
+          "line": 34
+        },
+        {
+          "kind": "import(deferred)",
+          "module": "shutil",
+          "names": [
+            "shutil"
+          ],
+          "level": 0,
+          "line": 66
+        }
+      ],
+      "defs": {
+        "VLM_API_URL": {
+          "kind": "const",
+          "args": [],
+          "line": 47
+        },
+        "VLM_API_KEY": {
+          "kind": "const",
+          "args": [],
+          "line": 48
+        },
+        "VLM_MODEL": {
+          "kind": "const",
+          "args": [],
+          "line": 49
+        },
+        "BASE_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 51
+        },
+        "KB_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 52
+        },
+        "FRAME_DIR": {
+          "kind": "const",
+          "args": [],
+          "line": 53
+        },
+        "VLM_PROMPT": {
+          "kind": "const",
+          "args": [],
+          "line": 56
+        },
+        "cleanup_temp_frames": {
+          "kind": "def",
+          "args": [],
+          "line": 64
+        },
+        "_signal_handler": {
+          "kind": "def",
+          "args": [
+            "signum",
+            "frame"
+          ],
+          "line": 75
+        },
+        "extract_frames": {
+          "kind": "def",
+          "args": [
+            "video_path",
+            "skip"
+          ],
+          "line": 89
+        },
+        "image_to_base64": {
+          "kind": "def",
+          "args": [
+            "img_path"
+          ],
+          "line": 125
+        },
+        "vlm_extract_tactic": {
+          "kind": "def",
+          "args": [
+            "b64_img"
+          ],
+          "line": 130
+        },
+        "download_video": {
+          "kind": "def",
+          "args": [
+            "url",
+            "dest_dir"
+          ],
+          "line": 165
+        },
+        "_dedup_new": {
+          "kind": "def",
+          "args": [
+            "tactics",
+            "ratio_threshold"
+          ],
+          "line": 183
+        },
+        "save_tactics_to_kb": {
+          "kind": "def",
+          "args": [
+            "video_name",
+            "tactics"
+          ],
+          "line": 210
+        },
+        "main": {
+          "kind": "def",
+          "args": [],
+          "line": 233
+        }
+      },
+      "methods": [],
+      "placeholders": [
+        {
+          "type": "pass",
+          "line": 290,
+          "text": "pass"
+        }
+      ],
+      "markers": []
+    },
+    "video_sources": {
+      "path": "video_sources.py",
+      "loc": 65,
+      "syntax_error": null,
+      "imports": [
+        {
+          "kind": "import",
+          "module": "os",
+          "names": [
+            "os"
+          ],
+          "level": 0,
+          "line": 13
+        },
+        {
+          "kind": "import",
+          "module": "shutil",
+          "names": [
+            "shutil"
+          ],
+          "level": 0,
+          "line": 14
+        },
+        {
+          "kind": "import",
+          "module": "subprocess",
+          "names": [
+            "subprocess"
+          ],
+          "level": 0,
+          "line": 15
+        }
+      ],
+      "defs": {
+        "USE_YTDLP": {
+          "kind": "const",
+          "args": [],
+          "line": 17
+        },
+        "_enabled": {
+          "kind": "def",
+          "args": [
+            "name"
+          ],
+          "line": 20
+        },
+        "_fetch_ytdlp": {
+          "kind": "def",
+          "args": [
+            "query",
+            "limit"
+          ],
+          "line": 27
+        },
+        "SOURCES": {
+          "kind": "def",
+          "args": [],
+          "line": 48
+        },
+        "search_videos": {
+          "kind": "def",
+          "args": [
+            "query",
+            "limit"
+          ],
+          "line": 56
+        }
+      },
+      "methods": [],
+      "placeholders": [],
+      "markers": []
+    }
+  },
+  "dep_graph": {
+    "admin_panel": {
+      "local": [
+        "config",
+        "session"
+      ],
+      "third_party": [
+        "psutil"
+      ],
+      "optional_stubbed": []
+    },
+    "agent_cli": {
+      "local": [
+        "agent_main",
+        "cli_ui",
+        "config",
+        "game_profile_check",
+        "kb_maintainer",
+        "mcp_connector",
+        "report_notifier",
+        "session",
+        "skill_manager"
+      ],
+      "third_party": [
+        "yaml"
+      ],
+      "optional_stubbed": []
+    },
+    "agent_main": {
+      "local": [
+        "auto_tuner",
+        "combat_judge",
+        "config",
+        "kb_maintainer",
+        "report_notifier"
+      ],
+      "third_party": [
+        "dotenv",
+        "mcp",
+        "pyautogui",
+        "requests"
+      ],
+      "optional_stubbed": [
+        "dotenv",
+        "pyautogui"
+      ]
+    },
+    "auto_tuner": {
+      "local": [
+        "config"
+      ],
+      "third_party": [
+        "yaml"
+      ],
+      "optional_stubbed": []
+    },
+    "boot_check": {
+      "local": [
+        "config"
+      ],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "cli_ui": {
+      "local": [],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "combat_judge": {
+      "local": [
+        "config"
+      ],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "config": {
+      "local": [],
+      "third_party": [
+        "yaml"
+      ],
+      "optional_stubbed": []
+    },
+    "game_profile_check": {
+      "local": [
+        "config"
+      ],
+      "third_party": [
+        "yaml"
+      ],
+      "optional_stubbed": []
+    },
+    "kb_maintainer": {
+      "local": [
+        "config"
+      ],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "mcp_connector": {
+      "local": [
+        "config"
+      ],
+      "third_party": [
+        "mcp",
+        "yaml"
+      ],
+      "optional_stubbed": []
+    },
+    "mcp_server": {
+      "local": [
+        "config",
+        "kb_maintainer",
+        "predictor"
+      ],
+      "third_party": [
+        "chromadb",
+        "mcp",
+        "pyautogui",
+        "requests",
+        "sentence_transformers"
+      ],
+      "optional_stubbed": [
+        "pyautogui"
+      ]
+    },
+    "packaging.android_main": {
+      "local": [],
+      "third_party": [
+        "kivy"
+      ],
+      "optional_stubbed": []
+    },
+    "perception_server": {
+      "local": [],
+      "third_party": [
+        "flask"
+      ],
+      "optional_stubbed": []
+    },
+    "predictor": {
+      "local": [
+        "config"
+      ],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "report_notifier": {
+      "local": [
+        "auto_tuner",
+        "config"
+      ],
+      "third_party": [
+        "requests"
+      ],
+      "optional_stubbed": []
+    },
+    "session": {
+      "local": [
+        "config"
+      ],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "skill_manager": {
+      "local": [],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "skills.report.skill": {
+      "local": [],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "tools.add_game": {
+      "local": [
+        "game_profile_check"
+      ],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "tools.build_dist": {
+      "local": [],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "tools.static_audit": {
+      "local": [],
+      "third_party": [],
+      "optional_stubbed": []
+    },
+    "ui_pyqt": {
+      "local": [],
+      "third_party": [
+        "PyQt6",
+        "yaml"
+      ],
+      "optional_stubbed": []
+    },
+    "ui_streamlit": {
+      "local": [],
+      "third_party": [
+        "streamlit",
+        "yaml"
+      ],
+      "optional_stubbed": [
+        "streamlit"
+      ]
+    },
+    "ui_tkinter": {
+      "local": [],
+      "third_party": [
+        "yaml"
+      ],
+      "optional_stubbed": []
+    },
+    "video_learner": {
+      "local": [
+        "video_sources"
+      ],
+      "third_party": [
+        "cv2",
+        "dotenv",
+        "requests"
+      ],
+      "optional_stubbed": [
+        "cv2",
+        "dotenv"
+      ]
+    },
+    "video_sources": {
+      "local": [],
+      "third_party": [],
+      "optional_stubbed": []
+    }
+  },
+  "third_party_usage": {
+    "cv2": [
+      "video_learner"
+    ],
+    "dotenv": [
+      "agent_main",
+      "video_learner"
+    ],
+    "pyautogui": [
+      "agent_main",
+      "mcp_server"
+    ],
+    "streamlit": [
+      "ui_streamlit"
+    ]
+  },
+  "probes": {
+    "admin_panel": {
+      "module": "admin_panel",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "agent_cli": {
+      "module": "agent_cli",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "agent_main": {
+      "module": "agent_main",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "auto_tuner": {
+      "module": "auto_tuner",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "boot_check": {
+      "module": "boot_check",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "cli_ui": {
+      "module": "cli_ui",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "combat_judge": {
+      "module": "combat_judge",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "config": {
+      "module": "config",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "game_profile_check": {
+      "module": "game_profile_check",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "kb_maintainer": {
+      "module": "kb_maintainer",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "mcp_connector": {
+      "module": "mcp_connector",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "mcp_server": {
+      "module": "mcp_server",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "packaging.android_main": {
+      "module": "packaging.android_main",
+      "ok": false,
+      "error": "ModuleNotFoundError: No module named 'packaging.android_main'",
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "trace": [
+        "  File \"<frozen importlib._bootstrap>\", line 1387, in _gcd_import",
+        "  File \"<frozen importlib._bootstrap>\", line 1360, in _find_and_load",
+        "  File \"<frozen importlib._bootstrap>\", line 1324, in _find_and_load_unlocked",
+        "ModuleNotFoundError: No module named 'packaging.android_main'"
+      ],
+      "stub_limited": false
+    },
+    "perception_server": {
+      "module": "perception_server",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "predictor": {
+      "module": "predictor",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "report_notifier": {
+      "module": "report_notifier",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "session": {
+      "module": "session",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "skill_manager": {
+      "module": "skill_manager",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "skills.report.skill": {
+      "module": "skills.report.skill",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "tools.add_game": {
+      "module": "tools.add_game",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "tools.build_dist": {
+      "module": "tools.build_dist",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "ui_pyqt": {
+      "module": "ui_pyqt",
+      "ok": false,
+      "error": "ModuleNotFoundError: No module named 'PyQt6'",
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "trace": [
+        "    from PyQt6.QtWidgets import (",
+        "    ...<2 lines>...",
+        "    )",
+        "ModuleNotFoundError: No module named 'PyQt6'"
+      ],
+      "stub_limited": false
+    },
+    "ui_streamlit": {
+      "module": "ui_streamlit",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "ui_tkinter": {
+      "module": "ui_tkinter",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "video_learner": {
+      "module": "video_learner",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    },
+    "video_sources": {
+      "module": "video_sources",
+      "ok": true,
+      "error": null,
+      "stubbed": [
+        "PIL",
+        "PyQt5",
+        "PySide6",
+        "anthropic",
+        "cv2",
+        "dotenv",
+        "dxcam",
+        "google",
+        "mss",
+        "numpy",
+        "openai",
+        "pyautogui",
+        "pynput",
+        "streamlit",
+        "tkinter",
+        "torch",
+        "ultralytics",
+        "win32api",
+        "win32con",
+        "win32gui"
+      ],
+      "stub_limited": false
+    }
+  },
+  "cross_check": {
+    "missing_symbols": [],
+    "bad_kwargs": [],
+    "missing_attrs": [
+      {
+        "from": "agent_cli",
+        "line": 29,
+        "module_alias": "session",
+        "resolved_to": "session",
+        "attr": "load_state",
+        "available": [
+          "BASE_DIR",
+          "HISTORY_FILE",
+          "HISTORY_MAX",
+          "SNAP_PATH",
+          "STATE_FILE",
+          "__main__",
+          "_append_history",
+          "_default",
+          "describe",
+          "history",
+          "load",
+          "mark_resumed",
+          "record_end",
+          "record_start",
+          "resume_info",
+          "save",
+          "snapshot_rounds_deaths",
+          "stats",
+          "stats_text"
+        ]
+      },
+      {
+        "from": "agent_cli",
+        "line": 30,
+        "module_alias": "session",
+        "resolved_to": "session",
+        "attr": "save_state",
+        "available": [
+          "BASE_DIR",
+          "HISTORY_FILE",
+          "HISTORY_MAX",
+          "SNAP_PATH",
+          "STATE_FILE",
+          "__main__",
+          "_append_history",
+          "_default",
+          "describe",
+          "history",
+          "load",
+          "mark_resumed",
+          "record_end",
+          "record_start",
+          "resume_info",
+          "save",
+          "snapshot_rounds_deaths",
+          "stats",
+          "stats_text"
+        ]
+      },
+      {
+        "from": "agent_cli",
+        "line": 31,
+        "module_alias": "session",
+        "resolved_to": "session",
+        "attr": "update_state",
+        "available": [
+          "BASE_DIR",
+          "HISTORY_FILE",
+          "HISTORY_MAX",
+          "SNAP_PATH",
+          "STATE_FILE",
+          "__main__",
+          "_append_history",
+          "_default",
+          "describe",
+          "history",
+          "load",
+          "mark_resumed",
+          "record_end",
+          "record_start",
+          "resume_info",
+          "save",
+          "snapshot_rounds_deaths",
+          "stats",
+          "stats_text"
+        ]
+      },
+      {
+        "from": "agent_cli",
+        "line": 32,
+        "module_alias": "session",
+        "resolved_to": "session",
+        "attr": "clear_state",
+        "available": [
+          "BASE_DIR",
+          "HISTORY_FILE",
+          "HISTORY_MAX",
+          "SNAP_PATH",
+          "STATE_FILE",
+          "__main__",
+          "_append_history",
+          "_default",
+          "describe",
+          "history",
+          "load",
+          "mark_resumed",
+          "record_end",
+          "record_start",
+          "resume_info",
+          "save",
+          "snapshot_rounds_deaths",
+          "stats",
+          "stats_text"
+        ]
+      }
+    ]
+  },
+  "requirements": {
+    "declared": {
+      "flask": "flask>=3.0.0",
+      "requests": "requests>=2.31.0",
+      "python-dotenv": "python-dotenv>=1.0.0",
+      "pyyaml": "pyyaml>=6.0.0",
+      "psutil": "psutil>=5.9.0",
+      "mcp": "mcp>=1.0.0,<2.0.0",
+      "numpy": "numpy>=1.24.0",
+      "pyautogui": "pyautogui>=0.9.54",
+      "pillow": "pillow>=10.0.0",
+      "opencv-python": "opencv-python>=4.8.0"
+    },
+    "declared_dev": {
+      "pytest": "pytest>=7.4.0",
+      "pytest-cov": "pytest-cov>=4.1.0",
+      "ruff": "ruff>=0.4.0"
+    },
+    "used": {
+      "psutil": [
+        "admin_panel"
+      ],
+      "yaml": [
+        "agent_cli",
+        "auto_tuner",
+        "config",
+        "game_profile_check",
+        "mcp_connector",
+        "ui_pyqt",
+        "ui_streamlit",
+        "ui_tkinter"
+      ],
+      "requests": [
+        "agent_main",
+        "mcp_server",
+        "report_notifier",
+        "video_learner"
+      ],
+      "dotenv": [
+        "agent_main",
+        "video_learner"
+      ],
+      "mcp": [
+        "agent_main",
+        "mcp_connector",
+        "mcp_server"
+      ],
+      "pyautogui": [
+        "agent_main",
+        "mcp_server"
+      ],
+      "chromadb": [
+        "mcp_server"
+      ],
+      "sentence-transformers": [
+        "mcp_server"
+      ],
+      "kivy": [
+        "packaging.android_main"
+      ],
+      "flask": [
+        "perception_server"
+      ],
+      "pyqt6": [
+        "ui_pyqt"
+      ],
+      "streamlit": [
+        "ui_streamlit"
+      ],
+      "cv2": [
+        "video_learner"
+      ]
+    },
+    "undeclared": [
+      {
+        "package": "chromadb",
+        "used_by": [
+          "mcp_server"
+        ]
+      },
+      {
+        "package": "kivy",
+        "used_by": [
+          "packaging.android_main"
+        ]
+      },
+      {
+        "package": "pyqt6",
+        "used_by": [
+          "ui_pyqt"
+        ]
+      },
+      {
+        "package": "sentence-transformers",
+        "used_by": [
+          "mcp_server"
+        ]
+      },
+      {
+        "package": "streamlit",
+        "used_by": [
+          "ui_streamlit"
+        ]
+      }
+    ],
+    "unused": [
+      {
+        "package": "numpy",
+        "spec": "numpy>=1.24.0"
+      },
+      {
+        "package": "pillow",
+        "spec": "pillow>=10.0.0"
+      }
+    ],
+    "installed": {
+      "flask": "3.1.3",
+      "requests": "2.34.2",
+      "python-dotenv": "1.2.3",
+      "pyyaml": "6.0.3",
+      "psutil": "7.2.2",
+      "mcp": "2.2.0",
+      "numpy": "2.5.3",
+      "pyautogui": null,
+      "pillow": null,
+      "opencv-python": null,
+      "pytest": "9.1.1",
+      "pytest-cov": null,
+      "ruff": null
+    }
+  },
+  "namespace_shadow": [
+    {
+      "dir": "packaging",
+      "shadowed_by": "/home/g-bill/.workbuddy/binaries/python/envs/ugf/lib/python3.13/site-packages/packaging/__init__.py",
+      "py_files": [
+        "android_main.py"
+      ]
+    }
+  ],
+  "optional_stubs": {
+    "pyautogui": "GUI 自动化（无 X server）",
+    "pynput": "键鼠监听（无 X server）",
+    "cv2": "OpenCV（磁盘受限，刻意不装）",
+    "numpy": "数值计算",
+    "PIL": "Pillow 图像",
+    "mss": "屏幕截图",
+    "dxcam": "DXGI 截图（Windows）",
+    "ultralytics": "YOLO 模型（无权重文件）",
+    "torch": "深度学习（磁盘受限）",
+    "PyQt5": "Qt 前端",
+    "PySide6": "Qt 前端",
+    "streamlit": "Streamlit 前端",
+    "tkinter": "Tk 前端",
+    "win32gui": "Windows 窗口枚举",
+    "win32con": "Windows 常量",
+    "win32api": "Windows API",
+    "openai": "LLM SDK（无密钥）",
+    "anthropic": "LLM SDK（无密钥）",
+    "google": "Gemini SDK（无密钥）",
+    "dotenv": "环境变量加载"
+  }
+}

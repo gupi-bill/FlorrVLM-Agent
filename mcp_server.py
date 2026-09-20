@@ -25,10 +25,18 @@ from typing import Optional
 
 import requests
 
+# mcp 1.x 用 mcp.server.fastmcp.FastMCP；2.x 已将其改名为 mcp.server.mcpserver.MCPServer。
+# requirements.txt 已把 mcp 上界锁在 <2.0.0；此处再做一层兼容，避免本机装了 2.x 时直接 import 失败。
+# ⚠️ 2.x 还有其它 API 变更，工具注册是否完全可用由 S9 实测确认。
 try:
     from mcp.server.fastmcp import FastMCP
+    MCP_SDK_VERSION = 1
 except ImportError:
-    raise ImportError("请先安装 mcp: pip install mcp")
+    try:
+        from mcp.server.mcpserver import MCPServer as FastMCP
+        MCP_SDK_VERSION = 2
+    except ImportError:
+        raise ImportError("请先安装 mcp: pip install 'mcp>=1.0.0,<2.0.0'")
 
 # 本地模块
 import config
@@ -295,7 +303,11 @@ def reset_predictor() -> str:
 # v0.3 拟人移动：先走到目标附近一个随机中间点，再微移到位，偶尔停顿
 # 消除"笔直冲向目标"的机器感
 def _path_perturb_move(x: int, y: int):
-    import pyautogui
+    # S2 审计 W：与同文件其它键鼠入口保持一致，缺失 pyautogui 时直接返回而非抛 ImportError
+    try:
+        import pyautogui
+    except ImportError:
+        return
     # 目标点附近随机二次寻路
     mid_x = x + random.uniform(-25, 25)
     mid_y = y + random.uniform(-25, 25)

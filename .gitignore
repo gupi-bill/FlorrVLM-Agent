@@ -62,3 +62,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Agent 工作区状态（自动化记忆 / 会话数据，不入库）
+.workbuddy/

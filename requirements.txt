@@ -14,7 +14,9 @@ requests>=2.31.0            # HTTP 调用（webhook 汇报 / VLM API，可 mock�
 python-dotenv>=1.0.0        # .env 加载（无 .env 时自动降级，不阻断）
 pyyaml>=6.0.0               # config.yaml / game_profiles/*.yaml / tuned_overrides
 psutil>=5.9.0               # 监控大盘 CPU/内存占用显示（缺失时降级为 0）
-mcp>=1.0.0                  # MCP Server（mcp_server.py）
+# ⚠️ mcp 2.x 已移除 mcp.server.fastmcp.FastMCP（改名 MCPServer），本项目代码仍用 v1 API。
+# 上界必须锁死在 <2.0.0，否则全新安装会直接 ImportError（见 devplan/AUDIT.md 阻断级 B1）。
+mcp>=1.0.0,<2.0.0           # MCP Server（mcp_server.py，仅兼容 v1 API）
 numpy>=1.24.0               # 数值计算：预判引擎 / 威胁评分
 
 # ---------- 2. optional · 按需（无头 / 无 X server 环境可全部跳过） ----------
@@ -25,3 +27,12 @@ pillow>=10.0.0              # 截图编码；无头环境可用 numpy mock 数�
 # 无头环境请改用下面这一行，避免引入 GUI 依赖链：
 #   opencv-python-headless>=4.8.0
 opencv-python>=4.8.0        # 图像处理；无头机器请用上面的 -headless 版本
+
+# ---------- 3. 可选但默认不装（审计发现「代码 import 了但未声明」，见 AUDIT.md） ----------
+# 这些包刻意保持注释状态：它们体量大 / 强依赖 GUI 或模型权重，装上会拖垮 2.3G 的磁盘余量。
+# 需要用到对应模块时，自行取消注释并单独安装（务必带 TMPDIR）。
+# PyQt6>=6.5.0              # ui_pyqt.py（S11 UI 收敛后再决定是否保留）
+# streamlit>=1.30.0         # ui_streamlit.py（同上）
+# chromadb>=0.4.0           # mcp_server.py：仅 FLORR_VECTOR_SEARCH=1 时启用向量检索
+# sentence-transformers>=2.2.0  # mcp_server.py：同上，⚠️ 会连带拉入 torch（GB 级，磁盘紧张勿装）
+# kivy>=2.3.0               # packaging/android_main.py：仅 Android 打包需要，桌面端不涉及
