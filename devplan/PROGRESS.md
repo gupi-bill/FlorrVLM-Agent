@@ -280,3 +280,4 @@
     - 死亡防抖阈值 8 帧与 README/模块 docstring 旧描述"2 帧"不符，文档统一移交 **S13**。
     - `review_*.md` / `learning_stats.md` 随每次 dry-run 在 `knowledge_md/` 累积（已被 `.gitignore` 忽略），长跑清理建议交 **S12** 运维脚本。
     - 无 `.env`：真实 LLM 决策仍未实测，本轮全部走 `_fallback_decide` 规则分支，属预期降级。
+2026-09-21 06:51 · — · 用户叫停，A/B 双线自动化已置为 PAUSED · 已完成 S1~S8，505 用例全绿 · 剩余 S9~S14 待恢复后续跑（注意 validUntil 已过 07:00，恢复时需顺延）

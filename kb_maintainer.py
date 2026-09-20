@@ -104,20 +104,27 @@ def export(kb: str, arch: str, out_dir: str = None) -> str:
     stamp = time.strftime("%Y%m%d_%H%M%S")
     path = os.path.join(out_dir, f"kb_backup_{stamp}.tar.gz")
 
+    n_files = 0
     with tarfile.open(path, "w:gz") as tar:
         for name, src in [("knowledge_md", kb), ("knowledge_archive", arch)]:
             if not os.path.isdir(src):
                 continue
             for root, _, files in os.walk(src):
-                for fn in files:
+                for fn in sorted(files):
                     if not fn.endswith(".md"):
                         continue
                     full = os.path.join(root, fn)
-                    # 包内路径统一为 <name>/<文件名>，避免绝对路径被外部读取
-                    arc = f"{name}/{os.path.basename(full)}"
+                    # v2.0 S9：保留 src 内部的相对路径（如 florr/boss.md），
+                    # 此前用 basename 会把按游戏分子目录的知识库拍平、同名字段互相覆盖。
+                    rel = os.path.relpath(full, src).replace(os.sep, "/")
+                    rel = "/".join(p for p in rel.split("/") if p not in ("", ".", ".."))
+                    if not rel:
+                        continue
+                    arc = f"{name}/{rel}"
                     tar.add(full, arcname=arc)
+                    n_files += 1
     size = os.path.getsize(path) / 1024
-    return f"已导出知识库到: {path}（{size:.1f} KB）"
+    return f"已导出知识库到: {path}（{n_files} 个文件，{size:.1f} KB）"
 
 
 def import_backup(kb: str, arch: str, backup: str) -> str:
@@ -132,25 +139,40 @@ def import_backup(kb: str, arch: str, backup: str) -> str:
         return f"找不到备份文件: {backup}"
     os.makedirs(kb, exist_ok=True)
     os.makedirs(arch, exist_ok=True)
-    imported = 0
+
+    # v2.0 S9：按包内顶层目录还原到各自的位置。
+    # 此前 knowledge_archive/* 一律解压进活跃库 kb/，导致「已归档」的笔记被复活、
+    # kb_max_mb 的体积控制形同虚设；子目录也被拍平到根目录。
+    ROOTS = {"knowledge_md": kb, "knowledge_archive": arch}
+    imported = {"knowledge_md": 0, "knowledge_archive": 0}
     with tarfile.open(backup, "r:gz") as tar:
         for member in tar.getmembers():
             if not member.isfile() or not member.name.endswith(".md"):
                 continue
-            name = os.path.basename(member.name)
-            if name in ("", ".", "..") or "/" in name or "\\" in name:
+            parts = [p for p in member.name.replace("\\", "/").split("/") if p not in ("", ".", "..")]
+            if len(parts) < 2:
                 continue
-            dest = os.path.join(kb, name)
+            root_key = parts[0] if parts[0] in ROOTS else "knowledge_md"
+            dest_root = ROOTS[root_key]
+            # 兼容旧备份：旧包内是 knowledge_md/xxx.md（无子目录），rel 即文件名
+            rel = parts[1:]
+            dest = os.path.normpath(os.path.join(dest_root, *rel))
+            # 二次守门：必须仍在目标根内，防 .. 穿越
+            if os.path.commonpath([os.path.normpath(dest_root), dest]) != os.path.normpath(dest_root):
+                continue
             try:
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
                 f = tar.extractfile(member)
                 if f is None:
                     continue
                 with open(dest, "wb") as out:
                     out.write(f.read())
-                imported += 1
+                imported[root_key] += 1
             except (OSError, tarfile.TarError):
                 continue
-    return f"已从备份恢复 {imported} 个知识库文件到 {os.path.basename(kb)}/"
+    active, archived = imported["knowledge_md"], imported["knowledge_archive"]
+    return (f"已从备份恢复 {active} 个知识库文件到 {os.path.basename(kb)}/"
+            + (f"，{archived} 个归档文件到 {os.path.basename(arch)}/" if archived else ""))
 
 
 def archive_oldest(kb: str, arch: str, max_mb: float) -> int:

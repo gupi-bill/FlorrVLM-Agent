@@ -10,11 +10,14 @@ Universal-Game-Framework MCP Server mcp_server.py
   - 目录为空时自动写入基础模板文件（v0.2）
   - 默认纯文本关键词检索；向量检索预留开关，默认关闭
 
-MCP 工具（13 个）：
-  kb_list, kb_search, kb_write, kb_append,
+MCP 工具（15 个，v2.0 S9 实测与 README 表格一致）：
+  kb_list, kb_search, kb_write, kb_append, kb_export, kb_import,
   perceive_game, predict_all_entities, reset_predictor,
   game_action, switch_set, handle_afk,
   query_boss_history, clean_cache, switch_tactic
+
+SDK 兼容：mcp 1.x 用 FastMCP，2.x 改名 MCPServer；两条路径均在 S9 实测可注册、
+可列举、可调用（本机实际为 2.2.0）。
 """
 import json
 import os
@@ -84,6 +87,23 @@ def _stderr(msg: str):
         pass
 
 
+def _safe_name(name: str, sep: str = "_") -> str:
+    """
+    v2.0 S9：把外部传入的「文件名 / 游戏名 / 战术名」清洗成单层安全名字。
+
+    MCP 工具的入参来自 LLM 或外部客户端，等同不可信输入。此前
+    `filename="../../etc/passwd.md"` 会直接 `os.path.join(KB_DIR, filename)`
+    写到知识库之外；`game_name=".."` 会让 kb_list 列出上一级目录。
+    统一在这里去掉目录分隔符与 `..` 回溯片段，调用方拿到的一定是单层相对名。
+    """
+    raw = (name or "").strip()
+    raw = raw.replace("\\", sep).replace("/", sep)
+    if sep:
+        raw = "".join(ch if not ch.isspace() else sep for ch in raw)
+    raw = raw.replace("\0", "").replace("..", "")
+    return raw.strip().strip(sep).strip(".").strip()
+
+
 def _env_flag(name: str, default: bool = False) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -147,9 +167,9 @@ def kb_list(game_name: str = "") -> str:
     如果提供了 game_name，仅列出该游戏的文件夹下的文档。
     """
     if game_name:
-        safe_game_name = game_name.replace(" ", "_").replace("/", "-")
-        game_dir = os.path.join(KB_DIR, safe_game_name)
-        if os.path.exists(game_dir):
+        safe_game_name = _safe_name(game_name, "_")
+        game_dir = os.path.join(KB_DIR, safe_game_name) if safe_game_name else None
+        if game_dir and os.path.isdir(game_dir):
             files = sorted(f for f in os.listdir(game_dir) if f.endswith(".md"))
         else:
             files = []
@@ -165,16 +185,17 @@ def kb_search(keyword: str, game_name: str = "") -> str:
     如果提供了 game_name，仅在该游戏的文件夹中搜索。
     """
     if game_name:
-        safe_game_name = game_name.replace(" ", "_").replace("/", "-")
-        search_dir = os.path.join(KB_DIR, safe_game_name)
-        if not os.path.exists(search_dir):
+        safe_game_name = _safe_name(game_name, "_")
+        search_dir = os.path.join(KB_DIR, safe_game_name) if safe_game_name else None
+        if not search_dir or not os.path.isdir(search_dir):
             return f"未找到游戏: {game_name} 的知识库文件夹"
         search_base = search_dir
     else:
         search_base = KB_DIR
-    
-    USE_VECTOR_SEARCH = False  # 默认关闭，防止意外启动
-    
+
+    # v2.0 S9：原先此处有 `USE_VECTOR_SEARCH = False` 的局部变量，把模块级
+    # FLORR_VECTOR_SEARCH 开关彻底短路成死配置；且 _vector_search 只收 1 个参数，
+    # 真放行时会 TypeError。改为读全局开关 + 对齐签名。
     if USE_VECTOR_SEARCH:
         return _vector_search(keyword, search_base)
     return _text_search(keyword, search_base)
@@ -196,22 +217,23 @@ def _text_search(keyword: str, search_base: str) -> str:
                 continue
             if keyword_lower in content.lower():
                 results.append(f"## {os.path.relpath(fpath, search_base)}\n{content[:2000]}")
-    return f"共找到 {len(results)} 条结果:\n" + "\n\n".join(results) if results else "未找到相关内容"
+    # v2.0 S9：删除 return 之后 3 行不可达代码（S7 遗留），并补上命中计数前缀。
     if not results:
-        return f"知识库中未找到与「{keyword}」相关的内容。"
-    return "\n\n---\n\n".join(results)
+        return "未找到相关内容"
+    return f"共找到 {len(results)} 条结果:\n" + "\n\n---\n\n".join(results)
 
 
-def _vector_search(keyword: str) -> str:
+def _vector_search(keyword: str, search_base: str = None) -> str:
     """向量检索（预留，需安装 chromadb + sentence-transformers）。"""
+    base = search_base or KB_DIR
     try:
         import chromadb
         from sentence_transformers import SentenceTransformer
     except ImportError:
-        return "[向量检索未安装依赖，回退到文本检索]\n" + _text_search(keyword)
+        return "[向量检索未安装依赖，回退到文本检索]\n" + _text_search(keyword, base)
 
     # 预留实现：实际使用时需构建索引
-    return "[向量检索预留功能]\n" + _text_search(keyword)
+    return "[向量检索预留功能]\n" + _text_search(keyword, base)
 
 
 @mcp.tool()
@@ -226,21 +248,48 @@ def kb_write(filename: str, markdown_content: str, game_name: str = "") -> str:
         markdown_content: markdown 内容
         game_name: 游戏名称，用于创建子文件夹
     """
+    # v2.0 S9：文件名来自 LLM/外部客户端，先清洗再拒绝空名，
+    # 杜绝 `../../` 穿越写到知识库之外、以及空名落到 KB_DIR 目录本身。
+    filename = _safe_name(filename, "_")
+    if not filename:
+        return "错误: filename 不能为空或仅含路径分隔符"
     if not filename.endswith(".md"):
         filename += ".md"
-    
-    # 根据游戏名创建子文件夹
+
+    full_path = _resolve_kb_path(filename, game_name)
+    if full_path is None:
+        return f"错误: 非法的知识库路径 (filename={filename!r}, game={game_name!r})"
+
+    try:
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(markdown_content or "")
+    except OSError as e:
+        return f"写入知识库失败: {e}"
+    return f"已写入知识库: {full_path} ({len(markdown_content or '')} 字符)"
+
+
+def _resolve_kb_path(filename: str, game_name: str = ""):
+    """
+    把 (文件名, 游戏名) 解析成 KB_DIR 内的绝对路径；越界一律返回 None。
+    集中一处，保证 kb_write / kb_append 口径完全一致（S9）。
+    """
+    safe_file = _safe_name(filename, "_")
+    if not safe_file:
+        return None
+    root = KB_DIR
     if game_name:
-        safe_game_name = game_name.replace(" ", "_").replace("/", "-")
-        game_dir = os.path.join(KB_DIR, safe_game_name)
-        os.makedirs(game_dir, exist_ok=True)
-        full_path = os.path.join(game_dir, filename)
-    else:
-        full_path = os.path.join(KB_DIR, filename)
-    
-    with open(full_path, "w", encoding="utf-8") as f:
-        f.write(markdown_content)
-    return f"已写入知识库: {full_path} ({len(markdown_content)} 字符)"
+        safe_game = _safe_name(game_name, "_")
+        if safe_game:
+            root = os.path.join(KB_DIR, safe_game)
+            try:
+                os.makedirs(root, exist_ok=True)
+            except OSError:
+                return None
+    full = os.path.normpath(os.path.join(root, safe_file))
+    # 二次守门：normpath 后必须仍在 KB_DIR 内
+    if os.path.commonpath([os.path.normpath(KB_DIR), full]) != os.path.normpath(KB_DIR):
+        return None
+    return full
 
 
 @mcp.tool()
@@ -250,23 +299,25 @@ def kb_append(filename: str, markdown_content: str, game_name: str = "") -> str:
     如果提供了 game_name，内容将追加到 knowledge_md/<game_name>/filename.md，
     否则追加到 knowledge_md/filename.md（向后兼容）。
     """
+    filename = _safe_name(filename, "_")
+    if not filename:
+        return "错误: filename 不能为空或仅含路径分隔符"
     if not filename.endswith(".md"):
         filename += ".md"
-    
-    # 根据游戏名创建子文件夹
-    if game_name:
-        safe_game_name = game_name.replace(" ", "_").replace("/", "-")
-        game_dir = os.path.join(KB_DIR, safe_game_name)
-        os.makedirs(game_dir, exist_ok=True)
-        full_path = os.path.join(game_dir, filename)
-    else:
-        full_path = os.path.join(KB_DIR, filename)
-    
-    mode = "a" if os.path.exists(full_path) else "w"
-    with open(full_path, mode, encoding="utf-8") as f:
-        if mode == "a":
-            f.write("\n\n")
-        f.write(markdown_content)
+
+    full_path = _resolve_kb_path(filename, game_name)
+    if full_path is None:
+        return f"错误: 非法的知识库路径 (filename={filename!r}, game={game_name!r})"
+
+    try:
+        mode = "a" if os.path.exists(full_path) else "w"
+        with open(full_path, mode, encoding="utf-8") as f:
+            if mode == "a":
+                f.write("\n\n")
+            f.write(markdown_content or "")
+    except OSError as e:
+        # 注意：这里是"写失败必须显式报错"，S7 的 kb_append 静默失败正是吃了这个亏
+        return f"追加到知识库失败: {e}"
     return f"已追加到知识库: {full_path}"
 
 
@@ -403,6 +454,10 @@ def _path_perturb_move(x: int, y: int):
     pyautogui.moveTo(x, y, duration=0.06)
 
 
+# v2.0 S9：合法动作集中定义，校验先于 dry-run 分支，避免无效动作被记成成功
+VALID_ACTIONS = ("move", "attack", "defend", "synthesize", "idle")
+
+
 @mcp.tool()
 def game_action(action_type: str,
                 x: Optional[int] = None,
@@ -415,12 +470,17 @@ def game_action(action_type: str,
     """
     action_type = (action_type or "").lower()
 
+    # v2.0 S9：合法性校验必须在 dry-run 分支之前。原先 dry-run 直接放行，
+    # `game_action("fly")` 会返回"动作已记录"，把无效动作伪装成成功。
+    if action_type not in VALID_ACTIONS:
+        return f"未知动作类型: {action_type or '(空)'}，可选 {'/'.join(sorted(VALID_ACTIONS))}"
+
+    if action_type == "move" and (x is None or y is None):
+        return "move 动作必须提供 x 和 y 坐标"
+
     # v2.0 S7：dry-run 不做任何真实键鼠动作，只记录"本该执行的动作"并落盘
     if dry_run():
         coord = f" ({x},{y})" if action_type == "move" else ""
-        if action_type == "move" and (x is None or y is None):
-            _dryrun_log("action", "move 缺坐标 -> 拒绝")
-            return "move 动作必须提供 x 和 y 坐标"
         _dryrun_log("action", f"{action_type}{coord}")
         return "[dry-run] 动作已记录（未真实执行）: " + action_type + coord
 
@@ -429,10 +489,7 @@ def game_action(action_type: str,
     except ImportError:
         return "错误: 未安装 pyautogui，请执行 pip install pyautogui"
 
-
     if action_type == "move":
-        if x is None or y is None:
-            return "move 动作必须提供 x 和 y 坐标"
         _path_perturb_move(x, y)
     elif action_type == "attack":
         pyautogui.keyDown("space")
@@ -530,9 +587,12 @@ def clean_cache(target: str = "all") -> str:
         done.append("预判历史已清空")
     if target in ("all", "frames"):
         frame_dir = os.path.join(BASE_DIR, config.get("paths.frames", "video_frames"))
+        # v2.0 S9：目录不存在时也报"已清理"会误导排障，改为区分「已清理/本就不存在」
         if os.path.isdir(frame_dir):
             shutil.rmtree(frame_dir, ignore_errors=True)
-        done.append("临时帧目录已清理")
+            done.append("临时帧目录已清理" if not os.path.isdir(frame_dir) else "临时帧目录清理失败")
+        else:
+            done.append("临时帧目录不存在（无需清理）")
     return "; ".join(done) if done else f"未知目标: {target}，可选 all/predict/frames"
 
 
@@ -542,16 +602,26 @@ def switch_tactic(tactic_file: str) -> str:
     指定知识库里的一份 Markdown 文件作为"当前战术"。
     会在玩家战术文档(_current_tactic.md)里记录，供后续决策快速读取。
     """
+    raw_name = tactic_file
+    tactic_file = _safe_name(tactic_file, "_")
+    if not tactic_file:
+        return f"错误: 非法的战术文件名: {raw_name!r}"
     if not tactic_file.endswith(".md"):
         tactic_file += ".md"
     src = os.path.join(KB_DIR, tactic_file)
     if not os.path.exists(src):
         return f"知识库中没有这份战术文档: {tactic_file}"
-    with open(src, "r", encoding="utf-8") as f:
-        content = f.read()
+    try:
+        with open(src, "r", encoding="utf-8") as f:
+            content = f.read()
+    except OSError as e:
+        return f"读取战术文档失败: {e}"
     mark = os.path.join(KB_DIR, "_current_tactic.md")
-    with open(mark, "w", encoding="utf-8") as f:
-        f.write(f"# 当前战术: {tactic_file}\n\n来自: {tactic_file}\n\n{content[:2000]}")
+    try:
+        with open(mark, "w", encoding="utf-8") as f:
+            f.write(f"# 当前战术: {tactic_file}\n\n来自: {tactic_file}\n\n{content[:2000]}")
+    except OSError as e:
+        return f"写入当前战术标记失败: {e}"
     return f"已切换当前战术为: {tactic_file}"
 
 
