@@ -14,9 +14,12 @@ requests>=2.31.0            # HTTP 调用（webhook 汇报 / VLM API，可 mock�
 python-dotenv>=1.0.0        # .env 加载（无 .env 时自动降级，不阻断）
 pyyaml>=6.0.0               # config.yaml / game_profiles/*.yaml / tuned_overrides
 psutil>=5.9.0               # 监控大盘 CPU/内存占用显示（缺失时降级为 0）
-# ⚠️ mcp 2.x 已移除 mcp.server.fastmcp.FastMCP（改名 MCPServer），本项目代码仍用 v1 API。
-# 上界必须锁死在 <2.0.0，否则全新安装会直接 ImportError（见 devplan/AUDIT.md 阻断级 B1）。
-mcp>=1.0.0,<2.0.0           # MCP Server（mcp_server.py，仅兼容 v1 API）
+# mcp 1.x 用 mcp.server.fastmcp.FastMCP，2.x 改名 mcp.server.mcpserver.MCPServer。
+# mcp_server.py 已做双版本兼容；v2.0 S9 在 2.2.0 上实测：15 个工具全部可列举、
+# 可调用、schema 正确（见 devplan/TOOLS.md），故不再锁 <2.0.0。
+# ⚠️ 注意两版差异：2.x 的 Tool 字段是 input_schema（1.x 别名 inputSchema）；
+#    进程内 call_tool 对「未知工具」抛 ToolError（1.x 只塞 is_error 结果）。
+mcp>=1.0.0                  # MCP Server（mcp_server.py，1.x / 2.x 双兼容）
 numpy>=1.24.0               # 数值计算：预判引擎 / 威胁评分
 
 # ---------- 2. optional · 按需（无头 / 无 X server 环境可全部跳过） ----------

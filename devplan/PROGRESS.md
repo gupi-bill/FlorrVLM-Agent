@@ -16,7 +16,7 @@
 | S6 | 感知服务离线化 | ✅ 完成 | 04:43~05:05 (A线) | `perception_server.py` 重写（mock/auto/http 三后端 + `--selftest`）、`tests/test_perception_server.py`(99 用例)、`config.yaml`/`config.py` 新增 `perception.*` 段；`mcp_server._perception_url()` 端口随配置走 |
 | S7 | 主循环 dry-run | ✅ 完成 | 05:11~05:34 (A线) | `agent_main.py` dry-run 分支 + `--rounds` 别名 + 软失败检测；`mcp_server.py` 补注册 `kb_append`、stdout→stderr、进程内 mock 感知降级；`perception_server.py` mock 漂移改累计时间基准；`tests/test_agent_main.py`(87)；`devplan/SMOKE_S7.md`；457 用例全绿 |
 | S8 | CLI 全命令冒烟 | ✅ 完成 | 06:00~06:30 (A线) | `tools/cli_smoke.py`(31 条命令矩阵，可复用为门禁)、`tests/test_agent_cli.py`(48 用例)、`devplan/SMOKE_S8.md`；`agent_cli.py` 9 处修复：补齐未定义的 `_append_log`、`-c` 一次性模式彻底禁用交互提问、补 help/play/auto 与 `--auto search`、`unload` 跨进程恢复、kb_* 支持游戏名第二参数、交互模式补 kb_* 分支、帮助清单补登记、删 `_run_auto` 死代码 |
-| S9 | MCP 工具注册验证 | ⬜ 待执行 | | |
+| S9 | MCP 工具注册验证 | ✅ 完成 | 06:39~07:10 (B线) | `tools/mcp_tools_check.py`(15 工具核对/调用/往返三检)、`tests/test_mcp_server.py`(109 用例)、`devplan/TOOLS.md`；`mcp_server.py` 10 处修复（路径穿越/向量开关死配置/dry-run 动作校验）、`kb_maintainer.py` 往返保真修复；`requirements.txt` mcp 放宽至 `>=1.0.0` |
 | S10 | 游戏档案体系固化 | ⬜ 待执行 | | |
 | S11 | UI 收敛与统一启动器 | ⬜ 待执行 | | |
 | S12 | 运维脚本与容器一致性 | ⬜ 待执行 | | |
@@ -76,13 +76,25 @@
 
 ## 调度说明
 
-本次冲刺由两条错峰自动化线驱动，共同实现「每 30 分钟推进一个阶段」：
+本次冲刺由多条错峰自动化线驱动，共同实现「每 30 分钟推进一个阶段」：
 
-- **A 线（整点）**：01:00 / 02:00 / 03:00 / 04:00 / 05:00 / 06:00
-- **B 线（半点）**：00:30 / 01:30 / 02:30 / 03:30 / 04:30 / 05:30 / 06:30
+**第二轮窗口：2026-09-21 23:00 ~ 2026-09-22 07:00（从 S9 续跑）**
 
-两条线共用本文件判定「下一个待执行阶段」；各自限制单轮 25~30 分钟内完成，07:00 后自动停止（`validUntil`）。
-调度器不支持逗号形式的 `BYMINUTE`，故采用双线错峰实现 30 分钟周期。
+| 时间 | 触发线 | 时间 | 触发线 |
+|---|---|---|---|
+| 09-21 23:00 | 一次性启动任务 | 09-22 03:00 | A 线（整点） |
+| 09-21 23:30 | 一次性半点任务 | 09-22 03:30 | B 线（半点） |
+| 09-22 00:00 | A 线（整点） | 09-22 04:00 | A 线 |
+| 09-22 00:30 | B 线（半点） | 09-22 04:30 | B 线 |
+| 09-22 01:00 | A 线 | 09-22 05:00 | A 线 |
+| 09-22 01:30 | B 线 | 09-22 05:30 | B 线 |
+| 09-22 02:00 | A 线 | 09-22 06:00 | A 线 |
+| 09-22 02:30 | B 线 | 09-22 06:30 | B 线（最后一轮） |
+
+- 各条线共用本文件判定「下一个待执行阶段」；单轮限制 25~30 分钟内完成；窗口结束（07:00）后自动停止（`validUntil`）。
+- 调度器限制：不支持逗号形式的 `BYMINUTE`；且 `validFrom` 为当日 23:00 时会被顺延到次日 00:00，故 23:00 / 23:30 两轮改用一次性任务补齐。
+
+> 第一轮窗口（2026-09-21 00:30~06:50）：A 线整点 + B 线半点，完成 S1~S8 后由用户叫停。
 
 ---
 
@@ -281,3 +293,28 @@
     - `review_*.md` / `learning_stats.md` 随每次 dry-run 在 `knowledge_md/` 累积（已被 `.gitignore` 忽略），长跑清理建议交 **S12** 运维脚本。
     - 无 `.env`：真实 LLM 决策仍未实测，本轮全部走 `_fallback_decide` 规则分支，属预期降级。
 2026-09-21 06:51 · — · 用户叫停，A/B 双线自动化已置为 PAUSED · 已完成 S1~S8，505 用例全绿 · 剩余 S9~S14 待恢复后续跑（注意 validUntil 已过 07:00，恢复时需顺延）
+
+- **2026-09-21 07:10 · S9 · MCP 服务端工具注册验证（mcp_server.py）**
+  - 背景说明（自主决策理由）：本轮 B 线 06:39 启动时 S9 为首个待执行阶段，执行日志无并行占用，遂开工。06:51 A 线判定到点并置双线为 PAUSED、把本轮进行中的改动一并提交为 `12b4cf3`（"S8+ 叫停"）。因 S9 主体工作已完成、只剩交付物文档与状态回填，**选择把 S9 收尾干净再停**（避免出现"代码已改但进度表仍记 ⬜"的不一致状态），不做 S10 及后续。
+  - 做了什么：
+    1. 新建核对脚本 `tools/mcp_tools_check.py`：解析 README 的 MCP 工具表格 → 与服务端 `list_tools()` 实际注册清单逐字比对（多/少/改名/标题数量不符都会报）；对 15 个工具逐个以 mock 参数走**真实 `mcp.call_tool()`**（不是直接调底层函数，才能测出"装饰器没注册/参数 schema 不匹配"这类问题，S7 的 `kb_append` 漏注册正是死在这一层）；再跑一遍 `kb_export → kb_import` 往返。支持 `--json`（S13 可直接接门禁）/ `--strict`。
+    2. 新建 `tests/test_mcp_server.py`（**109 用例**）：清单一致性 9、逐工具可调用 16、schema/必填参数 30、知识库路径安全 20、往返一致性 7、工具错误处理 17 等。知识库目录一律 `monkeypatch` 到 `tmp_path`，感知走 dry-run 进程内 mock，全程零真实网络/键鼠。
+    3. **修复 M1/M2（阻断，路径穿越）**：`kb_write` / `kb_append` 的 `filename` 与 `kb_list` / `kb_search` 的 `game_name` 都只把 `/` 换成 `-`，`..` 原样保留 → `filename="../../evil.md"` 可写到知识库之外、`game_name=".."` 可列出上一级目录。新增 `_safe_name()` 与集中式 `_resolve_kb_path()`（`normpath` + `commonpath` 二次守门），两处口径统一。
+    4. **修复 M3/M4（阻断，往返失真）**：`kb_maintainer.export` 用 `basename` 打包，把 `knowledge_md/florr/boss.md` 拍平成 `knowledge_md/boss.md`——按游戏分目录的知识库备份后**分类全丢**，同名文件互相覆盖；`import_backup` 又把 `knowledge_archive/*` 一律解进活跃库，**已归档笔记被复活**、`kb_max_mb` 体积控制形同虚设。改为保留相对路径 + 按顶层目录分流还原，并保留对旧扁平备份的兼容（已回归锁定）。
+    5. **修复 M5（高，死配置）**：`kb_search` 函数内 `USE_VECTOR_SEARCH = False` 局部变量把模块级 `FLORR_VECTOR_SEARCH` 开关彻底短路，且 `_vector_search()` 只收 1 个参数、真放行必 `TypeError`。改读全局开关并对齐签名。
+    6. **修复 M6（中，假成功）**：`game_action` 的 dry-run 分支在合法性校验**之前**返回，`game_action("fly")` 会回"动作已记录"，把无效动作伪装成成功。新增 `VALID_ACTIONS`，校验与 move 坐标检查前置。
+    7. 其余：删 `_text_search` 的 3 行不可达代码并补命中计数（M7，S7 遗留）；模块 docstring「13 个」改 15 个（M8）；`clean_cache` 帧目录不存在时不再谎报"已清理"（M9）；`switch_tactic` 补路径清洗与 `OSError` 保护（M10）。
+    8. `requirements.txt`：`mcp` 由 `<2.0.0` 放宽为 `>=1.0.0`。本机实际是 **2.2.0**，与原锁定矛盾；S9 已在 2.2.0 上实测 15 工具全部可注册/可调用/schema 正确，注释中记录两版差异。
+  - 产物：`tools/mcp_tools_check.py`、`tests/test_mcp_server.py`、`devplan/TOOLS.md`、`mcp_server.py`(M)、`kb_maintainer.py`(M)、`requirements.txt`(M)、`devplan/PROGRESS.md`(M)
+  - 测试结果：
+    - `python -m pytest tests/ -q` → **614 passed**（S8 的 505 + 本轮 109，0 failed）✅
+    - `python tools/mcp_tools_check.py --strict` → 清单一致 OK / **15 个工具逐个调用 OK**（均有非空描述、`inputSchema.type=object`、非空返回、非 is_error）/ 往返 OK，**退出码 0** ✅
+    - 往返实证：包内成员 `['knowledge_md/root.md','knowledge_md/florr/boss.md','knowledge_archive/old.md']`；还原后子目录保真 `True`、归档不被复活 `True`（修复前分别为 `False` / `False`）✅
+    - SDK 实测修正（与 S7 记录不同）：mcp **2.x** 进程内 `call_tool` 对**未知工具会抛 `ToolError`**，只有工具内部异常才被包成 `is_error` 结果；2.x 的 Tool 只有 `input_schema`（无 `inputSchema` 别名，直接访问 `AttributeError`）。测试已按双版本兼容写法锁定 ✅
+    - `compileall -q .` 退出码 0；探针产生的 `knowledge_md/_s9_probe*` / `_current_tactic.md` / `kb_backups/` 已清理 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - `handle_afk` 仅返回流程说明文本，不做实质处理（无真实弹窗坐标可测），属预期降级。
+    - 旧格式扁平备份中若两个游戏目录有同名文件，导入仍会互相覆盖（导出侧已修，历史备份无法追溯）。
+    - 向量检索仍为预留实现（`chromadb` / `sentence-transformers` 未装，后者会拉入 torch，磁盘紧张不装），本轮只验证"开关不被短路 + 签名正确 + 回退文本检索"。
+    - S10~S14 未执行（06:51 双线已置 PAUSED）；恢复时需顺延 `validUntil` 并按 S10 → S14 顺序继续。
+2026-09-21 06:59 · — · 用户指令「今晚 23:00 继续」：第二轮冲刺窗口定为 2026-09-21 23:00 ~ 2026-09-22 07:00，从 S9 续跑；A/B 双线已重新 ACTIVE 并顺延 validFrom/validUntil，23:00 与 23:30 两轮用一次性任务补齐（调度器会把当日 23:00 的 validFrom 顺延到次日 00:00）
