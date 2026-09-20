@@ -1,11 +1,27 @@
-# FlorrVLM-Agent 依赖
-flask>=3.0.0
-requests>=2.31.0
-pyautogui>=0.9.54
-pillow>=10.0.0
-opencv-python>=4.8.0
-numpy>=1.24.0
-python-dotenv>=1.0.0
-pyyaml>=6.0.0
-psutil>=5.9.0      # 可选：监控大盘的 CPU 占用显示
-mcp>=1.0.0
+# Universal-Game-Framework 运行依赖
+# 分组：core（必装） / optional（按需，无头环境可跳过）
+# 开发测试依赖见 requirements-dev.txt
+#
+# 安装（⚠️ 本机 /tmp 是 10M tmpfs，必须前置 TMPDIR，否则 OSError: [Errno 28]）：
+#   TMPDIR=/home/g-bill/.workbuddy/tmp \
+#   /home/g-bill/.workbuddy/binaries/python/envs/ugf/bin/pip install -r requirements.txt
+#
+# 磁盘紧张（<3G）时的最小安装：只装 core 段即可跑通离线 / dry-run 全链路。
+
+# ---------- 1. core · 核心必装（离线链路 + MCP + 面板均依赖） ----------
+flask>=3.0.0                # 管理面板 admin_panel.py
+requests>=2.31.0            # HTTP 调用（webhook 汇报 / VLM API，可 mock）
+python-dotenv>=1.0.0        # .env 加载（无 .env 时自动降级，不阻断）
+pyyaml>=6.0.0               # config.yaml / game_profiles/*.yaml / tuned_overrides
+psutil>=5.9.0               # 监控大盘 CPU/内存占用显示（缺失时降级为 0）
+mcp>=1.0.0                  # MCP Server（mcp_server.py）
+numpy>=1.24.0               # 数值计算：预判引擎 / 威胁评分
+
+# ---------- 2. optional · 按需（无头 / 无 X server 环境可全部跳过） ----------
+# 图像采集与真实键鼠控制，仅在「有显示器 + 有 X server」的机器上需要。
+# 本项目在无 X server 环境会自动走 mock / dry-run 分支，不装也能跑通全链路。
+pyautogui>=0.9.54           # 真实键鼠控制；headless 不可用，代码已内置降级
+pillow>=10.0.0              # 截图编码；无头环境可用 numpy mock 数据替代
+# 无头环境请改用下面这一行，避免引入 GUI 依赖链：
+#   opencv-python-headless>=4.8.0
+opencv-python>=4.8.0        # 图像处理；无头机器请用上面的 -headless 版本

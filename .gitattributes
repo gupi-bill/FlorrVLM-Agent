@@ -1,0 +1,35 @@
+# 统一换行符：仓库内一律 LF，检出时按平台自动转换
+# 目的：消除 Windows/Linux 混合开发导致的整文件 diff 噪音
+* text=auto eol=lf
+
+# 明确文本文件（防止被误判为二进制）
+*.py      text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.yaml    text eol=lf
+*.yml     text eol=lf
+*.json    text eol=lf
+*.sh      text eol=lf
+*.spec    text eol=lf
+*.cfg     text eol=lf
+*.toml    text eol=lf
+*.service text eol=lf
+Dockerfile text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Windows 专用脚本必须保留 CRLF，否则无法执行
+*.bat     text eol=crlf
+*.ps1     text eol=crlf
+*.cmd     text eol=crlf
+
+# 明确二进制（禁止任何换行/编码转换）
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.zip     binary
+*.gz      binary
+*.apk     binary
+*.db      binary

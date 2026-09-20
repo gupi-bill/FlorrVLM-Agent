@@ -30,6 +30,19 @@ dist_win/
 build/
 *.spec~
 
+# S1 · 构建产物与大二进制（曾经误入版本库，已从索引移除，磁盘文件保留）
+.buildozer/
+.gradle/
+*.apk
+*.aab
+*.tar.gz
+*.zip
+*.db
+
+# IDE / 编辑器产物
+.trae-html-share-packages/
+.trae/
+
 # v1.0 自动调参覆盖 + 知识库归档目录（运行时生成）
 tuned_overrides.yaml
 knowledge_archive/

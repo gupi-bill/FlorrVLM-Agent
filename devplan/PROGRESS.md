@@ -8,7 +8,7 @@
 | 阶段 | 名称 | 状态 | 周期 | 主要产物 |
 |---|---|---|---|---|
 | S0 | 前置：核心文件恢复 + venv | ✅ 完成 | 手动 | 17 个文件从 git HEAD 恢复；隔离 venv |
-| S1 | 仓库基线修复与卫生清理 | ⬜ 待执行 | | |
+| S1 | 仓库基线修复与卫生清理 | ✅ 完成 | 01:31~01:40 (B线) | `.gitattributes`、`.gitignore` 增补、`requirements.txt` 三段分组、`requirements-dev.txt`；移除 8 个构建产物（含 1 个 31MB tar.gz）出版本库 |
 | S2 | 静态依赖与接口审计 | ⬜ 待执行 | | |
 | S3 | 预判引擎实测定型 | ⬜ 待执行 | | |
 | S4 | 战斗评估与自动调参校验 | ⬜ 待执行 | | |
@@ -60,3 +60,24 @@
 ## 执行日志
 
 （每个周期结束后在下方追加，格式：时间 · 阶段 · 做了什么 · 产物 · 测试结果 · 遗留）
+
+- **2026-09-21 01:40 · S1 · 仓库基线修复与卫生清理**
+  - 做了什么：
+    1. `git rm -r --cached` 移除 `packaging/androidapp/.buildozer/**`（4 个文件，含 1 个 31MB `v3.14.2.tar.gz`），磁盘文件保留未删。
+    2. 追加发现 IDE 产物 `.trae-html-share-packages/`（60K / 4 文件）同样被跟踪，一并从索引移除。
+    3. `.gitignore` 增补：`.buildozer/` `.gradle/` `*.apk` `*.aab` `*.tar.gz` `*.zip` `*.db` `.trae-html-share-packages/` `.trae/`；主动放弃 `bin/` 规则（避免误伤合法脚本目录，改由 `*.apk` 覆盖）。
+    4. 新增 `.gitattributes`：`* text=auto eol=lf`，显式声明文本/二进制类型，Windows 脚本保留 CRLF。
+    5. 重写 `requirements.txt`：core（7 项）/ optional（3 项，标注 `opencv-python-headless` 无头替代）两段分组，附 TMPDIR 安装说明。
+    6. 新增 `requirements-dev.txt`：pytest / pytest-cov / ruff。
+    7. 补装缺失的 core 依赖 `numpy`（2.5.3），装在隔离 venv 内。
+  - 产物：`.gitattributes`、`.gitignore`(M)、`requirements.txt`(M)、`requirements-dev.txt`
+  - 测试结果：
+    - `git diff --cached --diff-filter=AM` 无 MB 级新增 ✅
+    - `git add -A && git status --short` 无异常项 ✅
+    - 版本库内最大文件由 31MB 降至 33KB（`agent_main.py`），跟踪文件 51 个 ✅
+    - `compileall -q .` 退出码 0 ✅
+    - core 依赖导入探测全通过（flask/requests/dotenv/yaml/psutil/mcp/numpy/pytest）✅
+    - optional（pyautogui/PIL/cv2）确认不可用 —— 无头环境预期内，后续阶段走 mock 降级
+  - 遗留：
+    - 历史 pack 仍含 31MB 对象（`.git` 125MB）。按 PLAN 约束不跑 `git gc --aggressive`，待磁盘宽裕时再说。
+    - `.gitignore` 中 `*.png` `*.jpg` 为宽泛规则，若将来需入库图片素材需 `git add -f` 或收窄规则（记录备查）。

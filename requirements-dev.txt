@@ -1,0 +1,12 @@
+# Universal-Game-Framework 开发依赖（测试 + 静态检查）
+# 说明：仅开发/CI 需要，运行期不需要安装。
+# 安装（注意 /tmp 为 10M tmpfs，必须指定 TMPDIR）：
+#   TMPDIR=/home/g-bill/.workbuddy/tmp \
+#   /home/g-bill/.workbuddy/binaries/python/envs/ugf/bin/pip install -r requirements-dev.txt
+
+# --- 测试 ---
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# --- 静态检查 / 格式化 ---
+ruff>=0.4.0
