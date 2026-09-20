@@ -184,6 +184,7 @@ def _run_yolo(image_path: str) -> dict:
 def reset_mock():
     """重置 mock 漂移基准时间（换局 / 测试隔离时用）。"""
     _MOCK_STATE["last"] = None
+    _MOCK_STATE["t0"] = None
 
 
 def _pingpong(start: float, speed: float, dt: float, lo: float, hi: float) -> float:
@@ -222,8 +223,14 @@ def mock_detections(cfg=None, now=None) -> dict:
     now = time.time() if now is None else float(now)
     dt = 0.0
     if bool(cfg.get("drift", True)):
-        last = _MOCK_STATE.get("last")
-        dt = 0.0 if last is None else max(0.0, now - last)
+        # v2.0 S7：基准时间一旦确立就不再随每帧滑动。
+        # 修复前 dt 取"上一帧到这一帧"的增量，位置 = start + v*dt 恒等于
+        # start + v*帧间隔 —— 实体永远停在原地附近，predictor 算出的速度恒为 0，
+        # 预判置信度永远上不去（dry-run 端到端实测：5 帧后 x_now 完全一致）。
+        t0 = _MOCK_STATE.get("t0")
+        if t0 is None or now < t0:
+            t0 = _MOCK_STATE["t0"] = now
+        dt = max(0.0, now - t0)
         _MOCK_STATE["last"] = now
 
     entities = []

@@ -20,6 +20,7 @@ import json
 import os
 import random
 import shutil
+import sys
 import time
 from typing import Optional
 
@@ -70,6 +71,42 @@ def _perception_url() -> str:
 # 如需开启，设置环境变量 FLORR_VECTOR_SEARCH=1，并安装 chromadb
 USE_VECTOR_SEARCH = os.getenv("FLORR_VECTOR_SEARCH", "0") == "1"
 
+
+def _stderr(msg: str):
+    """
+    v2.0 S7：所有启动期输出必须走 stderr。
+    MCP stdio 传输把服务端 stdout 当作 JSON-RPC 通道，任何 print 到 stdout 的
+    内容都会被客户端解析成协议消息而报 ValidationError（实测复现，S7 修复）。
+    """
+    try:
+        print(msg, file=sys.stderr, flush=True)
+    except Exception:
+        pass
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def dry_run() -> bool:
+    """UGF_DRY_RUN=1 时不执行任何真实键鼠动作，只走流程与写状态。"""
+    return _env_flag("UGF_DRY_RUN")
+
+
+def _dryrun_log(kind: str, detail: str):
+    """dry-run 下把"本该发生的动作"落盘，便于离线验收与回放核对。"""
+    try:
+        log_dir = os.path.join(BASE_DIR, config.get("paths.run_logs", "run_logs"))
+        os.makedirs(log_dir, exist_ok=True)
+        line = (f"{time.strftime('%Y-%m-%d %H:%M:%S')}\t{kind}\t{detail}\n")
+        with open(os.path.join(log_dir, "dryrun_actions.log"), "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass
+
 mcp = FastMCP("Universal-Game-Framework")
 
 
@@ -94,7 +131,7 @@ def ensure_kb_templates():
         if not os.path.exists(fpath):
             with open(fpath, "w", encoding="utf-8") as f:
                 f.write(content)
-    print(f"[MCP] 知识库为空，已自动写入 {len(KB_TEMPLATES)} 个基础模板到 {KB_DIR}")
+    _stderr(f"[MCP] 知识库为空，已自动写入 {len(KB_TEMPLATES)} 个基础模板到 {KB_DIR}")
 
 
 ensure_kb_templates()
@@ -206,6 +243,7 @@ def kb_write(filename: str, markdown_content: str, game_name: str = "") -> str:
     return f"已写入知识库: {full_path} ({len(markdown_content)} 字符)"
 
 
+@mcp.tool()
 def kb_append(filename: str, markdown_content: str, game_name: str = "") -> str:
     """追加内容到已有知识库文档（不存在则新建），自动按游戏分类。
     
@@ -272,7 +310,21 @@ def perceive_game() -> str:
         resp = requests.get(_perception_url(), timeout=8)
         resp.raise_for_status()
         data = resp.json()
+    except requests.ConnectionError:
+        # v2.0 S7：dry-run 下不要求外部感知服务常驻 —— 直接在进程内合成一帧，
+        # 保证 detect→predict→judge→act 全链路可离线跑通（结果带 _fallback 标记）。
+        if dry_run():
+            data = _inproc_perception()
+        else:
+            return json.dumps({"error": "感知服务未启动，请先运行 perception_server.py"},
+                              ensure_ascii=False)
+    except Exception as e:
+        if dry_run():
+            data = _inproc_perception(str(e))
+        else:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
 
+    try:
         # 自动喂给预判模块
         entities = data.get("entities", [])
         predictor.update_frame_entities(entities)
@@ -280,11 +332,27 @@ def perceive_game() -> str:
         # 去掉 _raw 减少 token
         data.pop("_raw", None)
         return json.dumps(data, ensure_ascii=False, indent=2)
-    except requests.ConnectionError:
-        return json.dumps({"error": "感知服务未启动，请先运行 perception_server.py"},
-                          ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": str(e)}, ensure_ascii=False)
+        return json.dumps({"error": f"感知结果处理失败: {e}"}, ensure_ascii=False)
+
+
+def _inproc_perception(reason: str = "") -> dict:
+    """
+    dry-run 降级：在本进程内直接调用 perception_server 的取帧函数拿一帧 mock 场景。
+    与 HTTP 路由共用 build_perception_payload()，避免"降级链路能跑、真实链路跑挂"。
+    """
+    try:
+        import perception_server
+        data = perception_server.build_perception_payload("mock")
+        data["_fallback"] = "inproc-mock"
+        if reason:
+            data["_fallback_reason"] = str(reason)[:200]
+        _dryrun_log("perceive", f"inproc-mock entities={len(data.get('entities') or [])}")
+        return data
+    except Exception as e:  # 连降级都失败也必须给出结构化错误，不能抛穿
+        _dryrun_log("perceive", f"inproc-mock 失败: {e}")
+        return {"error": f"dry-run 进程内感知降级失败: {e}",
+                "player": {}, "entities": [], "teammates": []}
 
 
 @mcp.tool()
@@ -319,6 +387,8 @@ def reset_predictor() -> str:
 # 消除"笔直冲向目标"的机器感
 def _path_perturb_move(x: int, y: int):
     # S2 审计 W：与同文件其它键鼠入口保持一致，缺失 pyautogui 时直接返回而非抛 ImportError
+    if dry_run():
+        return
     try:
         import pyautogui
     except ImportError:
@@ -343,12 +413,22 @@ def game_action(action_type: str,
     move 时需提供 x, y 坐标，会自动做拟人化路径微扰+偶发停顿。
     套装切换请使用独立工具 switch_set。
     """
+    action_type = (action_type or "").lower()
+
+    # v2.0 S7：dry-run 不做任何真实键鼠动作，只记录"本该执行的动作"并落盘
+    if dry_run():
+        coord = f" ({x},{y})" if action_type == "move" else ""
+        if action_type == "move" and (x is None or y is None):
+            _dryrun_log("action", "move 缺坐标 -> 拒绝")
+            return "move 动作必须提供 x 和 y 坐标"
+        _dryrun_log("action", f"{action_type}{coord}")
+        return "[dry-run] 动作已记录（未真实执行）: " + action_type + coord
+
     try:
         import pyautogui
     except ImportError:
         return "错误: 未安装 pyautogui，请执行 pip install pyautogui"
 
-    action_type = action_type.lower()
 
     if action_type == "move":
         if x is None or y is None:
@@ -389,14 +469,20 @@ def switch_set(set_name: str) -> str:
     set_name: combat / tank / retreat / chase / team。
     通过按数字键完成切换。
     """
+    key = SET_TO_KEY.get((set_name or "").lower())
+    if key is None:
+        return f"未知套装: {set_name}，可选 {'/'.join(SET_TO_KEY)}"
+
+    # v2.0 S7：dry-run 只记录换套意图，不按真实按键
+    if dry_run():
+        _dryrun_log("switch_set", f"{set_name} (按键 {key})")
+        return f"[dry-run] 套装切换已记录（未真实执行）: {set_name} (按键 {key})"
+
     try:
         import pyautogui
     except ImportError:
         return "错误: 未安装 pyautogui，请执行 pip install pyautogui"
 
-    key = SET_TO_KEY.get(set_name.lower())
-    if key is None:
-        return f"未知套装: {set_name}，可选 {'/'.join(SET_TO_KEY)}"
     pyautogui.press(key)
     return f"已切换套装: {set_name} (按键 {key})"
 
@@ -473,7 +559,8 @@ def switch_tactic(tactic_file: str) -> str:
 # 入口
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    print(f"[MCP] Universal-Game-Framework 服务启动")
-    print(f"[MCP] 知识库目录: {KB_DIR}")
-    print(f"[MCP] 向量检索: {'开启' if USE_VECTOR_SEARCH else '关闭(默认)'}")
+    _stderr(f"[MCP] Universal-Game-Framework 服务启动")
+    _stderr(f"[MCP] 知识库目录: {KB_DIR}")
+    _stderr(f"[MCP] 向量检索: {'开启' if USE_VECTOR_SEARCH else '关闭(默认)'}")
+    _stderr(f"[MCP] dry-run: {'开启(不执行真实键鼠)' if dry_run() else '关闭'}")
     mcp.run()

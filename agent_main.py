@@ -8,7 +8,7 @@ MCP Client 主循环，串联全部模块：
   → LLM 决策 → 执行(game_action，带移动抖动) → 循环
 
 附加功能：
-- 死亡防抖：连续 2 帧 alive=false 才判定真实死亡
+- 死亡防抖：连续 N 帧 alive=false 才判定真实死亡（N = agent.death_frame_threshold，默认 8）
 - 复盘过滤：只有 highest_boss / boss / 组队对局才生成复盘 md
 - 统一复盘模板（v0.2）：结果 / 面对怪物 / 自身套装 / 死亡原因 / 可改进点
 - 崩溃兜底清理（v0.2）：启动时清理上次残留的临时帧目录与截图
@@ -58,6 +58,37 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MCP_SERVER_SCRIPT = os.path.join(BASE_DIR, "mcp_server.py")
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+# v2.0 S7：UGF_DRY_RUN=1 —— 不碰真实键鼠、不调外部 LLM、不要求感知服务常驻，
+# 只走 detect→brief→research→ensure→play→report 全流程并写状态/日志。
+DRY_RUN = _env_flag("UGF_DRY_RUN")
+
+
+def _mcp_server_env() -> dict:
+    """
+    MCP stdio 客户端只向子进程透传白名单变量（实测：ugf_* 之类一律丢失），
+    dry-run / 感知后端等开关必须显式带上，否则"父进程开了开关、子进程没收到"。
+    """
+    try:
+        from mcp.client.stdio import get_default_environment
+        env = dict(get_default_environment())
+    except Exception:
+        env = {k: os.environ[k] for k in
+               ("PATH", "HOME", "SHELL", "TERM", "USER", "LOGNAME") if k in os.environ}
+    for key, val in os.environ.items():
+        if key.startswith("UGF_"):
+            env[key] = val
+    if DRY_RUN:
+        env["UGF_DRY_RUN"] = "1"
+    return env
+
+
 def _late_report(round_count, total_deaths):
     """v1.7 局中进度汇报：写单文件 + 可选 Webhook，在后台线程跑，不阻塞主循环。"""
     import report_notifier
@@ -75,6 +106,51 @@ def _late_report(round_count, total_deaths):
         log(f"[汇报] 局中进度上报启动失败: {e}")
 
 
+def _tool_text(result) -> str:
+    """MCP CallToolResult → 纯文本；不同 SDK 版本返回形状不同，统一兜底。"""
+    try:
+        content = result.content
+    except Exception:
+        content = None
+    if content is None:          # 非 CallToolResult 形状（字符串 / 自定义对象）
+        try:
+            return str(result) if result is not None else ""
+        except Exception:
+            return ""
+    if not content:              # 空 content：明确返回空串，不要退化成对象 repr
+        return ""
+    try:
+        return content[0].text
+    except Exception:
+        return ""
+
+
+def _tool_error(result) -> str:
+    """
+    MCP 工具调用"软失败"检测（v2.0 S7）：
+    call_tool 对未知工具/内部异常并不抛异常，而是把错误塞进返回内容；
+    不检查就会出现"日志说已写入、实际什么都没写"的静默失败（kb_append 即实测案例）。
+    """
+    text = _tool_text(result)
+    low = text.lower()
+    for key in ("unknown tool", "failed", "traceback", "错误"):
+        if key in low:
+            return text
+    return ""
+
+
+def _json_fields(text: str, *keys) -> str:
+    """从 JSON 文本里取若干字段拼成可读片段；取不到就给空串（不影响主循环）。"""
+    try:
+        data = json.loads(text)
+    except Exception:
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    parts = [f"{k}={data[k]}" for k in keys if data.get(k) not in (None, "")]
+    return "，".join(parts)
+
+
 def reload_config():
     """从 config.yaml 重读参数（热加载入口）。"""
     global LOG_DIR, DEATH_FRAME_THRESHOLD, BOSS_MEMORY_INTERVAL
@@ -89,8 +165,27 @@ def reload_config():
     CORNER_MARGIN = config.get("combat.safe_zone_margin", 100)  # 复用安全区边距
     BOSS_SAMPLE_MAX = config.get("agent.boss_sample_max", 120)
     BOSS_CLOSE_DIST = config.get("agent.boss_close_dist", 120)
-    LEARNING_STATS_INTERVAL = config.get("agent.learning_stats_interval", 24)
-    REPORT_EVERY = int(config.get("agent.report_every", 0) or 0)  # v1.7 局中定时汇报间隔(轮)
+    LEARNING_STATS_INTERVAL = _int_env(
+        "UGF_LEARN_EVERY", config.get("agent.learning_stats_interval", 24))
+    # v1.7 局中定时汇报间隔(轮)，0=关闭；环境变量用于 dry-run 中验证心跳而不改 config.yaml
+    REPORT_EVERY = _int_env("UGF_REPORT_EVERY", config.get("agent.report_every", 0))
+
+
+def _int_env(name: str, default) -> int:
+    """读整型环境变量，缺失/非法时回退到配置值（不抛异常，避免脏 env 炸主循环）。"""
+    raw = os.getenv(name)
+    if raw is None or str(raw).strip() == "":
+        try:
+            return int(default or 0)
+        except (TypeError, ValueError):
+            return 0
+    try:
+        return int(str(raw).strip())
+    except ValueError:
+        try:
+            return int(default or 0)
+        except (TypeError, ValueError):
+            return 0
 
 
 reload_config()
@@ -106,7 +201,10 @@ except ImportError:
 # 本地模块
 import combat_judge
 
-SERVER_PARAMS = StdioServerParameters(command=sys.executable, args=[MCP_SERVER_SCRIPT])
+SERVER_PARAMS = StdioServerParameters(command=sys.executable,
+                                      args=[MCP_SERVER_SCRIPT],
+                                      env=_mcp_server_env(),
+                                      cwd=BASE_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -318,12 +416,15 @@ async def review_round(session, survived: bool, note: str, state: str):
     except Exception:
         content += "\n- 历史对比检索失败\n"
 
-    await session.call_tool("kb_write", {
+    res = await session.call_tool("kb_write", {
         "filename": f"review_{timestamp}",
         "markdown_content": content,
     })
     await session.call_tool("reset_predictor")
-    log(f"[复盘] 对局结束，结果={outcome}，经验已写入知识库，预判历史已清空")
+    err = _tool_error(res)
+    log(f"[复盘] 对局结束，结果={outcome}"
+        + ("，经验已写入知识库" if not err else f"，写知识库失败: {err[:150]}")
+        + "，预判历史已清空")
 
 
 # ---------------------------------------------------------------------------
@@ -384,11 +485,15 @@ async def write_boss_memory(session, boss_observations: list, boss_samples: dict
         for uid, samples in boss_samples.items():
             if len(samples) >= 3:
                 content += f"- {uid}: {_analyze_boss_behavior(samples)}\n"
-    await session.call_tool("kb_append", {
+    res = await session.call_tool("kb_append", {
         "filename": "boss_behavior_log",
         "markdown_content": content,
     })
-    log(f"[记忆] 已写入 {len(boss_observations)} 条 BOSS 行为观察")
+    err = _tool_error(res)
+    if err:
+        log(f"[记忆] BOSS 行为记忆写入失败: {err[:200]}")
+    else:
+        log(f"[记忆] 已写入 {len(boss_observations)} 条 BOSS 行为观察")
 
 
 # ---------------------------------------------------------------------------
@@ -422,9 +527,14 @@ def write_snapshot(round_count, total_deaths, player, predictions, combat_eval, 
             import json as _j  # noqa
             pred = _j.loads(predictions) if isinstance(predictions, str) and predictions.startswith("[") else []
             for t in pred[:6]:
+                # v2.0 S7：predictor 输出的是 x_now/y_now + raw_id，
+                # 原先按 x/y/name 取恒为 0 与空串，监控大盘上看不到威胁在哪
                 threats.append({
-                    "cat": t.get("category", "?"), "name": t.get("name", ""),
-                    "threat": t.get("threat_score", 0), "x": t.get("x", 0), "y": t.get("y", 0),
+                    "cat": t.get("category", "?"),
+                    "name": t.get("raw_id") or t.get("name", ""),
+                    "threat": t.get("threat_score", 0),
+                    "x": t.get("x", t.get("x_now", 0)),
+                    "y": t.get("y", t.get("y_now", 0)),
                 })
         except Exception:
             threats = []
@@ -449,6 +559,8 @@ def write_snapshot(round_count, total_deaths, player, predictions, combat_eval, 
 async def run_agent(interval: float = 0.5, max_rounds: int = 0):
     log("=" * 55)
     log("  Universal-Game-Framework 启动 (MCP Client + 预判 + 战斗评估)")
+    if DRY_RUN:
+        log("  模式: DRY-RUN —— 无真实键鼠 / 无外部 LLM / 感知走进程内 mock")
     log("=" * 55)
 
     # v0.2 崩溃兜底：启动时清理残留临时文件
@@ -461,13 +573,16 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
             log(f"[MCP] 已连接，可用工具: {[t.name for t in tools.tools]}")
 
             kb_result = await session.call_tool("kb_list")
-            log(f"[知识库] 当前文档: {kb_result.content[0].text[:150]}")
+            log(f"[知识库] 当前文档: {_tool_text(kb_result)[:150]}")
 
             # 运行状态
             round_count = 0
             total_deaths = 0          # v1.1 累计死亡数（供监控大盘）
             game_state = "{}"
             death_streak = 0          # 连续死亡帧数
+            skipped_frames = 0        # v2.0 S7 感知跳过帧数（dry-run 验收用）
+            action_counts = {}        # v2.0 S7 动作分布（dry-run 验收用）
+            set_switches = 0          # v2.0 S7 换套次数
             last_boss_memory_time = 0
             boss_observations = []
             boss_samples = {}         # v0.3：BOSS 坐标样本，累积归纳习性
@@ -481,10 +596,12 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
 
             try:
                 while True:
-                    round_count += 1
-                    if max_rounds and round_count > max_rounds:
+                    # v2.0 S7：先判定再自增，保证 round_count 等于"实际执行回合数"
+                    # （原先自增后判定，日志会多报 1 轮）
+                    if max_rounds and round_count >= max_rounds:
                         log("[Agent] 达到最大轮数，退出")
                         break
+                    round_count += 1
 
                     # v0.5 热加载：config.yaml 变了就刷新各模块常量
                     if config.reload_if_changed():
@@ -506,14 +623,17 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
 
                     # 1. 感知
                     perceive_result = await session.call_tool("perceive_game")
-                    game_state = perceive_result.content[0].text
+                    game_state = _tool_text(perceive_result) or "{}"
 
+                    # v2.0 S7：把 _reason / _error 打出来，否则"跳过本帧"看不到具体原因
                     if '"_skipped"' in game_state:
-                        log("[感知] YOLO 超时或截图失败，跳过本帧")
+                        log(f"[感知] 跳过本帧（{_json_fields(game_state, '_reason', '_error')}）")
+                        skipped_frames += 1
                         await asyncio.sleep(interval)
                         continue
                     if '"error"' in game_state:
-                        log(f"[感知] 异常: {game_state[:100]}")
+                        log(f"[感知] 异常: {_json_fields(game_state, 'error', 'message')}"
+                            f" {game_state[:80]}")
                         await asyncio.sleep(2)
                         continue
 
@@ -544,7 +664,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
 
                     # 3. 预判
                     pred_result = await session.call_tool("predict_all_entities")
-                    predictions = pred_result.content[0].text
+                    predictions = _tool_text(pred_result) or "[]"
 
                     # 4. 战斗评估（v0.2 防抖：0.7s 内命中缓存不重算）
                     pred_data = json.loads(predictions) if predictions.startswith("[") else []
@@ -591,7 +711,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                     recommended_set = combat_eval.get("recommended_set")
                     if recommended_set and recommended_set != current_set:
                         await session.call_tool("switch_set", {"set_name": recommended_set})
-                        await session.call_tool("kb_append", {
+                        _res = await session.call_tool("kb_append", {
                             "filename": "player_tactics",
                             "markdown_content": (
                                 f"- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
@@ -601,8 +721,12 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                                 f"→ 换 {recommended_set} 套"
                             ),
                         })
+                        _err = _tool_error(_res)
+                        if _err:
+                            log(f"[战术] 写入 player_tactics 失败: {_err[:150]}")
                         log(f"[套装] {current_set} → {recommended_set}，已记入 player_tactics.md")
                         current_set = recommended_set
+                        set_switches += 1
 
                     # 6. 检索知识库
                     keyword = "boss" if combat_eval.get("has_highest_boss") else "战术"
@@ -635,8 +759,12 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                         action_args["x"] = int(tx)
                         action_args["y"] = int(ty)
 
-                    # 9. 执行
+                    # 9. 执行（dry-run 下由 MCP 服务端记录动作但不碰键鼠）
                     exec_result = await session.call_tool("game_action", action_args)
+                    action_counts[action_type] = action_counts.get(action_type, 0) + 1
+                    exec_text = _tool_text(exec_result)
+                    if any(k in exec_text for k in ("错误", "必须提供", "未知动作")):
+                        log(f"[动作] 执行异常: {exec_text[:120]}")
 
                     # 10. BOSS 行为观察收集（v0.3 累积坐标样本，归纳习性）
                     if combat_eval.get("has_highest_boss") or any(
@@ -677,7 +805,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                             col[0] += 1
                             col[1] += int(h)
                         summary = [f"- {k}: {col[1]}/{col[0]} 次命中" for k, col in weak.items()]
-                        await session.call_tool("kb_append", {
+                        _res = await session.call_tool("kb_append", {
                             "filename": "learning_stats",
                             "markdown_content": (
                                 f"- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
@@ -686,6 +814,9 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                                 f"应优先补充教程"
                             ),
                         })
+                        _err = _tool_error(_res)
+                        if _err:
+                            log(f"[学习] 命中率汇总写入失败: {_err[:150]}")
                         learn_stats = []
                         # v1.0 基础自动调参：按命中率 + 本周期死亡数微调阈值
                         try:
@@ -712,10 +843,22 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
             except KeyboardInterrupt:
                 log("\n[Agent] 收到中断信号")
             finally:
-                # 退出前写剩余 BOSS 记忆
-                if boss_observations:
-                    await write_boss_memory(session, boss_observations, boss_samples)
-                await review_round(session, True, "Agent 正常退出", game_state)
+                # 退出前写剩余 BOSS 记忆；收尾失败绝不影响退出码
+                try:
+                    if boss_observations:
+                        await write_boss_memory(session, boss_observations, boss_samples)
+                except Exception as e:
+                    log(f"[记忆] 退出前写 BOSS 记忆失败: {e}")
+                try:
+                    await review_round(session, True, "Agent 正常退出", game_state)
+                except Exception as e:
+                    log(f"[复盘] 退出前复盘失败（不影响退出）: {e}")
+                log("[汇总] " + " | ".join([
+                    f"回合={round_count}", f"死亡={total_deaths}",
+                    f"跳过帧={skipped_frames}", f"换套={set_switches}",
+                    "动作=" + (",".join(f"{k}x{v}" for k, v in sorted(action_counts.items()))
+                               or "无"),
+                ]))
 
     log("[Agent] 已断开 MCP 连接")
 
@@ -727,15 +870,23 @@ def main():
     parser = argparse.ArgumentParser(description="Universal-Game-Framework 主程序")
     parser.add_argument("--interval", type=float, default=0.5,
                         help="决策循环间隔秒数，默认 0.5")
-    parser.add_argument("--max-rounds", type=int, default=0,
-                        help="最大运行回合数，0=无限")
+    parser.add_argument("--max-rounds", "--rounds", dest="max_rounds", type=int, default=0,
+                        help="最大运行回合数，0=无限（--rounds 为等价别名）")
     args = parser.parse_args()
 
     if not os.path.exists(MCP_SERVER_SCRIPT):
         print(f"错误: 找不到 MCP 服务端 {MCP_SERVER_SCRIPT}")
         sys.exit(1)
 
-    asyncio.run(run_agent(interval=args.interval, max_rounds=args.max_rounds))
+    if DRY_RUN:
+        print("[dry-run] 已开启：不做真实键鼠动作、不调用外部 LLM、"
+              "感知缺失时走进程内 mock")
+    try:
+        asyncio.run(run_agent(interval=args.interval, max_rounds=args.max_rounds))
+    except KeyboardInterrupt:
+        print("\n[dry-run] 已中断" if DRY_RUN else "\n已中断")
+        sys.exit(130)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

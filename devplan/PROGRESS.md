@@ -14,7 +14,7 @@
 | S4 | 战斗评估与自动调参校验 | ✅ 完成 | 03:27~03:45 (A线) | `tests/test_combat_judge.py`(64)、`tests/test_auto_tuner.py`(26)；`combat_judge.py` 6 处修复、`auto_tuner.py` 3 处修复；`config.yaml`/`config.py` 新增 `combat.flee_distance`/`strafe_distance` |
 | S5 | 会话/汇报/技能模块校验 | ✅ 完成 | 03:50~04:08 (B线) | `tests/test_session.py`(68)、`tests/test_report_notifier.py`(33)、`tests/test_skill_manager.py`(34)；`session.py` 10 处修复、`report_notifier.py` 5 处、`skill_manager.py` 5 处、`agent_cli.py` 会话 shim + 技能持久化；`skills/report/*` 从 9 行演示桩改为真实汇报 |
 | S6 | 感知服务离线化 | ✅ 完成 | 04:43~05:05 (A线) | `perception_server.py` 重写（mock/auto/http 三后端 + `--selftest`）、`tests/test_perception_server.py`(99 用例)、`config.yaml`/`config.py` 新增 `perception.*` 段；`mcp_server._perception_url()` 端口随配置走 |
-| S7 | 主循环 dry-run | ⬜ 待执行 | | |
+| S7 | 主循环 dry-run | ✅ 完成 | 05:11~05:34 (A线) | `agent_main.py` dry-run 分支 + `--rounds` 别名 + 软失败检测；`mcp_server.py` 补注册 `kb_append`、stdout→stderr、进程内 mock 感知降级；`perception_server.py` mock 漂移改累计时间基准；`tests/test_agent_main.py`(87)；`devplan/SMOKE_S7.md`；457 用例全绿 |
 | S8 | CLI 全命令冒烟 | ⬜ 待执行 | | |
 | S9 | MCP 工具注册验证 | ⬜ 待执行 | | |
 | S10 | 游戏档案体系固化 | ⬜ 待执行 | | |
@@ -226,3 +226,28 @@
     - `--selftest` 对 http 后端只校验"结构合规"，`_skipped` 帧也判 ok（退出码 0）。语义上属"链路可跑"而非"感知可用"，**S13** 若要做 CI 门禁需区分这两者。
     - `agent_main` 目前只判断 `"_skipped"` / `"error"` 两个字面量，不打印 `_reason`/`_error`，排障时看不到具体原因。**S7** 主循环改造时一并补日志。
     - 无 `.env` / 无真实 YOLO：http 后端的真实截图与模型推理仍未实测，本轮全部由 monkeypatch 覆盖，属预期降级。
+
+- **2026-09-21 05:34 · S7 · 主循环 dry-run（agent_main 全链路离线跑通）**
+  - 做了什么：
+    1. **新增 `UGF_DRY_RUN=1` 开关**（`agent_main.py`）：启动打印模式横幅；MCP 子进程环境显式透传全部 `UGF_*`（实测 mcp stdio 客户端只转发 `HOME/PATH/SHELL/TERM/USER/LOGNAME` 六个白名单变量，不补这一步会出现"父进程开了开关、子进程没收到"）；新增 `--rounds` 作为 `--max-rounds` 等价别名（PLAN 验收命令用 `--rounds`）。
+    2. **`mcp_server.py` dry-run 降级**：`game_action` / `switch_set` / `_path_perturb_move` 在无真实键鼠时只记录不执行，返回 `[dry-run] ...` 并把动作明细落盘到 `run_logs/dryrun_actions.log`；`perceive_game` 在感知服务不可达时改走**进程内 mock**（复用 `perception_server.build_perception_payload()`，结果带 `_fallback=inproc-mock`），非 dry-run 仍返回明确错误、不伪装成空场景。
+    3. **修复 A1（阻断，静默失败）**：`kb_append` 从未被 `@mcp.tool()` 注册，而主循环的 BOSS 记忆 / 战术记忆 / 学习汇总三处都在调它；`call_tool` 不抛异常只把错误塞进返回内容，导致"日志说已写入 N 条、实际一个字节没写"。已补注册，并在 `agent_main` 新增 `_tool_error()` 软失败检测，写失败改为显式报错。
+    4. **修复 A2（阻断，协议污染）**：MCP 服务启动 banner 与知识库模板提示 `print` 到 stdout，而 stdio 传输把 stdout 当 JSON-RPC 通道，客户端每帧解析报 `ValidationError`。新增 `_stderr()` 全部改走 stderr。
+    5. **修复 A3（高，端到端暴露）**：`perception_server` 的 mock 位移用"上一帧到这一帧"的增量 `dt`，位置恒等于 `start + v×帧间隔`，实体原地不动 → predictor 速度恒为 0、预判置信度永远上不去（dry-run 实测 5 帧 `x_now` 完全相同）。改为累计时间基准 `t0`，`reset_mock()` 一并清理。
+    6. **修复 A4/A5/A6/A7**：回合计数先自增后判定导致 `--rounds 5` 汇总报"回合=6"；监控快照按 `x/y/name` 取字段而 predictor 输出 `x_now/y_now/raw_id`，威胁坐标恒为 `(0,0)`、名字恒为空；感知跳过/异常不打 `_reason`；MCP 返回解析直接下标 `content[0].text`，异常形状会打断主循环 → 统一由 `_tool_text()` 兜底，退出前 BOSS 记忆与复盘包 try/except 保证退出码 0。
+    7. 新增 `UGF_REPORT_EVERY` / `UGF_LEARN_EVERY` 两个环境变量覆盖（仅用于在不改 `config.yaml` 的前提下验证汇报心跳与命中率汇总）；修正 docstring 中"连续 2 帧判定死亡"与配置 `death_frame_threshold: 8` 的不一致。
+    8. 新建 `tests/test_agent_main.py`（**87 用例**）+ `devplan/SMOKE_S7.md`（开关语义、7 项缺陷、实测样例、13 项验证矩阵、5 条遗留）。
+  - 产物：`agent_main.py`(M)、`mcp_server.py`(M)、`perception_server.py`(M)、`tests/test_agent_main.py`、`devplan/SMOKE_S7.md`、`devplan/PROGRESS.md`(M)
+  - 测试结果：
+    - `python -m pytest tests/ -q` → **457 passed**（S3 46 + S4 90 + S5 135 + S6 99 + S7 87，0 failed）✅
+    - 验收命令 `UGF_DRY_RUN=1 python agent_main.py --rounds 5` → **exit 0**，5 轮全走完，产出 `agent_snapshot.json` / `dryrun_actions.log` / `progress_report.md` / `agent_20260921.log`，知识库写入 `boss_behavior_log.md` / `player_tactics.md` / `review_*.md` ✅
+    - S7 单测覆盖：开关解析 12 例、工具返回解析 9 例（含空 content / 非 CallToolResult 形状）、软失败检测 4 例、兜底决策 6 例、复盘过滤 5 例、BOSS 行为归纳 4 例、日志滚动与清理 3 例、热加载与子进程环境透传 3 例、工具注册回归锁 10 例（主循环依赖的 9 个工具 + `kb_append`）、dry-run 动作/换套 8 例、进程内 mock 感知 5 例（含"感知→预判"多帧连通）、mock 漂移累积回归 1 例 ✅
+    - 场景验证：汇报心跳（每 4 轮）、命中率汇总 + `auto_tuner.tune`（每 6 轮）、BOSS 记忆 flush、死亡分支（临时置 `alive:false` 跑 10 轮 → 第 8 轮判定死亡、写复盘、exit 0，配置已还原）、运行中 `touch config.yaml` 触发热加载 ✅
+    - 修复 A3 后快照坐标真实：hornet x=622.7、beetle x=1416.5（此前恒为初始 ± 一帧增量）✅
+    - `compileall -q .` 退出码 0；`git status` 仅预期 4 项变更，无临时 png / 日志入库 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - `_fallback_decide` 无 LLM 时只输出 `attack`/`defend`/`idle`，`move` 分支（安全区钳制 + 抖动）在 dry-run 中未被覆盖，需规则化 move 策略后补测（建议 **S13** 前）。
+    - `mcp_server._text_search` 的 `return` 之后有 3 行不可达代码；行为无影响（空结果已正确返回"未找到相关内容"），**S13** 清理。
+    - 死亡防抖阈值 8 帧与 README/模块 docstring 旧描述"2 帧"不符，文档统一移交 **S13**。
+    - `review_*.md` / `learning_stats.md` 随每次 dry-run 在 `knowledge_md/` 累积（已被 `.gitignore` 忽略），长跑清理建议交 **S12** 运维脚本。
+    - 无 `.env`：真实 LLM 决策仍未实测，本轮全部走 `_fallback_decide` 规则分支，属预期降级。
