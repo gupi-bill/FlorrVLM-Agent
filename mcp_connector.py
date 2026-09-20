@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 外部 MCP 连接器 mcp_connector.py
+Universal-Game-Framework 外部 MCP 连接器 mcp_connector.py
 ================================================
 v0.7 —— 让 Agent 不只是"对外暴露工具"，还能"主动去连别人的 MCP"。
 

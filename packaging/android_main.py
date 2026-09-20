@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent  Android 壳入口  (v1.9)
+Universal-Game-Framework  Android 壳入口  (v1.9)
 实验性最小 APK：能在手机打开，展示本包信息。
 完整智能体核心跑在桌面，需再接网络把状态推到此壳（见 README）。
 """
@@ -13,7 +13,7 @@ from kivy.clock import Clock
 class Root(BoxLayout):
     def __init__(self, **kw):
         super().__init__(orientation="vertical", **kw)
-        self.add_widget(Label(text="FlorrVLM-Agent v1.9", font_size=28, bold=True))
+        self.add_widget(Label(text="Universal-Game-Framework v1.9", font_size=28, bold=True))
         self.add_widget(Label(
             text="通用游戏操作引擎 · 哦带了壳版\n\n"
                  "核心(桌面)功能：VLM 视觉感知 / 实体预判 / 战斗评估 / MCP 知识库\n\n"

@@ -1,4 +1,4 @@
-# FlorrVLM-Agent 外部 MCP 连接配置 mcp_connectors.yaml
+# Universal-Game-Framework 外部 MCP 连接配置 mcp_connectors.yaml
 # v0.7 —— Agent 启动时会逐个连接这里的 MCP Server，把外部工具并入能力。
 #
 # 每条连接：

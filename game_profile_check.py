@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 游戏档案自检器  game_profile_check.py  (v1.8)
+Universal-Game-Framework 游戏档案自检器  game_profile_check.py  (v1.8)
 ============================================================
 投 bo / 换游戏之前，先校验 game_profiles/<name>.yaml 是否完整、字段是否合法，
 避免"格式写错 → 启动才报错"的低级问题。

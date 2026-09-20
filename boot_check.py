@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 启动自检 boot_check.py
+Universal-Game-Framework 启动自检 boot_check.py
 =====================================
 v1.0 —— 解决"装完开不起来、报错看不懂"的问题。
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 可视化监控大盘 admin_panel.py  (v1.1)
+Universal-Game-Framework 可视化监控大盘 admin_panel.py  (v1.1)
 =====================================================
 浏览器打开 http://127.0.0.1:5002 即可实时查看：
 - 指标卡片：当前游戏 / 会话状态 / 本局回合数 / 累计死亡 / 知识库规模 / 时间
@@ -138,7 +138,7 @@ def _status() -> dict:
 
 
 PAGE = """<!DOCTYPE html><html lang="zh"><meta charset="utf-8">
-<title>FlorrVLM-Agent 监控大盘</title>
+<title>Universal-Game-Framework 监控大盘</title>
 <style>
  :root{--bg:#0b101d;--card:#141b2c;--line:#26314a;--tx:#e6e8ee;--mut:#8b96ad;
        --ok:#34d399;--warn:#fbbf24;--err:#f87171;--acc:#60a5fa}
@@ -163,7 +163,7 @@ PAGE = """<!DOCTYPE html><html lang="zh"><meta charset="utf-8">
  .banner{background:var(--err);color:#fff;padding:8px 10px;border-radius:8px;margin-bottom:10px;display:none}
  @media(max-width:700px){.row{grid-template-columns:1fr}}
 </style>
-<h1>FlorrVLM-Agent 监控大盘</h1>
+<h1>Universal-Game-Framework 监控大盘</h1>
 <div class="sub" id="time">加载中…</div>
 <div class="banner" id="banner">⚠ 未检测到 Agent 运行快照（可能还没 `play`，或感知服务未启动）</div>
 <div class="grid">

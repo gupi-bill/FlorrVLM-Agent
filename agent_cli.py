@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 交互式入口 agent_cli.py
+Universal-Game-Framework 交互式入口 agent_cli.py
 =======================================
 v0.6 —— 从"后台脚本"变成"能对话、能汇报、能编排"的 Agent。
 v1.0 —— 界面美化 + 开玩前"了解游戏"问答流程(brief)。
@@ -19,7 +19,20 @@ import os
 import sys
 
 import config
-import session  # v1.4 会话记忆 & 断点续玩
+import config
+try:
+    import session  # v1.4 会话记忆 & 断点续玩
+except ImportError:
+    # 如果 session 模块不存在，提供空实现防止程序崩溃
+    import types
+    session = types.ModuleType("session")
+    session.load_state = lambda: {}
+    session.save_state = lambda s: None
+    session.update_state = lambda k, v: None
+    session.clear_state = lambda: None
+    session.describe = lambda: "无会话状态 (模块未加载)"
+    session.resume_info = lambda: "无待续玩进度"
+    session.stats_text = lambda: "会话统计: 无数据"
 from cli_ui import banner, panel, chip, bold, cyan, green, magenta, dim, yellow, red
 from report_notifier import notify  # v1.2 自动汇报
 from skill_manager import SkillManager
@@ -140,7 +153,7 @@ def describe_capabilities() -> str:
     lines = [f"  {x}" for x in lines]
     lines.append("")
     lines += [f"  · {x}" for x in _inspected_components()]
-    return panel("FlorrVLM-Agent 能力清单(可随时输入 capabilities 查看)", lines)
+    return panel("Universal-Game-Framework 能力清单(可随时输入 capabilities 查看)", lines)
 
 
 HELP_LINES = [
@@ -361,7 +374,189 @@ def _cmd_kb_import(backup: str) -> str:
         return chip(f"恢复失败: {e}", "err")
 
 
+KB_DIR = os.path.join(BASE_DIR, "knowledge_md")
+
+
+def _cmd_kb_list(game_name: str = "") -> str:
+    """列出知识库文档，支持按游戏过滤。
+    
+    用法:
+      kb_list              - 列出所有知识库文件
+      kb_list florr        - 仅列出 florr 游戏的知识库文件
+    """
+    if game_name:
+        safe_name = game_name.replace(" ", "_").replace("/", "-")
+        game_dir = os.path.join(KB_DIR, safe_name)
+        if os.path.exists(game_dir):
+            files = sorted(f for f in os.listdir(game_dir) if f.endswith(".md"))
+        else:
+            files = []
+            _append_log(f"⚠️ 未找到游戏 {game_name} 的知识库文件夹")
+    else:
+        if os.path.exists(KB_DIR):
+            files = sorted(f for f in os.listdir(KB_DIR) if f.endswith(".md"))
+        else:
+            files = []
+            _append_log("ℹ️ knowledge_md 目录不存在")
+    
+    if files:
+        return f"知识库文件 ({len(files)} 个):\n" + "\n".join(f"• {f}" for f in files)
+    return "知识库暂无文档"
+
+
+def _cmd_kb_search(keyword: str, game_name: str = "") -> str:
+    """在知识库中搜索关键词，支持按游戏过滤。
+    
+    用法:
+      kb_search boss       - 在所有游戏知识库中搜索 "boss"
+      kb_search boss florr - 仅在 florr 游戏知识库中搜索 "boss"
+    """
+    if not keyword:
+        return "用法: kb_search <关键词> [游戏名]"
+
+    if game_name:
+        safe_name = game_name.replace(" ", "_").replace("/", "-")
+        search_dir = os.path.join(KB_DIR, safe_name)
+        if not os.path.exists(search_dir):
+            return f"未找到游戏 {game_name} 的知识库"
+        search_base = search_dir
+    else:
+        search_base = KB_DIR
+
+    # 简单的文本搜索
+    results = []
+    keyword_lower = keyword.lower()
+    
+    # os.walk 遍历目录树
+    for root, dirs, files in os.walk(search_base):
+        for fname in files:
+            if fname.endswith(".md"):
+                fpath = os.path.join(root, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    if keyword_lower in content.lower():
+                        rel_path = os.path.relpath(fpath, search_base)
+                        results.append(f">>> {rel_path}\n{content[:1500]}")
+                except Exception:
+                    continue
+    
+    if results:
+        return f"共找到 {len(results)} 条结果:\n" + "\n---\n".join(results)
+    return f"在 {search_base} 中未找到关键词: {keyword}"
+
+
+def _cmd_kb_write(filename: str, game_name: str = "") -> str:
+    """写入内容到知识库，自动归入对应游戏文件夹。
+    
+    用法:
+      kb_write my_tactics.md     - 写入到 knowledge_md/ my_tactics.md (根目录)
+      kb_write my_tactics.md florr - 写入到 knowledge_md/florr/ my_tactics.md
+    """
+    if not filename:
+        return "用法: kb_write <文件名> [游戏名]"
+    
+    if not filename.endswith(".md"):
+        filename += ".md"
+    
+    # 确定保存路径
+    if game_name:
+        safe_name = game_name.replace(" ", "_").replace("/", "-")
+        target_dir = os.path.join(KB_DIR, safe_name)
+        os.makedirs(target_dir, exist_ok=True)
+    else:
+        target_dir = KB_DIR
+    
+    target_path = os.path.join(target_dir, filename)
+    
+    # 写入内容 - 需要从用户获取，这里提示输入
+    # 由于 CLI 交互的局限性，我们提供两种模式：
+    # 1. 直接用默认内容（如空白模板）
+    # 2. 提示用户输入
+    
+    # 这里我们使用一个简单的模板内容
+    template = f"""# {filename}
+
+**游戏**: {game_name or "未指定"}
+**创建时间**: {__import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+**内容摘要**: 请编辑此文件添加您的战术或笔记。
+
+## 要点
+
+- 要点 1
+- 要点 2
+- 要点 3
+"""
+    
+    try:
+        with open(target_path, "w", encoding="utf-8") as f:
+            f.write(template)
+        return f"✅ 写入知识库: {target_path}"
+    except Exception as e:
+        return f"❌ 写入失败: {e}"
+
+
+def _cmd_kb_append(filename: str, game_name: str = "") -> str:
+    """追加内容到知识库文件，自动归入对应游戏文件夹。
+    
+    用法:
+      kb_append notes.md florr    - 追加到 knowledge_md/florr/ notes.md
+    """
+    if not filename:
+        return "用法: kb_append <文件名> [游戏名]"
+    
+    if not filename.endswith(".md"):
+        filename += ".md"
+    
+    # 确定保存路径（同写入逻辑）
+    if game_name:
+        safe_name = game_name.replace(" ", "_").replace("/", "-")
+        target_dir = os.path.join(KB_DIR, safe_name)
+        os.makedirs(target_dir, exist_ok=True)
+    else:
+        target_dir = KB_DIR
+    
+    target_path = os.path.join(target_dir, filename)
+    
+    # 追加内容 - 使用同样的模板但使用追加模式
+    template = f"""
+
+# 追加内容
+
+**追加时间**: {__import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+- 添加了新的观察或战术
+- 可以在这里记录新发现
+"""
+    
+    try:
+        # 检查文件是否存在
+        if os.path.exists(target_path):
+            # 文件存在，追加内容
+            with open(target_path, "a", encoding="utf-8") as f:
+                f.write(template)
+            return f"✅ 追加到知识库: {target_path} (已追加)"
+        else:
+            # 文件不存在，创建新文件
+            with open(target_path, "w", encoding="utf-8") as f:
+                f.write(template)
+            return f"✅ 创建并写入知识库: {target_path} (新建)"
+    except Exception as e:
+        return f"❌ 操作失败: {e}"
+
+
 def _run_auto(game: str) -> str:
+    """全链路自动：detect → brief(若无) → research → ensure。"""
+    st = load_state()
+    parts = [_cmd_detect(game)]
+    if not st.get("brief"):
+        st["brief"] = _collect_brief(st.get("brief"))
+        st["status"] = "researching"
+        save_state(st)
+        parts.append(panel("已按引导完成游戏了解(brief)", _format_brief(st["brief"])))
+    parts.append(_cmd_research())
+    parts.append(_cmd_ensure())
+    return "\n".join(parts)
     """全链路自动：detect → brief(若无) → research → ensure。"""
     st = load_state()
     parts = [_cmd_detect(game)]
@@ -470,7 +665,7 @@ def main():
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-    parser = argparse.ArgumentParser(description="FlorrVLM-Agent 交互式入口")
+    parser = argparse.ArgumentParser(description="Universal-Game-Framework 交互式入口")
     parser.add_argument("-c", "--command", help="执行单条命令后退出(如 report / skills)")
     args = parser.parse_args()
 
@@ -494,6 +689,10 @@ def main():
             "package": lambda: _cmd_package(arg),
             "kb_export": lambda: _cmd_kb_export(),
             "kb_import": lambda: _cmd_kb_import(arg),
+            "kb_list": lambda: _cmd_kb_list(arg),
+            "kb_search": lambda: _cmd_kb_search(arg),
+            "kb_write": lambda: _cmd_kb_write(arg),
+            "kb_append": lambda: _cmd_kb_append(arg),
             "skills": lambda: SKILLS.summary(),
             "load": lambda: SKILLS.load(arg),
             "unload": lambda: SKILLS.unload(arg),

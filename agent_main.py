@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 主程序 agent_main.py
+Universal-Game-Framework 主程序 agent_main.py
 =====================================
 MCP Client 主循环，串联全部模块：
 
@@ -186,7 +186,7 @@ def startup_cleanup():
 # ---------------------------------------------------------------------------
 # LLM 决策
 # ---------------------------------------------------------------------------
-SYSTEM_PROMPT = """你是 FlorrVLM-Agent，一个玩 florr.io 的游戏智能体，目标是优先保命、持续作战。
+SYSTEM_PROMPT = """你是 Universal-Game-Framework，一个玩 florr.io 的游戏智能体，目标是优先保命、持续作战。
 可调用工具：perceive_game, kb_search, predict_all_entities, game_action, kb_write, handle_afk, reset_predictor。
 套装切换(switch_set)由战斗评估自动执行，无需你手动调用。
 决策规则：
@@ -448,7 +448,7 @@ def write_snapshot(round_count, total_deaths, player, predictions, combat_eval, 
 # ---------------------------------------------------------------------------
 async def run_agent(interval: float = 0.5, max_rounds: int = 0):
     log("=" * 55)
-    log("  FlorrVLM-Agent 启动 (MCP Client + 预判 + 战斗评估)")
+    log("  Universal-Game-Framework 启动 (MCP Client + 预判 + 战斗评估)")
     log("=" * 55)
 
     # v0.2 崩溃兜底：启动时清理残留临时文件
@@ -724,7 +724,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
 # 入口
 # ---------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(description="FlorrVLM-Agent 主程序")
+    parser = argparse.ArgumentParser(description="Universal-Game-Framework 主程序")
     parser.add_argument("--interval", type=float, default=0.5,
                         help="决策循环间隔秒数，默认 0.5")
     parser.add_argument("--max-rounds", type=int, default=0,

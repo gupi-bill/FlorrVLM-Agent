@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent MCP Server mcp_server.py
+Universal-Game-Framework MCP Server mcp_server.py
 =========================================
 基于 Model Context Protocol 的标准工具服务端。
 
@@ -47,7 +47,7 @@ PERCEPTION_URL = "http://127.0.0.1:5001/perceive"
 # 如需开启，设置环境变量 FLORR_VECTOR_SEARCH=1，并安装 chromadb
 USE_VECTOR_SEARCH = os.getenv("FLORR_VECTOR_SEARCH", "0") == "1"
 
-mcp = FastMCP("FlorrVLM-Agent")
+mcp = FastMCP("Universal-Game-Framework")
 
 
 # ---------------------------------------------------------------------------
@@ -81,38 +81,62 @@ ensure_kb_templates()
 # 知识库工具
 # ---------------------------------------------------------------------------
 @mcp.tool()
-def kb_list() -> str:
-    """列出知识库中全部 Markdown 文档名称。"""
-    files = sorted(f for f in os.listdir(KB_DIR) if f.endswith(".md"))
+def kb_list(game_name: str = "") -> str:
+    """列出知识库中全部 Markdown 文档名称。
+    
+    如果提供了 game_name，仅列出该游戏的文件夹下的文档。
+    """
+    if game_name:
+        safe_game_name = game_name.replace(" ", "_").replace("/", "-")
+        game_dir = os.path.join(KB_DIR, safe_game_name)
+        if os.path.exists(game_dir):
+            files = sorted(f for f in os.listdir(game_dir) if f.endswith(".md"))
+        else:
+            files = []
+    else:
+        files = sorted(f for f in os.listdir(KB_DIR) if f.endswith(".md"))
     return json.dumps(files, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
-def kb_search(keyword: str) -> str:
+def kb_search(keyword: str, game_name: str = "") -> str:
+    """在本地 md 知识库中做关键词检索。
+    
+    如果提供了 game_name，仅在该游戏的文件夹中搜索。
     """
-    在本地 md 知识库中做关键词检索。
-    默认纯文本匹配；向量检索需手动开启 FLORR_VECTOR_SEARCH=1。
-    """
+    if game_name:
+        safe_game_name = game_name.replace(" ", "_").replace("/", "-")
+        search_dir = os.path.join(KB_DIR, safe_game_name)
+        if not os.path.exists(search_dir):
+            return f"未找到游戏: {game_name} 的知识库文件夹"
+        search_base = search_dir
+    else:
+        search_base = KB_DIR
+    
+    USE_VECTOR_SEARCH = False  # 默认关闭，防止意外启动
+    
     if USE_VECTOR_SEARCH:
-        return _vector_search(keyword)
-    return _text_search(keyword)
+        return _vector_search(keyword, search_base)
+    return _text_search(keyword, search_base)
 
 
-def _text_search(keyword: str) -> str:
+def _text_search(keyword: str, search_base: str) -> str:
     """纯文本关键词检索。"""
     results = []
     keyword_lower = keyword.lower()
-    for fname in sorted(os.listdir(KB_DIR)):
-        if not fname.endswith(".md"):
-            continue
-        fpath = os.path.join(KB_DIR, fname)
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                content = f.read()
-        except Exception:
-            continue
-        if keyword_lower in content.lower():
-            results.append(f"## {fname}\n{content[:2000]}")
+    for root, dirs, files in os.walk(search_base):
+        # 只搜索 md 文件
+        md_files = [f for f in files if f.endswith(".md")]
+        for fname in sorted(md_files):
+            fpath = os.path.join(root, fname)
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except Exception:
+                continue
+            if keyword_lower in content.lower():
+                results.append(f"## {os.path.relpath(fpath, search_base)}\n{content[:2000]}")
+    return f"共找到 {len(results)} 条结果:\n" + "\n\n".join(results) if results else "未找到相关内容"
     if not results:
         return f"知识库中未找到与「{keyword}」相关的内容。"
     return "\n\n---\n\n".join(results)
@@ -131,28 +155,58 @@ def _vector_search(keyword: str) -> str:
 
 
 @mcp.tool()
-def kb_write(filename: str, markdown_content: str) -> str:
-    """将内容写入知识库，保存为 Markdown 文件。"""
+def kb_write(filename: str, markdown_content: str, game_name: str = "") -> str:
+    """将内容写入知识库，自动按游戏分类到不同文件夹。
+    
+    如果提供了 game_name，内容将保存在 knowledge_md/<game_name>/ 下，
+    否则保存在 knowledge_md/ 根目录（向后兼容）。
+    
+    Args:
+        filename: 文件名（不包含路径，会自动添加游戏文件夹）
+        markdown_content: markdown 内容
+        game_name: 游戏名称，用于创建子文件夹
+    """
     if not filename.endswith(".md"):
         filename += ".md"
-    full_path = os.path.join(KB_DIR, filename)
+    
+    # 根据游戏名创建子文件夹
+    if game_name:
+        safe_game_name = game_name.replace(" ", "_").replace("/", "-")
+        game_dir = os.path.join(KB_DIR, safe_game_name)
+        os.makedirs(game_dir, exist_ok=True)
+        full_path = os.path.join(game_dir, filename)
+    else:
+        full_path = os.path.join(KB_DIR, filename)
+    
     with open(full_path, "w", encoding="utf-8") as f:
         f.write(markdown_content)
-    return f"已写入知识库: {filename} ({len(markdown_content)} 字符)"
+    return f"已写入知识库: {full_path} ({len(markdown_content)} 字符)"
 
 
-@mcp.tool()
-def kb_append(filename: str, markdown_content: str) -> str:
-    """追加内容到已有知识库文档（不存在则新建）。"""
+def kb_append(filename: str, markdown_content: str, game_name: str = "") -> str:
+    """追加内容到已有知识库文档（不存在则新建），自动按游戏分类。
+    
+    如果提供了 game_name，内容将追加到 knowledge_md/<game_name>/filename.md，
+    否则追加到 knowledge_md/filename.md（向后兼容）。
+    """
     if not filename.endswith(".md"):
         filename += ".md"
-    full_path = os.path.join(KB_DIR, filename)
+    
+    # 根据游戏名创建子文件夹
+    if game_name:
+        safe_game_name = game_name.replace(" ", "_").replace("/", "-")
+        game_dir = os.path.join(KB_DIR, safe_game_name)
+        os.makedirs(game_dir, exist_ok=True)
+        full_path = os.path.join(game_dir, filename)
+    else:
+        full_path = os.path.join(KB_DIR, filename)
+    
     mode = "a" if os.path.exists(full_path) else "w"
     with open(full_path, mode, encoding="utf-8") as f:
         if mode == "a":
             f.write("\n\n")
         f.write(markdown_content)
-    return f"已追加到知识库: {filename}"
+    return f"已追加到知识库: {full_path}"
 
 
 # ---------------------------------------------------------------------------
@@ -392,7 +446,7 @@ def switch_tactic(tactic_file: str) -> str:
 # 入口
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    print(f"[MCP] FlorrVLM-Agent 服务启动")
+    print(f"[MCP] Universal-Game-Framework 服务启动")
     print(f"[MCP] 知识库目录: {KB_DIR}")
     print(f"[MCP] 向量检索: {'开启' if USE_VECTOR_SEARCH else '关闭(默认)'}")
     mcp.run()

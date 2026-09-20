@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 配置加载 config.py
+Universal-Game-Framework 配置加载 config.py
 ==================================
 所有阈值/路径集中到 yaml，改参数不用改源码。
 

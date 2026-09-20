@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 基础自动调参 auto_tuner.py
+Universal-Game-Framework 基础自动调参 auto_tuner.py
 ========================================
 v1.0 —— 多次对局后根据"战损统计"自动微调阈值，不用手动改配置。
 

@@ -1,4 +1,4 @@
-# FlorrVLM-Agent 开发路线图（ROADMAP）
+# Universal-Game-Framework 开发路线图（ROADMAP）
 
 > 从 Florr.io 专用智能体出发，逐版本演进，最终成为通用游戏智能体。
 > 核心能力贯穿始终：VLM 视觉感知 / 实体运动预判 / MCP 本地 MD 知识库 / 视频自学 / 死亡复盘 / 临时文件自动清理 / 低资源占用。

@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎮 FlorrVLM-Agent
+# 🎮 Universal-Game-Framework
 
 **一个会自己玩游戏的通用 Agent · From Florr.io → 所有游戏**
 
@@ -142,7 +142,7 @@ Windows EXE / Android APK 见 [packaging/README.md](packaging/README.md)。
 ## 📁 文件结构
 
 ```
-FlorrVLM-Agent/
+Universal-Game-Framework/
 ├── agent_cli.py             # 对话指挥入口（交互 + -c 单命令）
 ├── agent_main.py            # MCP Client 主循环
 ├── mcp_server.py            # MCP 服务端

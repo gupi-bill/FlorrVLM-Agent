@@ -1,4 +1,4 @@
-# FlorrVLM-Agent 全局配置 config.yaml
+# Universal-Game-Framework 全局配置 config.yaml
 # 所有阈值/路径集中在这里，改参数不用改源码。
 # 改完保存即热加载生效（agent_main 每轮会检测文件变化）。
 # 这些是 Florr 专属部分：1.0 之后整份可作为第一张"游戏档案"抽走。

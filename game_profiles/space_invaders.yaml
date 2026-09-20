@@ -1,0 +1,33 @@
+# Universal-Game-Framework 游戏档案 florr.yaml
+# ====================================
+# v0.9 —— 每个游戏一份档案。核心模块(predictor/combat_judge/agent_main)只认这些
+# 键的语义，不认具体游戏名。切换游戏 = 设 AGENT_GAME 指向另一份档案，核心零改动。
+#
+# 优先级：DEFAULT 兜底 < config.yaml(通用项) < 本档案(游戏专属项)。
+# config.py 启动/热加载时读取 AGENT_GAME(=config.yaml 里 agent.game) 合并本档案。
+
+# 游戏元信息
+game:
+  name: space_invaders
+  description: 经典街机游戏，控制光子射击者防御地球，消灭入侵的外星人。
+
+# 实体分类（太空侵略者实体体系）
+# 定义： player, mothership, alien_drone, alien_swarmer, alien_boss
+predictor:
+  # 稀有度链（此处保持框架默认，实际游戏中可自定义）
+  rarity_highest_boss: ["boss"]   # 最高威胁 - 邪恶母舰
+  rarity_boss: ["boss"]           # BOSS 类别
+  rarity_elite: ["mothership"]    # 精英 - 母舰
+  rarity_normal: ["alien_drone", "alien_swarmer"]  # 普通 - 基本外星人
+  # 分类 -> 威胁分数（战斗评估判断打/跑/追）
+  threat:
+    highest_boss: 2000            # 邪恶母舰 - 极高威胁
+    boss: 800                      # 母舰 - 高威胁
+    elite: 100                     # 基本外星人 - 中等威胁
+    normal: 20                     # 最小外星人 - 低威胁
+    player_enemy: 100              # 对手玩家/军团威胁
+    player_ally: 0                 # 队友 - 无威胁
+    unknown: 10                    # 未知实体
+
+combat:
+  chase_min_category: elite      # 追击套最低怪物档次

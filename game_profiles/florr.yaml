@@ -1,4 +1,4 @@
-# FlorrVLM-Agent 游戏档案 florr.yaml
+# Universal-Game-Framework 游戏档案 florr.yaml
 # ====================================
 # v0.9 —— 每个游戏一份档案。核心模块(predictor/combat_judge/agent_main)只认这些
 # 键的语义，不认具体游戏名。切换游戏 = 设 AGENT_GAME 指向另一份档案，核心零改动。

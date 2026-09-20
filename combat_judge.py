@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 战斗评估模块 combat_judge.py
+Universal-Game-Framework 战斗评估模块 combat_judge.py
 =============================================
 纯逻辑运算，不写磁盘，不调用外部 API。
 

@@ -1,4 +1,4 @@
-# FlorrVLM-Agent 项目总览
+# Universal-Game-Framework 项目总览
 
 > ⚠️ **声明：仅用于本地 AI 智能体技术研究。在 florr.io 官方服务器运行 bot 违反游戏服务条款，可能导致账号封禁。**
 
@@ -67,7 +67,7 @@ git clone https://github.com/OpenCloserOrg/OpenClaw.git
 ## 四、自有文件结构
 
 ```
-FlorrVLM-Agent/
+Universal-Game-Framework/
 ├── agent_cli.py            # 对话指挥入口（交互 + -c 单命令）——主入口
 ├── agent_main.py           # MCP Client 主循环
 ├── mcp_server.py           # MCP 服务端（15 个工具，MD 知识库）
@@ -193,7 +193,7 @@ detect(这是什么游戏) → brief(开玩前了解) → research(去查资料)
 
 ```bash
 # 1. 进入项目
-cd FlorrVLM-Agent
+cd Universal-Game-Framework
 
 # 2. 克隆外部依赖（Florr 实机才需要）
 git clone https://github.com/PANP2010/florr_powerful_tools.git

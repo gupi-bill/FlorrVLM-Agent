@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 轻量知识库维护 kb_maintainer.py
+Universal-Game-Framework 轻量知识库维护 kb_maintainer.py
 ==============================================
 v1.0 —— 知识库体积有上限，不无限膨胀撑爆小硬盘。
 

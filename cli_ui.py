@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 终端界面工具 cli_ui.py
+Universal-Game-Framework 终端界面工具 cli_ui.py
 ======================================
 v1.0 —— 把原来的纯文本命令行变成"好看"的彩色面板界面。
 
@@ -43,7 +43,7 @@ def bold(t):    return _c(BOLD, t)
 def dim(t):     return _c(DIM, t)
 
 
-def banner(title: str = "FlorrVLM-Agent", subtitle: str = "通用游戏操作引擎 v1.0",
+def banner(title: str = "Universal-Game-Framework", subtitle: str = "通用游戏操作引擎 v1.0",
            width: int = 46) -> str:
     """居中的彩色横幅。"""
     half = title.center(width - 4)

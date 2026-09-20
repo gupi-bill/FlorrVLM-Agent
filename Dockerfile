@@ -1,4 +1,4 @@
-# FlorrVLM-Agent 一键部署镜像（v1.0）
+# Universal-Game-Framework 一键部署镜像（v1.0）
 # ==================================
 # 构建: docker build -t florr-agent .
 # 运行: docker run --rm -it -v "$PWD/.env:/app/.env" florr-agent
