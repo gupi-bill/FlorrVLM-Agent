@@ -28,6 +28,27 @@ DEFAULT = {
     "server.perception_port": 5001,
     "server.panel_port": 5002,
 
+    # v2.0 S6 感知服务离线化
+    "perception.backend": "auto",       # auto|http|mock
+    "perception.yolo_timeout": 8,
+    "perception.skip_on_timeout": 0.8,
+    "perception.screen_w": 1920,
+    "perception.screen_h": 1080,
+    "perception.mock": {
+        "drift": True,
+        "afk_popup": False,
+        "player": {"alive": True, "hp": 100, "max_hp": 100, "x": 960, "y": 540,
+                   "power_score": 120, "petal_set": "combat", "talent": "none"},
+        "entities": [
+            {"raw_id": "hornet", "rarity": "Common", "x": 400, "y": 300, "vx": 80, "vy": 0},
+            {"raw_id": "ladybug", "rarity": "Unusual", "x": 700, "y": 420, "vx": -60, "vy": 40},
+            {"raw_id": "centipede", "rarity": "Rare", "x": 1200, "y": 600, "vx": 0, "vy": -50},
+            {"raw_id": "beetle", "rarity": "Epic", "x": 1500, "y": 350, "vx": -30, "vy": -30},
+            {"raw_id": "mantis", "rarity": "Super", "x": 1700, "y": 800, "vx": 0, "vy": 0},
+        ],
+        "teammates": [{"raw_id": "player_ally", "petal_set": "support", "x": 900, "y": 500}],
+    },
+
     "predictor.predict_seconds": 1.2,
     "predictor.min_frames": 3,
     "predictor.entity_timeout": 0.4,

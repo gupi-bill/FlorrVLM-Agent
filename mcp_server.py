@@ -51,6 +51,21 @@ os.makedirs(KB_DIR, exist_ok=True)
 
 PERCEPTION_URL = "http://127.0.0.1:5001/perceive"
 
+
+def _perception_url() -> str:
+    """
+    v2.0 S6：端口随配置走（perception.port > server.perception_port），
+    避免改了 config.yaml 却仍打 5001 这种"改了没生效"的坑。
+    """
+    try:
+        port = int(config.get("perception.port", 0) or 0)
+        if port <= 0:
+            port = int(config.get("server.perception_port", 5001) or 5001)
+    except (TypeError, ValueError):
+        port = 5001
+    return f"http://127.0.0.1:{port}/perceive"
+
+
 # 向量检索开关：默认关闭，J1900 低配机器不用装向量库
 # 如需开启，设置环境变量 FLORR_VECTOR_SEARCH=1，并安装 chromadb
 USE_VECTOR_SEARCH = os.getenv("FLORR_VECTOR_SEARCH", "0") == "1"
@@ -254,7 +269,7 @@ def perceive_game() -> str:
     同时自动更新 predictor 的实体历史（用于预判）。
     """
     try:
-        resp = requests.get(PERCEPTION_URL, timeout=8)
+        resp = requests.get(_perception_url(), timeout=8)
         resp.raise_for_status()
         data = resp.json()
 

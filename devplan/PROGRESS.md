@@ -13,7 +13,7 @@
 | S3 | 预判引擎实测定型 | ✅ 完成 | 02:41~02:55 (B线) | `tests/test_predictor.py`（46 用例全绿）、`tests/conftest.py`；`predictor.py` 抖动惩罚 + NaN 防御 + 分类逐帧重算；`config.yaml`/`config.py` 新增 4 个置信度曲线配置项 |
 | S4 | 战斗评估与自动调参校验 | ✅ 完成 | 03:27~03:45 (A线) | `tests/test_combat_judge.py`(64)、`tests/test_auto_tuner.py`(26)；`combat_judge.py` 6 处修复、`auto_tuner.py` 3 处修复；`config.yaml`/`config.py` 新增 `combat.flee_distance`/`strafe_distance` |
 | S5 | 会话/汇报/技能模块校验 | ✅ 完成 | 03:50~04:08 (B线) | `tests/test_session.py`(68)、`tests/test_report_notifier.py`(33)、`tests/test_skill_manager.py`(34)；`session.py` 10 处修复、`report_notifier.py` 5 处、`skill_manager.py` 5 处、`agent_cli.py` 会话 shim + 技能持久化；`skills/report/*` 从 9 行演示桩改为真实汇报 |
-| S6 | 感知服务离线化 | ⬜ 待执行 | | |
+| S6 | 感知服务离线化 | ✅ 完成 | 04:43~05:05 (A线) | `perception_server.py` 重写（mock/auto/http 三后端 + `--selftest`）、`tests/test_perception_server.py`(99 用例)、`config.yaml`/`config.py` 新增 `perception.*` 段；`mcp_server._perception_url()` 端口随配置走 |
 | S7 | 主循环 dry-run | ⬜ 待执行 | | |
 | S8 | CLI 全命令冒烟 | ⬜ 待执行 | | |
 | S9 | MCP 工具注册验证 | ⬜ 待执行 | | |
@@ -200,3 +200,29 @@
     - `session.py` 与 `agent_cli.py` 各维护一份 `_default_state` / `load_state` / `save_state`，且写同一个 `agent_state.json`，两处默认值不完全一致（CLI 侧无 `sessions` / `total_deaths` / `resumed` 等键）。未合并（会扩大改动面、影响既有 `state` 命令输出），移交 **S13** 收敛。
     - `_cmd_run_skill` 在 `run_skill` 未加载时才恢复技能，若同时存在同名技能被显式 `unload`，下次 `run_skill` 会重新加载（当前行为符合直觉，但与"显式卸载应生效"有语义冲突）。已在冒烟中确认行为，待 **S8** CLI 冒烟时统一口径。
     - 无 `.env` / 无网络：Webhook 真实推送、真实 LLM 摘要均未实测，本轮全部由注入假 `requests` 覆盖，属预期降级。
+
+- **2026-09-21 05:05 · S6 · 感知服务离线化（perception_server.py）**
+  - 做了什么：
+    1. **新增三后端**：`auto`（探测截图工具+YOLO 检测脚本，缺一即降级）/ `http`（真实截图+YOLO）/ `mock`（纯配置合成场景）。优先级：环境变量 `UGF_PERCEPTION_BACKEND` > `config.yaml perception.backend` > `auto`。显式后端不做探测，避免"想 mock 却被判成 http"。
+    2. **新增 `perception.*` 配置段**（`config.yaml` + `config.py DEFAULT`）：`backend` / `yolo_timeout` / `skip_on_timeout` / `screen_w|h` / `mock.{drift,afk_popup,player,entities,teammates}`。默认 5 个实体（Common→Super 覆盖四档稀有度）+ 1 个队友，全部带 `vx/vy`。所有读配置改走 `_cfg()` 运行时取值，热加载立即生效。
+    3. **修复 P1（静默空帧）**：原实现把 YOLO 报错（`{"error": ...}`）当成正常结果继续走标准化，返回 `entities: []` + `alive:true` 的"空场景"，Agent 会误判为"游戏里没怪"继续空转。现在统一走 `_skip_payload()`，显式带 `_skipped` / `_reason` / `_error`（`yolo_error` / `yolo_timeout` / `detect_script_missing` / `screenshot_tool_missing` / `screenshot_failed` / `yolo_bad_output`）。
+    4. **修复 P1（mock 实体飞出屏幕）**：端到端实测发现——实体按 `v*t` 无限外推，服务跑 3 分钟后 x 超出"屏幕 2 倍"越界阈值被 `_is_valid_entity` 过滤，感知结果从 5 个实体退化到 1 个（只剩 vx=0 的），离线主循环会"看不见怪"。新增 `_pingpong()` 三角波往返，实体永久留在屏幕内且持续运动（predictor 可稳定累积帧）。
+    5. **截图路径迁移**：`/tmp/florr_frame.png`（10M tmpfs，写大图会 OSError 28）→ `BASE_DIR/.perception_frame.png`（已被 `.gitignore` 的 `*.png` 覆盖）。
+    6. **加固**：`_is_valid_entity` 增加 NaN/Inf（含 `"nan"` 字符串）拦截；`normalize_player` 脏值统一回退；`normalize_teammates` 容忍 None/标量/非 dict 输入；`_run_yolo` 的 `json` 分支不再用 `'stdout' in dir()` 这种不可靠判断。
+    7. **新增 `--selftest`**：`python perception_server.py --selftest [--backend mock] [--rounds N]`，跑 N 帧校验契约（player/entities/teammates/afk_popup + 实体结构），mock 模式额外校验多帧漂移，输出 JSON，退出码 0/1。路由与自检共用 `build_perception_payload()`，避免"自检能过、实际跑挂"。
+    8. **`/health` 增强**：返回 `backend` / `configured_backend` / `port` / `screenshot_tool` / `detect_script` / `offline`；`/perceive?raw=0` 可去掉 `_raw` 省 token。
+    9. `mcp_server` 新增 `_perception_url()`：端口按 `perception.port` > `server.perception_port` 解析（原先硬编码 5001，改了 config 不生效）。
+  - 产物：`perception_server.py`(重写)、`tests/test_perception_server.py`、`config.yaml`(M)、`config.py`(M)、`mcp_server.py`(M)
+  - 测试结果：
+    - `python -m pytest tests/ -q` → **370 passed**（S3 46 + S4 90 + S5 135 + S6 99，0 failed）✅
+    - S6 覆盖：后端选择 12 例（env 优先级/非法回落/auto 三种探测/显式绕过）、配置读取 7 例（端口回退链/超时下限/屏幕尺寸兜底/config 缺失）、实体合法性 16 组（负坐标/越界/NaN/Inf/"nan" 字符串/缺字段/非 dict）、玩家脏值 7 组、队友 6 例、mock 漂移 6 例（含 `_pingpong` 5 组边界 + 长跑 1 小时后仍 5 实体且在屏内）、http 失败降级 7 例（含"错误不伪装成空场景"回归）、Flask 路由 4 例、自检 4 例、predictor 链路 1 例 ✅
+    - `python perception_server.py --selftest` → `backend=mock`（auto 在本机正确降级），`ok=true`, `drifting=true`, 退出码 0 ✅
+    - `python perception_server.py --selftest --backend http --rounds 1` → `ok=true`, `_reason=detect_script_missing`（结构化错误，不崩溃）✅
+    - 真实进程冒烟：`UGF_PERCEPTION_BACKEND=mock python perception_server.py` 起服务 → `/health` 返回 `backend=mock, offline=true, port=5001`；连续两帧 `/perceive` 均 5 实体、坐标在屏内、hornet 右移 120.5px ✅
+    - MCP 端到端：`mcp_server.perceive_game()` 打到活体 mock 服务，返回 `_backend=mock` + 5 实体 + 队友 + 完整 player；`predict_all_entities()` 随后算出 mantis(Super) 预判 ✅
+    - `compileall -q .` 退出码 0；`git status` 仅预期 5 项变更，无临时 png / 日志残留 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - 本机存在 ImageMagick `import`，`auto` 判定之所以仍落到 mock 是靠"无 YOLO 检测脚本"这一条。若将来放入 `florr_powerful_tools/detect.py`，`auto` 会切到 http 并在无 X server 时每帧返回 `screenshot_failed`——**S7 主循环 dry-run 必须显式设 `UGF_PERCEPTION_BACKEND=mock`**，或由 launcher 统一下发。
+    - `--selftest` 对 http 后端只校验"结构合规"，`_skipped` 帧也判 ok（退出码 0）。语义上属"链路可跑"而非"感知可用"，**S13** 若要做 CI 门禁需区分这两者。
+    - `agent_main` 目前只判断 `"_skipped"` / `"error"` 两个字面量，不打印 `_reason`/`_error`，排障时看不到具体原因。**S7** 主循环改造时一并补日志。
+    - 无 `.env` / 无真实 YOLO：http 后端的真实截图与模型推理仍未实测，本轮全部由 monkeypatch 覆盖，属预期降级。

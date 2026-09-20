@@ -7,6 +7,38 @@ server:
   perception_port: 5001        # 感知服务端口
   panel_port: 5002             # 本地面板端口
 
+perception:
+  # v2.0 S6：感知后端离线化
+  # backend: auto = 有截图工具+检测脚本走 http(真实YOLO)，否则自动降级 mock
+  #          mock = 直接返回配置里的合成场景（无截图、无YOLO、无显卡）
+  #          http = 强制走真实截图+YOLO（不可用时返回明确错误而非崩溃）
+  # 环境变量 UGF_PERCEPTION_BACKEND=mock|http|auto 优先级高于此处
+  backend: auto
+  yolo_timeout: 8              # YOLO 检测超时秒数，超过就跳过这一帧
+  skip_on_timeout: 0.8         # 超时时休眠秒数，给 CPU 喘息
+  screen_w: 1920               # 越界过滤用屏幕尺寸（可被实际分辨率覆盖）
+  screen_h: 1080
+  mock:
+    drift: true                # mock 实体按速度随时间移动，供 predictor 累积多帧
+    afk_popup: false
+    player:
+      alive: true
+      hp: 100
+      max_hp: 100
+      x: 960
+      y: 540
+      power_score: 120
+      petal_set: combat
+      talent: none
+    entities:
+      - {raw_id: hornet,     rarity: Common,  x: 400,  y: 300, vx: 80,  vy: 0}
+      - {raw_id: ladybug,    rarity: Unusual, x: 700,  y: 420, vx: -60, vy: 40}
+      - {raw_id: centipede,  rarity: Rare,    x: 1200, y: 600, vx: 0,   vy: -50}
+      - {raw_id: beetle,     rarity: Epic,    x: 1500, y: 350, vx: -30, vy: -30}
+      - {raw_id: mantis,     rarity: Super,   x: 1700, y: 800, vx: 0,   vy: 0}
+    teammates:
+      - {raw_id: player_ally, petal_set: support, x: 900, y: 500}
+
 predictor:
   predict_seconds: 1.2         # 预判未来秒数
   min_frames: 3                # 至少多少帧才算速度
