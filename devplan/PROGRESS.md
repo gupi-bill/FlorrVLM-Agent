@@ -15,7 +15,7 @@
 | S5 | 会话/汇报/技能模块校验 | ✅ 完成 | 03:50~04:08 (B线) | `tests/test_session.py`(68)、`tests/test_report_notifier.py`(33)、`tests/test_skill_manager.py`(34)；`session.py` 10 处修复、`report_notifier.py` 5 处、`skill_manager.py` 5 处、`agent_cli.py` 会话 shim + 技能持久化；`skills/report/*` 从 9 行演示桩改为真实汇报 |
 | S6 | 感知服务离线化 | ✅ 完成 | 04:43~05:05 (A线) | `perception_server.py` 重写（mock/auto/http 三后端 + `--selftest`）、`tests/test_perception_server.py`(99 用例)、`config.yaml`/`config.py` 新增 `perception.*` 段；`mcp_server._perception_url()` 端口随配置走 |
 | S7 | 主循环 dry-run | ✅ 完成 | 05:11~05:34 (A线) | `agent_main.py` dry-run 分支 + `--rounds` 别名 + 软失败检测；`mcp_server.py` 补注册 `kb_append`、stdout→stderr、进程内 mock 感知降级；`perception_server.py` mock 漂移改累计时间基准；`tests/test_agent_main.py`(87)；`devplan/SMOKE_S7.md`；457 用例全绿 |
-| S8 | CLI 全命令冒烟 | ⬜ 待执行 | | |
+| S8 | CLI 全命令冒烟 | ✅ 完成 | 06:00~06:30 (A线) | `tools/cli_smoke.py`(31 条命令矩阵，可复用为门禁)、`tests/test_agent_cli.py`(48 用例)、`devplan/SMOKE_S8.md`；`agent_cli.py` 9 处修复：补齐未定义的 `_append_log`、`-c` 一次性模式彻底禁用交互提问、补 help/play/auto 与 `--auto search`、`unload` 跨进程恢复、kb_* 支持游戏名第二参数、交互模式补 kb_* 分支、帮助清单补登记、删 `_run_auto` 死代码 |
 | S9 | MCP 工具注册验证 | ⬜ 待执行 | | |
 | S10 | 游戏档案体系固化 | ⬜ 待执行 | | |
 | S11 | UI 收敛与统一启动器 | ⬜ 待执行 | | |
@@ -24,6 +24,35 @@
 | S14 | 最终验收与归档 | ⬜ 待执行 | | |
 
 图例：⬜ 待执行 ｜ 🟡 进行中 ｜ ✅ 完成 ｜ ⛔ 阻塞
+
+- **2026-09-21 06:30 · S8 · CLI 全命令冒烟（agent_cli.py）**
+  - 做了什么：
+    1. 新建冒烟工具 `tools/cli_smoke.py`：以**子进程**真实执行 `agent_cli.py -c "<cmd>"`（不走 monkeypatch，能抓到 import 期/运行期真实崩溃），逐条打超时，判定「不可读错误」= 输出含 `Traceback`。支持 `--json` / `--strict` / `--only`，**S13 可直接接成门禁**。
+    2. **修复 C1（阻断，真实崩溃）**：`kb_list` / `kb_search` 在「游戏目录不存在」分支调用 `_append_log()`，而该函数在 `agent_cli.py` 中**根本不存在** —— `-c "kb_list florr"` 直接 `NameError` 吐 traceback。补齐实现（写 `run_logs/agent_<day>.log`，异常一律静默）。
+    3. **修复 C2（阻断，卡死）**：`_collect_brief()` 无条件 `input()`，原先只靠 `EOFError` 兜底 —— 实测当父进程把 tty 透传给子进程时，`-c brief` 20s 超时、`-c "play 2"` 卡死 200s 以上。新增 `_ONE_SHOT` 全局开关：`-c` / `--auto` 一次性调用**无论 stdin 是什么都不提问**，答案改从 `UGF_BRIEF_*` 环境变量取。同时把冒烟工具的 `stdin` 显式设为 `DEVNULL`（这是能稳定复现/验证该缺陷的关键）。
+    4. **修复 C3（高）**：`-c` 模式下 `help` / `play` / `auto` 三个在帮助里写着的命令全部落到「未知命令」。补齐，并把命令表从 `main()` 局部变量抽成 `_command_registry(arg)`，使「帮助清单 ⊇ 命令表」可由单测锁定。
+    5. **修复 C4（高，PLAN 点名项）**：`ui_pyqt.py:139` 一直以 `["python3","agent_cli.py","--auto","search",game,"basic guide"]` 调用，而 CLI 既无 `--auto` 参数也无 `search` 子命令，该调用 100% 失败。新增 `--auto`（`--auto <游戏>` 全链路 / `--auto search <游戏> <查询词>` 走 detect→research→ensure）与等价的 `-c "auto_search <游戏> <查询词>"`。
+    6. **修复 C5（中）**：`-c "unload report"` 跨进程不恢复技能，显式卸载恒返回「未加载」（`run_skill` 早有恢复逻辑，`unload` 漏了）→ 卸载前先按档案恢复。
+    7. **修复 C6（中）**：`kb_search/write/append` 把整个 `arg` 当成一个参数，`kb_search boss florr` 实际搜的是 `"boss florr"` → 新增 `_arg2()` 支持游戏名第二参数。
+    8. **修复 C7（中）**：交互模式 `interactive()` 的 elif 链里没有 `kb_list` / `kb_search` / `kb_write` / `kb_append`，交互式会话中这四个命令一律「未知命令」→ 补齐分支。
+    9. **修复 C8（低）**：`HELP_LINES` 与 `describe_capabilities()` 都没登记 4 个 kb 命令 → 补齐。
+    10. **修复 C9（低）**：`_run_auto` 的 `return` 之后有 28 行完全重复的死代码 → 删除，并由 AST 断言锁定。
+    11. 附带：删除重复 `import config`；模块级 `import datetime` 替代函数内 `__import__("datetime")`；`research` 离线时追加统一降级提示 `_offline_note()`；未知命令退出码 0→1 并附可用命令列表。
+  - 产物：`tools/cli_smoke.py`、`tests/test_agent_cli.py`、`devplan/SMOKE_S8.md`、`agent_cli.py`(M)
+  - 测试结果：
+    - `python tools/cli_smoke.py` → **31 条命令：ok 31 / traceback 0 / 有意义输出 30 (96%)**（余下 1 条为故意的未知命令反向用例）✅
+    - 修复前后对比：traceback 1→0；交互阻塞超时 1→0；卡死超时 3→0；落到「未知命令」的已声明命令 3→0 ✅
+    - `python -m pytest tests/ -q` → **505 passed**（S7 的 457 + 本轮 48，0 failed）✅
+    - 端到端：`-c "play 2"` 14 秒跑完 2 轮（修复前卡死 >200s），MCP 连上 15 个工具，回合日志/换套/BOSS 记忆/复盘/汇报全走通 ✅
+    - `-c "unload report"` 从「未加载」变为「已卸载」✅；`-c "kb_list florr"` 从 NameError 变为「知识库暂无文档」✅
+    - `--auto search florr basic guide` 与 `--auto florr` 均正常出结果（修复前参数不存在）✅
+    - `compileall -q .` 退出码 0；冒烟产生的 `dist/`(148K) / `kb_backups/`(16K) / `knowledge_md/smoke_s8.md` 已清理，`git status` 仅 3 项预期变更 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - `play` 的 dry-run 走 `_fallback_decide` 规则分支，冒烟 2 轮只触发 `defend`，`move` 类动作（安全区钳制+抖动）未覆盖。与 S7 遗留同源，建议 **S13** 前补规则化 move 策略。
+    - `package portable` / `kb_export` 会往 `dist/` 与 `kb_backups/` 落真实产物（已被 `.gitignore` 覆盖）。长跑累积移交 **S12** 运维脚本。
+    - `research` 的真实联网检索仍未实测（无外部 MCP 配置、无网络），本轮只验证降级分支可读不崩溃。
+    - **`ui_pyqt.py` 仍用 `python3` 而非隔离 venv 解释器**调用 CLI。本轮只对齐了参数形状（C4），解释器路径移交 **S11**。
+    - `reset_brief` 的 lambda 用海象+元组+`and` 写法，可读性差但行为正确，未重构以免扩大改动面，移交 **S13**。
 
 ---
 

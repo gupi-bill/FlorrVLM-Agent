@@ -18,7 +18,8 @@ import json
 import os
 import sys
 
-import config
+import datetime
+
 import config
 try:
     import session  # v1.4 会话记忆 & 断点续玩
@@ -117,6 +118,55 @@ def _restore_skills():
             pass
 
 
+def _append_log(msg: str):
+    """v2.0 S8：把提示写进当日运行日志。
+
+    原先 kb_list / kb_search 在多处调用 `_append_log()`，但该函数在
+    agent_cli.py 中**根本不存在**——一旦走到"游戏目录不存在"分支就直接
+    NameError 崩溃。此处补齐实现；写日志失败一律静默，绝不影响主命令。
+    """
+    try:
+        log_dir = os.path.join(BASE_DIR, config.get("paths.run_logs", "run_logs"))
+        os.makedirs(log_dir, exist_ok=True)
+        day = datetime.datetime.now().strftime("%Y%m%d")
+        line = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {msg}\n"
+        with open(os.path.join(log_dir, f"agent_{day}.log"), "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass
+
+
+# `-c` / `--auto` 属"一次性调用"：无论 stdin 是什么都不允许提问。
+# S8 实测：当父进程把 tty 透传给子进程时，`-c brief` 会一直阻塞在 input()
+# （冒烟 20s 超时；`-c "play 2"` 甚至卡死 200s 以上）。
+_ONE_SHOT = False
+
+
+def _is_interactive() -> bool:
+    """是否允许提问：仅"交互式会话 + stdin 是真实终端"时为 True。"""
+    if _ONE_SHOT:
+        return False
+    try:
+        return bool(sys.stdin) and sys.stdin.isatty()
+    except Exception:
+        return False
+
+
+def _arg2(arg: str):
+    """把 "a b" 拆成 ("a", "b")，兼容 `kb_search boss florr` 这类双参数命令。"""
+    parts = (arg or "").split()
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " ".join(parts[1:])
+
+
+def _offline_note(what: str) -> str:
+    """S8：需要网络/真机/密钥的能力，在离线环境下给出统一降级提示。"""
+    return dim(f"  （当前离线 / dry-run 模式：{what} 不可用，以上为本地降级结果）")
+
+
 def _cmd_load(name: str) -> str:
     out = SKILLS.load(name)
     _persist_skills()
@@ -124,6 +174,11 @@ def _cmd_load(name: str) -> str:
 
 
 def _cmd_unload(name: str) -> str:
+    # S8 修复：一次性调用模式下进程是新的，内存里没有已加载技能，
+    # 原先 `python agent_cli.py -c "unload report"` 恒返回"未加载"，
+    # 显式卸载永远不生效。卸载前先按档案恢复。
+    if not SKILLS.is_loaded(name):
+        _restore_skills()
     out = SKILLS.unload(name)
     _persist_skills()
     return out
@@ -146,6 +201,17 @@ def _collect_brief(answers: dict = None) -> dict:
     关键：只在真正终端里提问；被管道调用时用环境变量/已有答案兜底。
     """
     brief = dict(answers or {})
+    if not _is_interactive():
+        # S8 修复：`-c` 一次性调用 / 管道 / CI 下 stdin 不是终端，
+        # 原先会一直阻塞在 input() 直到超时（冒烟实测 20s TIMEOUT）。
+        # 非交互时改从环境变量取，没有就留空，绝不阻塞。
+        env_key = {"game_type": "UGF_BRIEF_GAME_TYPE",
+                   "focus": "UGF_BRIEF_FOCUS",
+                   "watch_out": "UGF_BRIEF_WATCH_OUT"}
+        for key, _p in BRIEF_QUESTIONS:
+            if not brief.get(key):
+                brief[key] = os.getenv(env_key.get(key, ""), "") or ""
+        return brief
     for key, prompt in BRIEF_QUESTIONS:
         if key in brief and brief[key]:
             continue
@@ -197,6 +263,9 @@ def describe_capabilities() -> str:
         "  play     —— 进入游戏主循环(自动打/跑/追/复盘)",
         "  report   —— 汇报进度与最近战况",
         "",
+        "  kb_list / kb_write / kb_append / kb_search —— 知识库读写检索",
+        "  validate / package / stats / session / resume / notify —— 自检与运维",
+        "",
         "其他: capabilities / state / skills / load / unload / run_skill / help / quit",
     ]
     lines = [f"  {x}" for x in lines]
@@ -219,6 +288,10 @@ HELP_LINES = [
     ("stats",        "多局战绩汇总与最近战绩(v1.5)"),
     ("validate <游戏>", "游戏档案自检(投bo前用，v1.8)"),
     ("package [类型]",  "打系统安装包(deb/portable/all；Windows/APK见packaging)，v1.9"),
+    ("kb_list [游戏]",   "列出知识库文档(可按游戏过滤)，v2.0"),
+    ("kb_write <文件> [游戏]", "写入知识库文档(模板)，v2.0"),
+    ("kb_append <文件> [游戏]", "追加内容到知识库文档，v2.0"),
+    ("kb_search <词> [游戏]", "在知识库中全文检索，v2.0"),
     ("kb_export",      "导出整个知识库为备份包(tar.gz)，v2.0"),
     ("kb_import <包>",  "从备份包恢复知识库(同名覆盖)，v2.0"),
     ("skills",       "列出可用 Skill"),
@@ -242,6 +315,9 @@ def _cmd_detect(game: str) -> str:
 def _cmd_brief() -> str:
     st = load_state()
     brief = _collect_brief(st.get("brief"))
+    if not _is_interactive():
+        # 非交互下问不了，明确告诉调用方答案从哪来
+        _append_log("brief 在非交互模式下完成（答案取自环境变量或留空）")
     st["brief"] = brief
     st["status"] = "researching"
     save_state(st)
@@ -264,7 +340,8 @@ def _cmd_research(query: str = None) -> str:
                 tools = ec.tool_catalog()
                 if not tools:
                     return (chip(f"未连接外部 MCP，无法联网查询「{query}」。", "warn") + "\n"
-                            + dim("  提示: 先在 mcp_connectors.yaml 配置外部 MCP 即可联网查资料"))
+                            + dim("  提示: 先在 mcp_connectors.yaml 配置外部 MCP 即可联网查资料")
+                            + "\n" + _offline_note("联网资料检索"))
                 return panel(f"已连接外部工具（“{query}”由 LLM 决策层调用对应工具查询）",
                              [f"· {t}" for t in tools])
             finally:
@@ -427,6 +504,7 @@ KB_DIR = os.path.join(BASE_DIR, "knowledge_md")
 
 
 def _cmd_kb_list(game_name: str = "") -> str:
+    game_name, _ = _arg2(game_name)
     """列出知识库文档，支持按游戏过滤。
     
     用法:
@@ -454,6 +532,8 @@ def _cmd_kb_list(game_name: str = "") -> str:
 
 
 def _cmd_kb_search(keyword: str, game_name: str = "") -> str:
+    keyword, _g = _arg2(keyword)
+    game_name = game_name or _g
     """在知识库中搜索关键词，支持按游戏过滤。
     
     用法:
@@ -496,6 +576,8 @@ def _cmd_kb_search(keyword: str, game_name: str = "") -> str:
 
 
 def _cmd_kb_write(filename: str, game_name: str = "") -> str:
+    filename, _g = _arg2(filename)
+    game_name = game_name or _g
     """写入内容到知识库，自动归入对应游戏文件夹。
     
     用法:
@@ -546,6 +628,8 @@ def _cmd_kb_write(filename: str, game_name: str = "") -> str:
 
 
 def _cmd_kb_append(filename: str, game_name: str = "") -> str:
+    filename, _g = _arg2(filename)
+    game_name = game_name or _g
     """追加内容到知识库文件，自动归入对应游戏文件夹。
     
     用法:
@@ -606,15 +690,17 @@ def _run_auto(game: str) -> str:
     parts.append(_cmd_research())
     parts.append(_cmd_ensure())
     return "\n".join(parts)
-    """全链路自动：detect → brief(若无) → research → ensure。"""
-    st = load_state()
+
+
+def _run_auto_search(game: str, query: str) -> str:
+    """`--auto search <游戏> <查询词>`：只做 detect → research → ensure。
+
+    S8 修复：`ui_pyqt.py` 一直以 `agent_cli.py --auto search <game> <query>`
+    拉起检索，但 CLI 既没有 `--auto` 参数也没有 `search` 子命令，
+    该调用 100% 落到"未知命令"。此处按 UI 的实际用法对齐补上。
+    """
     parts = [_cmd_detect(game)]
-    if not st.get("brief"):
-        st["brief"] = _collect_brief(st.get("brief"))
-        st["status"] = "researching"
-        save_state(st)
-        parts.append(panel("已按引导完成游戏了解(brief)", _format_brief(st["brief"])))
-    parts.append(_cmd_research())
+    parts.append(_cmd_research(query))
     parts.append(_cmd_ensure())
     return "\n".join(parts)
 
@@ -684,6 +770,14 @@ def interactive():
             print(_cmd_validate(arg))
         elif cmd == "package":
             print(_cmd_package(arg))
+        elif cmd == "kb_list":
+            print(_cmd_kb_list(arg))
+        elif cmd == "kb_search":
+            print(_cmd_kb_search(arg))
+        elif cmd == "kb_write":
+            print(_cmd_kb_write(arg))
+        elif cmd == "kb_append":
+            print(_cmd_kb_append(arg))
         elif cmd == "kb_export":
             print(_cmd_kb_export())
         elif cmd == "kb_import":
@@ -704,6 +798,47 @@ def interactive():
         # 循环内不做事件，交给用户
 
 
+def _command_registry(arg: str = "") -> dict:
+    """`-c` 一次性调用的命令表。
+
+    S8：原先这张表是 `main()` 内的局部变量，无法单测，导致
+    「帮助里写了命令、实际却没有实现」这类漂移只能靠人工冒烟发现
+    （实测 `help` / `play` / `auto` 三个命令在 `-c` 下全是"未知命令"）。
+    抽成函数后可由测试锁定"命令表 ⊇ 帮助清单"。
+    """
+    return {
+        "help": lambda: panel("可用命令", [f"  {green(bold(c)):<28} {d}" for c, d in HELP_LINES]),
+        "capabilities": lambda: describe_capabilities(),
+        "state": lambda: json.dumps(load_state(), ensure_ascii=False, indent=2),
+        "detect": lambda: _cmd_detect(arg or "florr"),
+        "brief": lambda: _cmd_brief(),
+        "reset_brief": lambda: (s := load_state(), s.update(brief=_collect_brief(None)), save_state(s)) and _format_brief(s["brief"]),
+        "research": lambda: _cmd_research(arg),
+        "ensure": lambda: _cmd_ensure(),
+        "report": lambda: _cmd_report(),
+        "notify": lambda: _cmd_notify(),
+        "session": lambda: session.describe(),
+        "resume": lambda: session.resume_info() or "无待续玩进度",
+        "stats": lambda: session.stats_text(),
+        "validate": lambda: _cmd_validate(arg),
+        "package": lambda: _cmd_package(arg),
+        "kb_export": lambda: _cmd_kb_export(),
+        "kb_import": lambda: _cmd_kb_import(arg),
+        "kb_list": lambda: _cmd_kb_list(arg),
+        "kb_search": lambda: _cmd_kb_search(arg),
+        "kb_write": lambda: _cmd_kb_write(arg),
+        "kb_append": lambda: _cmd_kb_append(arg),
+        "skills": lambda: SKILLS.summary(),
+        "load": lambda: _cmd_load(arg),
+        "unload": lambda: _cmd_unload(arg),
+        "run_skill": lambda: _cmd_run_skill(arg),
+        # S8：`-c` 模式原先没有 play / auto，脚本化编排主循环无从下手。
+        "play": lambda: _cmd_play(int(arg) if str(arg).isdigit() else 0),
+        "auto": lambda: _run_auto(arg or ACTIVE_GAME),
+        "auto_search": lambda: _run_auto_search(*(_arg2(arg) or (ACTIVE_GAME, ""))),
+    }
+
+
 # ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
@@ -716,39 +851,35 @@ def main():
         pass
     parser = argparse.ArgumentParser(description="Universal-Game-Framework 交互式入口")
     parser.add_argument("-c", "--command", help="执行单条命令后退出(如 report / skills)")
+    parser.add_argument("--auto", nargs="+", metavar="ARG",
+                        help="全链路自动: `--auto <游戏>` 或 `--auto search <游戏> <查询词>`")
     args = parser.parse_args()
+
+    # 一次性调用模式：禁止任何交互式提问（详见 _is_interactive 注释）
+    global _ONE_SHOT
+    _ONE_SHOT = bool(args.command or args.auto)
+
+    # S8：ui_pyqt.py 以 `agent_cli.py --auto search <game> <query>` 调用，
+    # 此前 CLI 无此参数，该调用恒定失败。
+    if args.auto:
+        a = list(args.auto)
+        if a[0].lower() == "search":
+            print(_run_auto_search(a[1] if len(a) > 1 else ACTIVE_GAME,
+                                   " ".join(a[2:]) or None))
+        else:
+            print(_run_auto(a[0]))
+        return
 
     if args.command:
         cmd, _, arg = args.command.partition(" ")
         arg = arg.strip()
-        fns = {
-            "capabilities": lambda: describe_capabilities(),
-            "state": lambda: json.dumps(load_state(), ensure_ascii=False, indent=2),
-            "detect": lambda: _cmd_detect(arg or "florr"),
-            "brief": lambda: _cmd_brief(),
-            "reset_brief": lambda: (s := load_state(), s.update(brief=_collect_brief(None)), save_state(s)) and _format_brief(s["brief"]),
-            "research": lambda: _cmd_research(arg),
-            "ensure": lambda: _cmd_ensure(),
-            "report": lambda: _cmd_report(),
-            "notify": lambda: _cmd_notify(),
-            "session": lambda: session.describe(),
-            "resume": lambda: session.resume_info() or "无待续玩进度",
-            "stats": lambda: session.stats_text(),
-            "validate": lambda: _cmd_validate(arg),
-            "package": lambda: _cmd_package(arg),
-            "kb_export": lambda: _cmd_kb_export(),
-            "kb_import": lambda: _cmd_kb_import(arg),
-            "kb_list": lambda: _cmd_kb_list(arg),
-            "kb_search": lambda: _cmd_kb_search(arg),
-            "kb_write": lambda: _cmd_kb_write(arg),
-            "kb_append": lambda: _cmd_kb_append(arg),
-            "skills": lambda: SKILLS.summary(),
-            "load": lambda: _cmd_load(arg),
-            "unload": lambda: _cmd_unload(arg),
-            "run_skill": lambda: _cmd_run_skill(arg),
-        }
+        fns = _command_registry(arg)
         fn = fns.get(cmd)
-        print(fn() if fn else f"未知命令: {cmd}")
+        if fn is None:
+            print(red(f"未知命令: {cmd}（输入 help 查看全部命令）"))
+            print(dim(f"可用命令: {', '.join(sorted(fns))}"))
+            sys.exit(1)
+        print(fn())
         return
 
     try:
