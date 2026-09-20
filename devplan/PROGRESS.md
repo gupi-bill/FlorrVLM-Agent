@@ -12,7 +12,7 @@
 | S2 | 静态依赖与接口审计 | ✅ 完成 | 02:01~02:45 (A线) | `tools/static_audit.py`、`devplan/AUDIT.md`、`devplan/audit_data.json`；`requirements.txt` 收敛 `mcp<2`、`mcp_server.py` v1/v2 兼容、`video_learner.py` cv2 软依赖 |
 | S3 | 预判引擎实测定型 | ✅ 完成 | 02:41~02:55 (B线) | `tests/test_predictor.py`（46 用例全绿）、`tests/conftest.py`；`predictor.py` 抖动惩罚 + NaN 防御 + 分类逐帧重算；`config.yaml`/`config.py` 新增 4 个置信度曲线配置项 |
 | S4 | 战斗评估与自动调参校验 | ✅ 完成 | 03:27~03:45 (A线) | `tests/test_combat_judge.py`(64)、`tests/test_auto_tuner.py`(26)；`combat_judge.py` 6 处修复、`auto_tuner.py` 3 处修复；`config.yaml`/`config.py` 新增 `combat.flee_distance`/`strafe_distance` |
-| S5 | 会话/汇报/技能模块校验 | ⬜ 待执行 | | |
+| S5 | 会话/汇报/技能模块校验 | ✅ 完成 | 03:50~04:08 (B线) | `tests/test_session.py`(68)、`tests/test_report_notifier.py`(33)、`tests/test_skill_manager.py`(34)；`session.py` 10 处修复、`report_notifier.py` 5 处、`skill_manager.py` 5 处、`agent_cli.py` 会话 shim + 技能持久化；`skills/report/*` 从 9 行演示桩改为真实汇报 |
 | S6 | 感知服务离线化 | ⬜ 待执行 | | |
 | S7 | 主循环 dry-run | ⬜ 待执行 | | |
 | S8 | CLI 全命令冒烟 | ⬜ 待执行 | | |
@@ -156,3 +156,47 @@
     - `decide_mindset` 的 1.2 / 1.5 / 0.5 / 0.4 / 0.3 五个心态阈值仍硬编码，与 v0.5「全部来自 config.yaml」原则不符。未提配置层（本轮预算 + 避免扩大改动面），移交 **S13**。
     - `should_chase(entity, player, ...)` 的 `player` 形参在函数体内未被使用，已给默认值 `None` 兼容，是否移除待 **S7** 主循环实测后再定。
     - pytest 的 `tmp_path` 落在 `/tmp`（10M tmpfs）。本轮用例产生的 yaml 均为字节级，实测无压力；**S13** 固化门禁时若新增大文件用例，需前置 `TMPDIR=/home/g-bill/.workbuddy/tmp`。
+
+- **2026-09-21 04:08 · S5 · 会话/汇报/技能三大支撑模块校验**
+  - 做了什么：
+    1. 新建三个测试文件共 **135 用例**：`tests/test_session.py`(68) / `tests/test_report_notifier.py`(33) / `tests/test_skill_manager.py`(34)。全部落盘路径经 `monkeypatch` 重定向到 `tmp_path`；Webhook 用注入的假 `requests` 模块，全程零真实网络请求。
+    2. **`session.py` 修复 10 处**：
+       - **S1（阻断）** `load()` 对 list / 标量档案 `d.update(st)` 抛 "cannot convert dictionary update sequence"，整个 `session` 命令不可用 → 加 `isinstance(st, dict)` 兜底。
+       - **S2（阻断）** 快照 / 历史 / 入参里的 `round` `deaths` 为 None、空串、非数字串或 NaN 时 `int(x or 0)` 抛 ValueError/TypeError，**直接炸掉 `agent_cli._cmd_play` 的收尾记账，一局白打** → 新增 `safe_int()` 统一收敛（含 `int(inf)` 的 OverflowError）。
+       - **S3** `save()` 只捕 `OSError`，含 set/datetime 等不可序列化对象时抛裸 `TypeError` → 放宽为 `RuntimeError` 并带原因。
+       - **S4** `describe()` 里 `last_report` 为 JSON `null` 时 `None[:80]` TypeError、为 dict 时切片 KeyError → 统一转字符串。
+       - **S5** `resume_info()` 直接 subscript `rp['game']` / `['from_rounds']`，档案缺键即 KeyError → 改 `.get` + `safe_int`。
+       - **S6** `stats()` / `stats_text()` 对含非 dict 条目、缺 `at`、`rounds` 非数字的历史文件会炸 → 过滤 + `safe_int`。
+       - **S7** `HISTORY_MAX` 在 import 时绑定 config，热加载后上限不生效（与 S4 的 F5 同类）→ 改 `_history_max()` 运行时取值。
+       - **S8** `_append_history` 遇到历史文件里混入非 dict 条目会原样写回、污染后续统计 → 写入前过滤。
+       - **S9** `record_end` 的 `skills` 未做类型归一，含非字符串元素会污染档案 → `sorted({str(s) ...})`。
+       - **S10** `history()` 文档串声称"新→旧"但实际返回文件顺序（旧→新），与 `stats()` 的 `[-5:][::-1]` 口径矛盾 → 修正文档串，避免**S13**文档同步时被误导。
+    3. **`report_notifier.py` 修复 5 处**：
+       - **R1** `_tail_log(0)`：`lines[-0:]` 等价于 `lines[0:]`，n≤0 时把**整份日志**塞进报告 → 显式 `n<=0` 返回 `[]`。
+       - **R2** 无快照时报告打出 `- HP：None/None`，读者无法区分"没数据"和"血量为 0" → 改为「未知（无快照）」。
+       - **R3** `push_webhook` 只返回 bool，无法区分「没配 URL / requests 缺失 / 网络异常 / HTTP 非 2xx」→ 改返回 `(ok, 原因)` 元组（已确认无外部调用方）。
+       - **R4** `write_report_file` / `notify` / `notify_progress` 的异常捕获从 `OSError` 放宽（日志目录被占成同名文件时会抛 `NotADirectoryError` 之外的类型）。
+       - **R5** 报告正文新增离线标注行，明确"数值来自本地快照"，避免离线产出被误读为真实对局数据。
+    4. **`skill_manager.py` 修复 5 处**：
+       - **K1（安全）** 技能名未校验，`load("../../etc")` 可越出 `skills/` 目录 → 新增 `is_valid_name()`，拒绝含 `/ \ : \0 ..` 的名字。
+       - **K2** 加载 skill.py 时不注册 `sys.modules`，技能内用 dataclasses / 相对导入 / 自引用必失败 → 先注册再 exec；加载失败时回退清除，不留残缺模块。
+       - **K3** 单个技能文件损坏（编码/权限）会拖垮整个 `scan()` → 逐项 try/except 并降级为空元信息。
+       - **K4** `entry` 指向非可调用对象时仍被当成可用入口 → 增加 `callable()` 校验。
+       - **K5** 只有文本返回，调用方无法程序化判断 → 新增 `is_loaded()` / `reload()`。
+    5. **`skills/report/` 从 9 行演示桩改为真实汇报**：`skill.py` 改为读取 `agent_state.json` + `run_logs/agent_snapshot.json`，输出场次/回合/死亡/HP/决策/心态/套装/最高威胁，读不到走降级分支并标注离线；`SKILL.md` 补数据来源表、入口签名、示例输出、离线约束。
+    6. **`agent_cli.py`**：修掉 S2 审计遗留的 W1 —— 会话降级 shim 里的 `load_state/save_state/update_state/clear_state` 在 `session.py` 中根本不存在，session 缺失时 `_cmd_play` 会 AttributeError；现按真实 API 对齐。另 `load_state()` 也补上非 dict 档案兜底。
+    7. **新增技能跨调用持久化**：`run_skill` 在一次性调用模式（`python agent_cli.py -c "run_skill report"`）下原先永远返回"未加载"，因为 `load` 只存在于内存、进程退出即丢 → 已加载技能写入 `agent_state.json["skills_active"]`，`run_skill` 时按需恢复。
+  - 产物：`tests/test_session.py`、`tests/test_report_notifier.py`、`tests/test_skill_manager.py`、`session.py`(M)、`report_notifier.py`(M)、`skill_manager.py`(M)、`agent_cli.py`(M)、`skills/report/SKILL.md`(M)、`skills/report/skill.py`(M)
+  - 测试结果：
+    - `python -m pytest tests/ -q` → **271 passed**（S3 46 + S4 90 + S5 135，0 failed）✅
+    - session 覆盖：safe_int 13 组、默认档案、往返、旧档案补字段、6 种损坏档案、list 档案、不可序列化、续玩点 3 态、resume_point 缺键 4 组、脏 deaths 7 组、历史追加/截断/汇总、脏历史 4 条、快照 6 组脏值、describe 5 组脏 report ✅
+    - report_notifier 覆盖：最小报告、快照字段、brief、5 种损坏输入、落盘+建目录、目录被占降级、Webhook 5 分支（未配置/204/199·301·400·500·503/异常/requests 缺失）、局中进度写入与覆盖、_tail_log 3 组非正数 ✅
+    - skill_manager 覆盖：名称合法性 10 组、扫描 5 例（含损坏技能不拖垮）、5 种加载失败模式且不留 sys.modules 残留、卸载/重载/调用/异常兜底、排序、清单标记、内置 report 技能真实输出与离线降级 ✅
+    - 集成冒烟：`agent_cli.py -c skills / load / run_skill / unload / session / stats / notify` 全部可读输出无 traceback；跨调用 `load report` → 新进程 `run_skill report` 成功输出真实进度 ✅
+    - `compileall -q .` 退出码 0；`config/predictor/combat_judge/auto_tuner/session/report_notifier/skill_manager/mcp_server/agent_cli` 全部可导入 ✅
+    - 仓库零污染：本轮生成的 `run_logs/report_*.md` 与 `agent_state.json` 已清理，`git status` 仅预期变更 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - `report_YYYYMMDD_HHMMSS.md` 同一秒多次 notify 会互相覆盖（未加序号后缀）。当前 `notify` 由 play 收尾单次调用，不构成实际问题；若 **S7** 主循环 dry-run 中提高汇报频率需一并处理。
+    - `session.py` 与 `agent_cli.py` 各维护一份 `_default_state` / `load_state` / `save_state`，且写同一个 `agent_state.json`，两处默认值不完全一致（CLI 侧无 `sessions` / `total_deaths` / `resumed` 等键）。未合并（会扩大改动面、影响既有 `state` 命令输出），移交 **S13** 收敛。
+    - `_cmd_run_skill` 在 `run_skill` 未加载时才恢复技能，若同时存在同名技能被显式 `unload`，下次 `run_skill` 会重新加载（当前行为符合直觉，但与"显式卸载应生效"有语义冲突）。已在冒烟中确认行为，待 **S8** CLI 冒烟时统一口径。
+    - 无 `.env` / 无网络：Webhook 真实推送、真实 LLM 摘要均未实测，本轮全部由注入假 `requests` 覆盖，属预期降级。

@@ -13,8 +13,9 @@ FlorrVLM-Agent 会话记忆 & 断点续玩  session.py  (v1.4)
   resume_info()                       返回本次"续玩说明"文本（无则空串）
   describe()                          “session”命令看到的记忆摘要
 """
-import os
 import json
+import math
+import os
 from datetime import datetime
 
 import config  # 读取 paths.run_logs，取监控快照里的真实回合/死亡
@@ -27,8 +28,35 @@ SNAP_PATH = os.path.join(
     config.get("paths.run_logs", "run_logs"),
     "agent_snapshot.json",
 )
-# v1.5 战绩历史最多保留 N 条，防文件无限膨胀
-HISTORY_MAX = int(config.get("session.history_max", 100) or 100)
+
+
+def safe_int(v, default: int = 0) -> int:
+    """
+    v2.0：把任意脏值收敛成 int。
+
+    历史 bug：主循环/快照/历史文件里的 round / deaths 若为 None、空串、
+    非数字字符串或 NaN，原实现 `int(x or 0)` 会抛 ValueError / TypeError，
+    直接把 `agent_cli._cmd_play` 的收尾记账炸掉（一局白打）。
+    """
+    if v is None or isinstance(v, bool):
+        return default
+    if isinstance(v, float):
+        # int(inf) / int(nan) 直接抛 OverflowError / ValueError
+        return int(v) if math.isfinite(v) else default
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        pass
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return default
+    return int(f) if math.isfinite(f) else default
+
+
+def _history_max() -> int:
+    """v2.0：运行时取值，避免 config 热加载后上限不生效（原先 import 时绑定）。"""
+    return max(1, safe_int(config.get("session.history_max", 100), 100))
 
 
 # ---------------------------------------------------------------------------
@@ -56,18 +84,23 @@ def load() -> dict:
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             st = json.load(f)
-        d = _default()
-        d.update(st or {})
-        return d
     except Exception:
         return _default()
+    # v2.0：档案被写坏成 list / 字符串 / 数字时，原实现 `d.update(st)` 会抛
+    # "cannot convert dictionary update sequence"，整个 session 命令不可用。
+    if not isinstance(st, dict):
+        return _default()
+    d = _default()
+    d.update(st)
+    return d
 
 
 def save(state: dict):
     try:
         with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
-    except OSError as e:
+    except (OSError, TypeError, ValueError) as e:
+        # v2.0：TypeError = 含不可序列化对象（set / datetime 等），给可读错误
         raise RuntimeError(f"会话档案保存失败: {e}") from e
 
 
@@ -81,7 +114,9 @@ def snapshot_rounds_deaths() -> tuple:
     try:
         with open(SNAP_PATH, "r", encoding="utf-8") as f:
             snap = json.load(f) or {}
-        return int(snap.get("round", 0) or 0), int(snap.get("deaths", 0) or 0)
+        if not isinstance(snap, dict):
+            return 0, 0
+        return safe_int(snap.get("round")), safe_int(snap.get("deaths"))
     except Exception:
         return 0, 0
 
@@ -96,7 +131,7 @@ def record_start(game: str, skills: list) -> bool:
     返回 True 时调用方能据此提示"续玩"并汇报要接着上次的进度打。
     """
     st = load()
-    prev_rounds = int(st.get("last_rounds", 0) or 0)
+    prev_rounds = safe_int(st.get("last_rounds"))
     prev_played = bool(st.get("last_played"))
     resumable = prev_played or prev_rounds > 0
     if resumable:
@@ -105,8 +140,8 @@ def record_start(game: str, skills: list) -> bool:
             "game": game,
             "at": datetime.now().isoformat(timespec="seconds"),
             "from_rounds": prev_rounds,
-            "total_deaths_so_far": int(st.get("total_deaths", 0) or 0),
-            "skills": list(skills),
+            "total_deaths_so_far": safe_int(st.get("total_deaths")),
+            "skills": list(skills or []),
         }
     else:
         st["resume_point"] = None
@@ -117,15 +152,18 @@ def record_start(game: str, skills: list) -> bool:
 def record_end(game: str, rounds: int, deaths: int, skills: list, report: str = ""):
     """主循环结束后调用：累加场次/死亡，存真实回合、技能与本次汇报，并写入战绩历史。"""
     st = load()
+    rounds = safe_int(rounds)
+    deaths = safe_int(deaths)
+    skills = sorted({str(s) for s in (skills or [])})
     st["game"] = game
     st["status"] = "done"
     st["last_played"] = datetime.now().isoformat(timespec="seconds")
     st["last_rounds"] = rounds
-    st["last_report"] = report
-    st["sessions"] = int(st.get("sessions", 0) or 0) + 1
-    # 死亡按"本次新增死亡"累加；真实死亡以主循环统计为准
-    st["total_deaths"] = int(st.get("total_deaths", 0) or 0) + max(0, int(deaths or 0))
-    st["skills_last"] = sorted(set(skills))
+    st["last_report"] = report or ""
+    st["sessions"] = safe_int(st.get("sessions")) + 1
+    # 死亡按"本次新增死亡"累加；真实死亡以主循环统计为准（负数不倒扣）
+    st["total_deaths"] = safe_int(st.get("total_deaths")) + max(0, deaths)
+    st["skills_last"] = skills
     st["resumed"] = False          # 本轮已结束，"续玩"标记复位
     st["resume_point"] = None
     save(st)
@@ -134,7 +172,7 @@ def record_end(game: str, rounds: int, deaths: int, skills: list, report: str = 
         "game": game,
         "rounds": rounds,
         "deaths": deaths,
-        "skills": sorted(set(skills)),
+        "skills": skills,
     })
 
 
@@ -158,23 +196,28 @@ def _append_history(record: dict):
                 h = []
         else:
             h = []
+        if not all(isinstance(r, dict) for r in h):
+            h = [r for r in h if isinstance(r, dict)]
         h.append(record)
-        if len(h) > HISTORY_MAX:
-            h = h[-HISTORY_MAX:]
+        limit = _history_max()
+        if len(h) > limit:
+            h = h[-limit:]
         with open(HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(h, f, ensure_ascii=False, indent=2)
-    except OSError:
+    except (OSError, TypeError, ValueError):
         pass
 
 
 def history() -> list:
-    """读战绩历史（新→旧排序）。"""
+    """读战绩历史（旧→新，与文件内顺序一致；stats() 内自行倒序展示）。"""
     if not os.path.exists(HISTORY_FILE):
         return []
     try:
         with open(HISTORY_FILE, "r", encoding="utf-8") as f:
             h = json.load(f)
-        return h if isinstance(h, list) else []
+        if not isinstance(h, list):
+            return []
+        return [r for r in h if isinstance(r, dict)]
     except Exception:
         return []
 
@@ -185,16 +228,20 @@ def stats() -> dict:
     if not h:
         return {"sessions": 0, "total_rounds": 0, "total_deaths": 0,
                 "avg_rounds": 0, "best_rounds": 0, "recent": []}
-    total_rounds = sum(int(r.get("rounds", 0) or 0) for r in h)
-    total_deaths = sum(int(r.get("deaths", 0) or 0) for r in h)
-    best_rounds = max(int(r.get("rounds", 0) or 0) for r in h)
+    records = [r for r in h if isinstance(r, dict)]
+    if not records:
+        return {"sessions": 0, "total_rounds": 0, "total_deaths": 0,
+                "avg_rounds": 0, "best_rounds": 0, "recent": []}
+    total_rounds = sum(safe_int(r.get("rounds")) for r in records)
+    total_deaths = sum(safe_int(r.get("deaths")) for r in records)
+    best_rounds = max(safe_int(r.get("rounds")) for r in records)
     return {
-        "sessions": len(h),
+        "sessions": len(records),
         "total_rounds": total_rounds,
         "total_deaths": total_deaths,
-        "avg_rounds": round(total_rounds / len(h), 1),
+        "avg_rounds": round(total_rounds / len(records), 1),
         "best_rounds": best_rounds,
-        "recent": h[-5:][::-1],
+        "recent": records[-5:][::-1],
     }
 
 
@@ -208,35 +255,41 @@ def resume_info() -> str:
     """
     st = load()
     rp = st.get("resume_point")
-    if not rp:
+    if not isinstance(rp, dict):
         return ""
+    skills = [str(s) for s in (rp.get("skills") or [])]
+    prev_rounds = safe_int(rp.get("from_rounds"))
+    total_d = safe_int(rp.get("total_deaths_so_far"))
     if st.get("resumed"):
         # 已提示过：换成"正在继续上次进度"的短说明
-        return (f"  继续上次进度: 游戏 {rp['game']} · "
-                f"已到回合 {rp['from_rounds']} · 累计死亡 {rp['total_deaths_so_far']} · "
-                f"技能: {', '.join(rp['skills']) if rp['skills'] else '无'}")
-    prev_rounds = rp["from_rounds"]
-    total_d = rp["total_deaths_so_far"]
+        return (f"  继续上次进度: 游戏 {rp.get('game') or '未知'} · "
+                f"已到回合 {prev_rounds} · 累计死亡 {total_d} · "
+                f"技能: {', '.join(skills) if skills else '无'}")
     got = ["续玩: 检测到上次会话进度"]
     if prev_rounds:
         got.append(f"已到回合 {prev_rounds}")
     if total_d:
         got.append(f"累计死亡 {total_d}")
-    if rp.get("skills"):
-        got.append(f"加载技能 {', '.join(rp['skills'])}")
+    if skills:
+        got.append(f"加载技能 {', '.join(skills)}")
     return " · ".join(got)
 
 
 def describe() -> str:
     """'session' 命令看到的会话记忆摘要。"""
     st = load()
-    lines = [f"当前游戏   : {st['game']}",
-             f"累计场次   : {st['sessions']}",
-             f"累计回合   : {st['last_rounds']}(最近一次)",
-             f"累计死亡   : {st['total_deaths']}",
-             f"上次游玩   : {st['last_played'] or '从未'}",
-             f"最近技能   : {', '.join(st['skills_last']) if st['skills_last'] else '无'}",
-             f"最近汇报   : {st['last_report'][:80] if st['last_report'] else '无'}"]
+    # v2.0：档案里 last_report 可能是 JSON null（原 `None[:80]` 会 TypeError）
+    # 或 dict/list（切片会 KeyError / TypeError），统一收敛成字符串
+    raw_report = st.get("last_report") or ""
+    report = raw_report if isinstance(raw_report, str) else str(raw_report)
+    skills = [str(s) for s in (st.get("skills_last") or [])]
+    lines = [f"当前游戏   : {st.get('game', 'florr')}",
+             f"累计场次   : {safe_int(st.get('sessions'))}",
+             f"累计回合   : {safe_int(st.get('last_rounds'))}(最近一次)",
+             f"累计死亡   : {safe_int(st.get('total_deaths'))}",
+             f"上次游玩   : {st.get('last_played') or '从未'}",
+             f"最近技能   : {', '.join(skills) if skills else '无'}",
+             f"最近汇报   : {report[:80] if report else '无'}"]
     if st.get("resume_point"):
         lines.append(f"待续玩进度 : {resume_info()}")
     return "\n".join(lines)
@@ -252,7 +305,8 @@ def stats_text() -> str:
             f"单局最高回合: {s['best_rounds']}"]
     if s["recent"]:
         head.append("最近战绩(新→旧):")
-        head += [f"  {r['at'][:16]} · {r['game']} · 回合 {r['rounds']} · 死亡 {r['deaths']}"
+        head += [f"  {str(r.get('at') or '未知')[:16]} · {r.get('game') or '未知'} · "
+                 f"回合 {safe_int(r.get('rounds'))} · 死亡 {safe_int(r.get('deaths'))}"
                  for r in s["recent"]]
     else:
         head.append("暂无战绩(打完 play 后自动记录)")

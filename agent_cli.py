@@ -23,16 +23,22 @@ import config
 try:
     import session  # v1.4 会话记忆 & 断点续玩
 except ImportError:
-    # 如果 session 模块不存在，提供空实现防止程序崩溃
+    # 如果 session 模块不存在，提供空实现防止程序崩溃。
+    # v2.0：原先这里的 load_state/save_state/update_state/clear_state
+    # 在 session.py 中根本不存在（S2 审计 W1），一旦 session 缺失，
+    # `_cmd_play` 调用 session.record_start 会直接 AttributeError。
+    # 现按 session.py 真实 API 对齐补齐。
     import types
     session = types.ModuleType("session")
-    session.load_state = lambda: {}
-    session.save_state = lambda s: None
-    session.update_state = lambda k, v: None
-    session.clear_state = lambda: None
+    session.record_start = lambda game, skills: False
+    session.record_end = lambda *a, **kw: None
+    session.mark_resumed = lambda: None
+    session.snapshot_rounds_deaths = lambda: (0, 0)
     session.describe = lambda: "无会话状态 (模块未加载)"
     session.resume_info = lambda: "无待续玩进度"
     session.stats_text = lambda: "会话统计: 无数据"
+    session.stats = lambda: {"sessions": 0, "total_rounds": 0, "total_deaths": 0,
+                             "avg_rounds": 0, "best_rounds": 0, "recent": []}
 from cli_ui import banner, panel, chip, bold, cyan, green, magenta, dim, yellow, red
 from report_notifier import notify  # v1.2 自动汇报
 from skill_manager import SkillManager
@@ -63,6 +69,7 @@ def _default_state() -> dict:
         "last_rounds": 0,
         "last_report": "",
         "brief": None,               # v1.0 开玩前的游戏了解答案 {key: 回答}
+        "skills_active": [],         # v2.0 已加载技能（跨调用持久化）
         "started_at": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
     }
 
@@ -72,19 +79,61 @@ def load_state() -> dict:
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             st = json.load(f)
-        d = _default_state()
-        d.update(st)
-        return d
     except Exception:
         return _default_state()
+    # v2.0：档案被写坏成 list / 标量时 `d.update(st)` 原会抛异常
+    if not isinstance(st, dict):
+        return _default_state()
+    d = _default_state()
+    d.update(st)
+    return d
 
 
 def save_state(state: dict):
     try:
         with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
-    except OSError as e:
+    except (OSError, TypeError, ValueError) as e:
         print(f"[状态] 保存失败: {e}")
+
+
+# ---------------------------------------------------------------------------
+# 技能持久化（v2.0）
+# ---------------------------------------------------------------------------
+def _persist_skills():
+    """把当前已加载技能写进会话档案，使 `python agent_cli.py -c "run_skill report"`
+    这类"一次性调用"也能拿到上一次 load 的结果。"""
+    st = load_state()
+    st["skills_active"] = SKILLS.loaded()
+    save_state(st)
+
+
+def _restore_skills():
+    """启动时按档案恢复已加载技能；恢复失败不影响主流程。"""
+    for name in load_state().get("skills_active") or []:
+        try:
+            SKILLS.load(name)
+        except Exception:
+            pass
+
+
+def _cmd_load(name: str) -> str:
+    out = SKILLS.load(name)
+    _persist_skills()
+    return out
+
+
+def _cmd_unload(name: str) -> str:
+    out = SKILLS.unload(name)
+    _persist_skills()
+    return out
+
+
+def _cmd_run_skill(name: str) -> str:
+    # 一次性调用模式下进程是新的，先按档案补齐已加载技能
+    if not SKILLS.is_loaded(name):
+        _restore_skills()
+    return SKILLS.call(name)
 
 
 # ---------------------------------------------------------------------------
@@ -642,11 +691,11 @@ def interactive():
         elif cmd == "skills":
             print(SKILLS.summary())
         elif cmd == "load":
-            print(SKILLS.load(arg))
+            print(_cmd_load(arg))
         elif cmd == "unload":
-            print(SKILLS.unload(arg))
+            print(_cmd_unload(arg))
         elif cmd == "run_skill":
-            print(SKILLS.call(arg))
+            print(_cmd_run_skill(arg))
         elif cmd == "auto":
             print(_run_auto(arg or "florr"))
             print(_cmd_play(0))
@@ -694,9 +743,9 @@ def main():
             "kb_write": lambda: _cmd_kb_write(arg),
             "kb_append": lambda: _cmd_kb_append(arg),
             "skills": lambda: SKILLS.summary(),
-            "load": lambda: SKILLS.load(arg),
-            "unload": lambda: SKILLS.unload(arg),
-            "run_skill": lambda: SKILLS.call(arg),
+            "load": lambda: _cmd_load(arg),
+            "unload": lambda: _cmd_unload(arg),
+            "run_skill": lambda: _cmd_run_skill(arg),
         }
         fn = fns.get(cmd)
         print(fn() if fn else f"未知命令: {cmd}")

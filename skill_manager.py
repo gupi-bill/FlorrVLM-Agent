@@ -21,9 +21,15 @@ Skill 目录结构（skills/<name>/SKILL.md）：
 import importlib.util
 import os
 import re
+import sys
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SKILLS_DIR = os.path.join(BASE_DIR, "skills")
+
+
+def is_valid_name(name: str) -> bool:
+    """v2.0：技能名必须是单层目录名，拒绝 `../` 之类越界路径。"""
+    return bool(name) and not re.search(r"[\/\\:\0]|\.\.", str(name))
 
 
 def _parse_meta(text: str) -> dict:
@@ -42,12 +48,18 @@ def scan() -> list:
     if not os.path.isdir(SKILLS_DIR):
         return out
     for name in sorted(os.listdir(SKILLS_DIR)):
+        if not is_valid_name(name):
+            continue
         fpath = os.path.join(SKILLS_DIR, name, "SKILL.md")
         if not (os.path.isdir(os.path.join(SKILLS_DIR, name))
                 and os.path.exists(fpath)):
             continue
-        with open(fpath, "r", encoding="utf-8") as f:
-            meta = _parse_meta(f.read())
+        # v2.0：单个技能文件损坏（编码/权限）不该让整个扫描挂掉
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                meta = _parse_meta(f.read())
+        except (OSError, UnicodeDecodeError):
+            meta = {}
         out.append({"name": name,
                     "description": meta.get("description", ""),
                     "entry": meta.get("entry", "")})
@@ -62,11 +74,16 @@ class SkillManager:
 
     def _find_entry(self, name: str):
         """按 SKILL.md 的 entry 字段定位 Python 入口函数。"""
+        if not is_valid_name(name):
+            return None, None
         fpath = os.path.join(SKILLS_DIR, name, "SKILL.md")
         if not os.path.exists(fpath):
             return None, None
-        with open(fpath, "r", encoding="utf-8") as f:
-            meta = _parse_meta(f.read())
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                meta = _parse_meta(f.read())
+        except (OSError, UnicodeDecodeError):
+            return None, None
         entry_name = meta.get("entry")
         if not entry_name:
             return None, None
@@ -74,14 +91,23 @@ class SkillManager:
         code_path = os.path.join(SKILLS_DIR, name, "skill.py")
         if not os.path.exists(code_path):
             return None, None
-        spec = importlib.util.spec_from_file_location(
-            f"skill_{name}", code_path)
+        mod_name = f"ugf_skill_{name}"
+        spec = importlib.util.spec_from_file_location(mod_name, code_path)
+        if spec is None or spec.loader is None:
+            return None, None
         mod = importlib.util.module_from_spec(spec)
         try:
+            # v2.0：先注册再 exec。原实现不注册 sys.modules，
+            # skill.py 内若用 dataclasses / 相对导入 / 自引用会直接失败。
+            sys.modules[mod_name] = mod
             spec.loader.exec_module(mod)
         except Exception:
+            sys.modules.pop(mod_name, None)
             return None, None
         fn = getattr(mod, entry_name, None)
+        if not callable(fn):
+            sys.modules.pop(mod_name, None)
+            return None, None
         return fn, (mod, entry_name)
 
     def load(self, name: str) -> str:
@@ -98,8 +124,19 @@ class SkillManager:
         """卸载一个技能。"""
         if name in self._loaded:
             del self._loaded[name]
+            sys.modules.pop(f"ugf_skill_{name}", None)
             return f"[skill] 已卸载: {name}"
         return f"[skill] {name} 未加载"
+
+    def reload(self, name: str) -> str:
+        """v2.0：改完 skill.py 后热重载，不必重启进程。"""
+        self._loaded.pop(name, None)
+        sys.modules.pop(f"ugf_skill_{name}", None)
+        return self.load(name)
+
+    def is_loaded(self, name: str) -> bool:
+        """v2.0：程序化判断（原先只有文本返回，调用方只能做字符串匹配）。"""
+        return name in self._loaded
 
     def loaded(self) -> list:
         """已加载技能名列表。"""
