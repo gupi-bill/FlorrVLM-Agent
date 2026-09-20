@@ -43,6 +43,9 @@ combat:
   safe_zone_margin: 100        # 安全区屏幕边缘边距
   safe_zone_w: 1920
   safe_zone_h: 1080
+  # v2.0：避险走位两段距离（原先硬编码在 combat_judge.calc_retreat_position 内）
+  flee_distance: 300           # 实力不足时，往反方向撤离的像素距离
+  strafe_distance: 150         # 实力可周旋时，侧向绕行的像素距离
 
 agent:
   game: florr                # 当前激活的游戏档案(game_profiles/<name>.yaml)

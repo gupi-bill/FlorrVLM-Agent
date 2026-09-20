@@ -56,6 +56,8 @@ DEFAULT = {
     "combat.safe_zone_margin": 100,
     "combat.safe_zone_w": 1920,
     "combat.safe_zone_h": 1080,
+    "combat.flee_distance": 300,
+    "combat.strafe_distance": 150,
 
     "agent.loop_interval": 0.5,
     "agent.game": "florr",

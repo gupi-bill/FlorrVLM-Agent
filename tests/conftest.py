@@ -11,9 +11,28 @@ import os
 import sys
 import types
 
+import pytest
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
+
+import config  # noqa: E402  （需在 sys.path 注入之后导入）
+
+
+@pytest.fixture
+def tmp_tuned(monkeypatch, tmp_path):
+    """
+    把 auto_tuner 的落盘路径重定向到临时目录。
+
+    S4：调参测试必须能在真实文件系统上跑（要验证写入/读取/重置），
+    但不能把 tuned_overrides.yaml 留在仓库里污染 config 加载优先级。
+    """
+    import auto_tuner
+    target = tmp_path / "tuned_overrides.yaml"
+    monkeypatch.setattr(auto_tuner, "TUNED_PATH", str(target))
+    monkeypatch.setattr(config, "TUNED_PATH", str(target))
+    return target
 
 
 def _install_stub(name: str, attrs: dict):

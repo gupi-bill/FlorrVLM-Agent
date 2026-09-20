@@ -11,7 +11,7 @@
 | S1 | 仓库基线修复与卫生清理 | ✅ 完成 | 01:31~01:40 (B线) | `.gitattributes`、`.gitignore` 增补、`requirements.txt` 三段分组、`requirements-dev.txt`；移除 8 个构建产物（含 1 个 31MB tar.gz）出版本库 |
 | S2 | 静态依赖与接口审计 | ✅ 完成 | 02:01~02:45 (A线) | `tools/static_audit.py`、`devplan/AUDIT.md`、`devplan/audit_data.json`；`requirements.txt` 收敛 `mcp<2`、`mcp_server.py` v1/v2 兼容、`video_learner.py` cv2 软依赖 |
 | S3 | 预判引擎实测定型 | ✅ 完成 | 02:41~02:55 (B线) | `tests/test_predictor.py`（46 用例全绿）、`tests/conftest.py`；`predictor.py` 抖动惩罚 + NaN 防御 + 分类逐帧重算；`config.yaml`/`config.py` 新增 4 个置信度曲线配置项 |
-| S4 | 战斗评估与自动调参校验 | ⬜ 待执行 | | |
+| S4 | 战斗评估与自动调参校验 | ✅ 完成 | 03:27~03:45 (A线) | `tests/test_combat_judge.py`(64)、`tests/test_auto_tuner.py`(26)；`combat_judge.py` 6 处修复、`auto_tuner.py` 3 处修复；`config.yaml`/`config.py` 新增 `combat.flee_distance`/`strafe_distance` |
 | S5 | 会话/汇报/技能模块校验 | ⬜ 待执行 | | |
 | S6 | 感知服务离线化 | ⬜ 待执行 | | |
 | S7 | 主循环 dry-run | ⬜ 待执行 | | |
@@ -123,4 +123,36 @@
   - 遗留：
     - 阈值锁偏保守：`confidence_threshold=0.65` 需 ≥6 帧且近乎直线才可能采信预判（3 帧上限仅 0.375）。属设计选择，交由 **S4** 的 `auto_tuner` 实测后再决定是否下调。
     - 同名怪匹配无距离上限，实体瞬移跨屏时仍可能张冠李戴（未修，避免与 v0.2 既有策略冲突）。
-    - `combat_judge` 复用 `predictor.threat` 表但自身另有默认值分支，**S4** 需核对两处是否漂移。
+    - `combat_judge` 复用 `predictor.threat` 表但自身另有默认值分支，**S4** 需核对两处是否漂移。（S4 结论：两处 threat 表数值一致，无漂移；但 `combat.chase_min_category` / `safe_zone_margin` 在 combat_judge 内确实存在配置漂移，已修）
+
+- **2026-09-21 03:45 · S4 · 战斗评估与自动调参校验**
+  - 做了什么：
+    1. 梳理输入契约：`judge_combat` 收 `CombatContext`（player/enemies/teammates/屏幕），输出 7 键决策字典；`agent_main` 消费 `decision` / `recommended_set` / `mindset` / `threat_ratio`，实测调用形状对齐无漂移。
+    2. 核对 `combat_judge.CATEGORY_THREAT`（自 `predictor.threat`）与 `predictor` 自身表：7 个分类数值完全一致，S3 遗留的「两处漂移」疑问排除。
+    3. 新建 `tests/test_combat_judge.py`（**64 用例**）与 `tests/test_auto_tuner.py`（**26 用例**）；`conftest.py` 新增 `tmp_tuned` 夹具把调参落盘路径重定向到 `tmp_path`，避免污染 config 加载优先级。
+    4. **修复 6 处 combat_judge 缺陷**：
+       - **F1（安全性，回归测试锁定）** 组队协同无条件覆盖 `recommended_set`，导致「已在全力逃生」被队友套装配置改成辅助套，逃生决策被静默吞掉 → 逃生优先级高于协同（`decision != retreat` 才协同；`_team_set_adjust` 新增可选 `decision` 参数，`None` 保持旧行为）。
+       - **F2** `clamp_to_safe_zone` 在屏幕小于安全区时恒返回 `margin`，坐标可能落到屏幕外 → 退化为钉屏幕中心。
+       - **F3** `calc_retreat_position` 硬编码 `margin=100 / 300 / 150`，与 `combat.safe_zone_margin` 脱节 → 改用配置，并把 `flee_distance` / `strafe_distance` 提到配置层（缺省值与原硬编码一致，行为不漂移）。
+       - **F4** `combat.chase_min_category` 是死配置（`should_chase` 把 boss/elite 写死在代码里）→ 新增 `CATEGORY_RANK` 档位表按配置取最低可追档位；`highest_boss` 仍永不追。
+       - **F5** `CombatEvaluator.__init__` 默认参数在 import 时绑定，config 热加载后新建评估器仍用旧防抖间隔 → 改 `None` 运行时取值。
+       - **F6** 脏数据防御：`hp` / `max_hp` / `power_score` 为 `None` / 字符串 / NaN、enemies 含非 dict 时原会抛 `TypeError` 或污染决策链 → 新增 `_safe_float()` 统一收敛。
+    5. **修复 3 处 auto_tuner 缺陷**：
+       - **T1** 模块常量 `HOLD` 只被 `_hold` 计数却从不消费，与文档「每次调整后一段时间内不再乱动」不符，实测会持续震荡 → 实现真正的冷静期（`_cooldown`），无调整则不进入冷静期。
+       - **T2** `current()` 原样返回文件里的越界值（如 `retreat_ratio: 99`）→ 读取即夹紧。
+       - **T3** 手写坏的 yaml（顶层非 dict / 子段为字符串 / 语法错误）会抛 `AttributeError` 炸穿 `agent_main` 调参调用点 → 新增 `_section()` / `_clamp()` 兜底；`_write` 异常捕获从 `OSError` 放宽到 `Exception`。
+    6. `config.yaml` + `config.py DEFAULT` 同步新增 `combat.flee_distance: 300`、`combat.strafe_distance: 150`。
+  - 产物：`tests/test_combat_judge.py`、`tests/test_auto_tuner.py`、`tests/conftest.py`(M)、`combat_judge.py`(M)、`auto_tuner.py`(M)、`config.yaml`(M)、`config.py`(M)
+  - 测试结果：
+    - `python -m pytest tests/ -q` → **136 passed**（predictor 46 + combat_judge 64 + auto_tuner 26，0 failed）✅
+    - combat_judge 覆盖：威胁求和/未知分类/非 dict 实体、威胁比（0/负/None/NaN → 999 哨兵）、三档决策与 0.8/1.4 边界、highest_boss 强弱势、心态 7 档、组队协同 4 例（含逃生回归）、追杀 5 例（含 `chase_min_category` 生效）、安全区钳制（含退化回归）、抖动边界、避险走位 flee/strafe/重合点、评估防抖缓存命中与 invalidate、脏数据、热加载 ✅
+    - auto_tuner 覆盖：默认值、死亡线性下调、命中率下调、上下限夹紧、坏文件 5 例、冷静期 4 例、往返/reset/status ✅
+    - 集成冒烟：复刻 `agent_main` 调用形状（highest_boss + 弱实力 + 战斗套队友）→ `decision=retreat, recommended_set=retreat`（修复前会被改成 `team`）✅
+    - `compileall` combat_judge / auto_tuner / config / tests 退出码 0 ✅
+    - 回归：`config / predictor / combat_judge / auto_tuner / mcp_server / session / report_notifier / skill_manager` 全部可导入 ✅
+    - 仓库零污染：调参测试后无 `tuned_overrides.yaml` 残留，`git status` 仅预期变更 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - `judge_combat` 的 highest_boss 分支中 `ratio > RETREAT_RATIO*0.6` 与 `else` 两个分支产出完全相同（均为 cautious + tank），属死分支。刻意不改（改动会影响既有对局策略），建议 **S13** 文档同步时如实标注或由产品侧决定「实力充足是否应升为 fight」。
+    - `decide_mindset` 的 1.2 / 1.5 / 0.5 / 0.4 / 0.3 五个心态阈值仍硬编码，与 v0.5「全部来自 config.yaml」原则不符。未提配置层（本轮预算 + 避免扩大改动面），移交 **S13**。
+    - `should_chase(entity, player, ...)` 的 `player` 形参在函数体内未被使用，已给默认值 `None` 兼容，是否移除待 **S7** 主循环实测后再定。
+    - pytest 的 `tmp_path` 落在 `/tmp`（10M tmpfs）。本轮用例产生的 yaml 均为字节级，实测无压力；**S13** 固化门禁时若新增大文件用例，需前置 `TMPDIR=/home/g-bill/.workbuddy/tmp`。
