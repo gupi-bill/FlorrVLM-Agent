@@ -123,18 +123,32 @@ def test_ops_check_clean_on_current_tree():
     assert ops_issues == [], f"运维脚本口径不一致: {ops_issues}"
 
 
-def test_ops_check_detects_missing_reference(tmp_path, monkeypatch):
-    """把 start_all.sh 改名后，check_ops 必须报 ERROR（防止校验器自身失效）。"""
-    src = os.path.join(BASE_DIR, "start_all.sh")
-    bak = tmp_path / "start_all.sh.bak"
-    bak.write_text(open(src, encoding="utf-8").read(), encoding="utf-8")
-    try:
-        os.remove(src)
-        issues = boot_check.check_ops()
-        assert any(i["level"] == "ERROR" and "start_all.sh" in i["msg"] for i in issues)
-    finally:
-        if not os.path.exists(src):
-            open(src, "w", encoding="utf-8").write(bak.read_text(encoding="utf-8"))
+def test_ops_check_detects_missing_reference(monkeypatch):
+    """引用了不存在的目标时，check_ops 必须报 ERROR（防止校验器自身失效）。
+
+    注意：早期版本会临时删除 start_all.sh 来制造该场景，但本机存在**并发的自动化线**
+    同时跑 pytest，删文件会让另一个进程的 boot_check 误报"运维脚本缺失"（曾导致
+    10 个用例随机失败）。故改为纯 monkeypatch，不触碰任何磁盘文件。
+    """
+    monkeypatch.setitem(boot_check.OPS_REFS, "start_all.sh",
+                        ["definitely_missing_target.py"])
+    issues = boot_check.check_ops()
+    assert any(i["level"] == "ERROR" and "definitely_missing_target.py" in i["msg"]
+               for i in issues), issues
+
+
+def test_ops_check_detects_port_drift(monkeypatch):
+    """脚本里的端口字面量与 config.yaml 不一致时必须报 ERROR。"""
+    real_read = boot_check._read
+
+    def fake_read(rel):
+        if rel == "Dockerfile":
+            return "EXPOSE 9999\n# panel_port: 9999\n"
+        return real_read(rel)
+
+    monkeypatch.setattr(boot_check, "_read", fake_read)
+    issues = boot_check.check_ops()
+    assert any(i["level"] == "ERROR" and "与 config.yaml" in i["msg"] for i in issues)
 
 
 def test_scripts_do_not_hardcode_python_binary():
