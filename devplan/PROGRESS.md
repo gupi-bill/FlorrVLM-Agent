@@ -35,8 +35,8 @@
 | S9 | MCP 工具注册验证 | ✅ 完成 | 06:39~07:10 (B线) | `tools/mcp_tools_check.py`(15 工具核对/调用/往返三检)、`tests/test_mcp_server.py`(109 用例)、`devplan/TOOLS.md`；`mcp_server.py` 10 处修复（路径穿越/向量开关死配置/dry-run 动作校验）、`kb_maintainer.py` 往返保真修复；`requirements.txt` mcp 放宽至 `>=1.0.0` |
 | S10 | 游戏档案体系固化 | ✅ 完成 | 23:02~23:2x (C线) | `tests/test_game_profiles.py`(38)、`devplan/PROFILE_SPEC.md`；`florr.yaml` 补 port/sets/tactics、`tools/add_game.py` v2.0（生成即通过 strict 自检）、`agent_cli.py validate` 支持 `--strict`；**652 用例全绿** |
 | S11 | UI 收敛与统一启动器 | ✅ 完成 | 23:16~23:36 (C线) | `launcher.py`（auto/panel/tk/cli + `--selftest`/`--list` + dry-run·mock 透传）、`tests/test_launcher.py`(26)、`ui/legacy/` 归档 pyqt/streamlit（含弃用头 + 路径 bootstrap + `python3`→`sys.executable`）、`admin_panel.py` 运行模式卡片、README 启动章节；**678 用例全绿** |
-| S12 | 运维脚本与容器一致性 | ✅ 完成 | 23:31~23:47 (D线) | `devplan/OPS.md`、`tests/test_ops.py`(21)；`boot_check.py` v2.0 分级自检（core=ERROR / GUI·YOLO·可选库=WARN+降级指引 / 新增 `--strict`·`--json`·`--no-ops` / `check_ops()` 运维口径校验）；`start_all.sh` v2.0（`--dry-run`/`--no-check`/`--help`、`UGF_PYTHON`/`UGF_DRY_RUN`/`UGF_FOREGROUND`、端口改从 config.yaml 现读）；`stop_all.sh` v2.0（dry-run + 优雅终止 + 日志轮转 + 失效 pid 清理）；`watchdog.sh` 解释器覆盖；`Dockerfile` v2.0（opencv→headless、EXPOSE 5001/5002、前台模式）；**699 用例全绿** |
-| S13 | 测试套件固化与文档同步 | 🟡 进行中 | 23:50~23:56 (D线，部分) | `scripts/check.sh`（一条命令门禁：compileall → boot_check --fail-fast → game_profile_check --all → pytest，支持 `--fast`/`--help`，失败退出码=环节编号）+ `tests/test_ops.py` 增至 23 用例；**未完成：README/PROJECT_SUMMARY/ROADMAP 文档同步（`tests/conftest.py` 已存在，无需重建）** |
+| S12 | 运维脚本与容器一致性 | ✅ 完成 | 23:31~00:12 (D线) | `devplan/OPS.md`、`tests/test_ops.py`(26)；`boot_check.py` v2.0 分级自检（core=ERROR / GUI·YOLO·可选库=WARN+降级指引 / 新增 `--strict`·`--json`·`--no-ops` / `check_ops()` 运维口径校验）；`start_all.sh` v2.0（`--dry-run`/`--no-check`/`--help`、`UGF_PYTHON`/`UGF_DRY_RUN`/`UGF_FOREGROUND`、端口改从 config.yaml 现读）；`stop_all.sh` v2.0（dry-run + 优雅终止 + 日志轮转 + 失效 pid 清理）；`watchdog.sh` 解释器覆盖；`Dockerfile` v2.0（opencv→headless、EXPOSE 5001/5002、前台模式）；**704 用例全绿（含根因修复后的回归）** |
+| S13 | 测试套件固化与文档同步 | 🟡 进行中 | 23:50~00:12 (D线，部分) | `scripts/check.sh`（一条命令门禁：compileall → boot_check --fail-fast → game_profile_check --all → pytest，支持 `--fast`/`--help`，失败退出码=环节编号）+ `tests/test_ops.py` 增至 26 用例；**未完成：README/PROJECT_SUMMARY/ROADMAP 文档同步（`tests/conftest.py` 已存在，无需重建）** |
 | S14 | 最终验收与归档 | ⬜ 待执行 | | |
 | S15 | 第二款游戏端到端跑通（space_invaders） | ⬜ 待执行 | | |
 | S16 | 参考适配器模板与档案规范固化 | ⬜ 待执行 | | |
@@ -444,3 +444,10 @@
     - 全量 pytest 曾出现一次 8 失败的瞬时结果（同目录下有并发写入），随后独立重跑 699 全绿；疑似与并行自动化线同时写文件有关，未复现。
 
 2026-09-21 23:56 · S13(部分) · 本轮 25 分钟预算内 S12 完成后仍有余量，按「预算有余则继续下一阶段」规则开工 S13 的可验收核心：新建 `scripts/check.sh` 一条命令门禁（compileall → boot_check --fail-fast → game_profile_check --all → pytest，`--fast` 秒级跑、`--help`、未知参数退 2、失败退出码=环节编号），`tests/test_ops.py` 补 2 用例（门禁 fast 全程退 0 且逐阶段打印 / 未知参数 2），现 23 用例。实测 `bash scripts/check.sh --fast` 退出码 0（语法 OK + 自检 ERROR 0/WARN 5 + 两份档案 ✅）。**未做**：README / PROJECT_SUMMARY / ROADMAP 三份文档同步（工作量大，超出本轮余量），移交下一轮；故 S13 标记为 🟡 而非 ✅。
+
+2026-09-22 00:12 · S12(补充·根因修复) · 修正上一版日志中"疑似并发线写文件"的错误归因（该结论不成立，已实测推翻）：
+  - **真实根因**：全量 pytest 期间出现 9~10 个用例随机失败，均为调用 `boot_check` 子进程的用例。抓完整 stdout 后定位到宿主有 **safe-delete 批量删除护栏**（`[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":133,"threshold":50,"scope":"turn"}`）：全量测试一轮累计删除超过 50 次后，`boot_check` 写探针里的 `os.remove(probe)` 被拦截并抛错 → 被 `except OSError` 捕获 → 误报 ERROR「目录不可写: run_logs」→ `start_all.sh --fail-fast` 退出 1。单跑 test_ops.py 时删除次数未达阈值，所以"时好时坏"。
+  - **修复**：新增 `boot_check._dir_writable()`，可写性探测改为「`os.access` + 追加方式打开复用同一探针文件」，**全程零删除**（残留一个空文件，由 `stop_all.sh` 顺带清理）。
+  - **回归锁定**：`tests/test_ops.py` 补 3 用例 —— AST 断言 `boot_check.py` 内不得出现 `remove/unlink/rmtree` 调用、`_dir_writable` 对 `run_logs` 返回 True、对「文件冒充目录」返回 False；另把原先会**临时删除 start_all.sh** 的反向用例改为纯 monkeypatch（删仓库文件在并发 pytest 下同样是隐患），并新增「端口漂移」检测用例。
+  - 验证：`pytest tests/ -q` 连续两次 **702 / 704 passed**（修复后不再随机失败）；`compileall` 退出码 0；`git status` 干净。
+  - 经验（供后续阶段参考）：**本机写测试时禁止在用例里删除仓库内文件**；任何 `os.remove/shutil.rmtree` 在全量测试规模下都可能触发宿主删除护栏，应改走 tmp_path 沙箱或 monkeypatch。
