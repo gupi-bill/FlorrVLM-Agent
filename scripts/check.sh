@@ -19,13 +19,25 @@ for arg in "$@"; do
   esac
 done
 
-if [ -n "${UGF_PYTHON:-}" ]; then
-  PY="$UGF_PYTHON"
-elif command -v python3 >/dev/null 2>&1; then
-  PY=python3
-else
-  PY=python
+# 解释器优先级：UGF_PYTHON > 项目内 venv > 系统 python3
+pick_python() {
+  for cand in "${UGF_PYTHON:-}" .venv/bin/python venv/bin/python \
+             "$HOME/.workbuddy/binaries/python/envs/ugf/bin/python" python3 python; do
+    [ -n "$cand" ] || continue
+    command -v "$cand" >/dev/null 2>&1 || [ -x "$cand" ] || continue
+    if "$cand" -c "import yaml" >/dev/null 2>&1; then
+      echo "$cand"; return 0
+    fi
+  done
+  return 1
+}
+
+if ! PY="$(pick_python)"; then
+  echo "❌ 找不到带核心依赖（pyyaml）的 Python 解释器。" >&2
+  echo "   请用 UGF_PYTHON=/path/to/venv/bin/python bash scripts/check.sh 指定。" >&2
+  exit 2
 fi
+echo "Python: $PY"
 
 step() { printf '\n===== [%s] %s =====\n' "$1" "$2"; }
 

@@ -89,7 +89,10 @@ def rmdir(rel):
             print("[dry-run] 将删除目录", rel)
         else:
             shutil.rmtree(p, ignore_errors=True)
-            print("已删除目录", rel)
+            if os.path.isdir(p):
+                print("[warn] 目录清理失败（可能被外部策略拦截），请手动删除:", rel)
+            else:
+                print("已删除目录", rel)
 
 
 def rmfile(p):
@@ -99,8 +102,8 @@ def rmfile(p):
         try:
             os.remove(p)
             print("已删除", os.path.relpath(p, base))
-        except OSError:
-            pass
+        except OSError as e:
+            print("[warn] 文件清理失败:", os.path.relpath(p, base), e)
 
 
 rmdir("video_frames")

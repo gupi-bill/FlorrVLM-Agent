@@ -26,10 +26,54 @@
 | v1.7 | 局中定时进度汇报（report_every 轮间隔，覆盖式单文件+Webhook，不阻塞主循环） | ✅ 已完成 |
 | v1.8 | 游戏档案自检器（validate 命令 / add_game 生成后即检，投bo前防格式错） | ✅ 已完成 |
 | v1.9 | 系统安装包打包（Linux .deb / 便携版 + Windows EXE/便携 + Android APK 脚手架，package 命令） | ✅ 已完成 |
-| v2.0 | 正式深度开发 Florr.io 专属高级功能（拟人化高水平玩家） | 📌 概述 |
+| v2.0 | **地基做实**：可导入 / 可离线跑通 / 有测试 / 有门禁 / 文档与代码一致（Florr 深度化后置） | 🚧 进行中 |
 | v3.0 | 转折点：转为通用 2D 游戏智能体 | 📌 概述 |
 | v4.0 | 完美适配全部 2D 游戏，自学习适配 | 📌 概述 |
 | v5.0 | 开始支持 3D 游戏 | 📌 概述 |
+
+> ⚠️ **状态口径（2026-09-22 校准）**：上表 v0.1~v1.9 的「✅ 已完成」指**功能代码已存在、且通过离线单元测试与冒烟**，
+> **不等于在真实 Florr.io 对局中验收过**。冲刺前的实测结论是：核心运行时模块一度缺失、零测试、文档超前于代码。
+> 因此 2026-09-21~22 的 v2.0 冲刺把目标从「加新功能」改为「把地基做实」，逐项验证结果见下节。
+> 方向判断以 [devplan/DIRECTION.md](devplan/DIRECTION.md) 为准，README 的历史措辞不作数。
+
+---
+
+## v2.0 冲刺校准（2026-09-21 ~ 09-22 实测）
+
+> 冲刺计划 [devplan/PLAN.md](devplan/PLAN.md)（S1~S14）· 进度 [devplan/PROGRESS.md](devplan/PROGRESS.md) · 第二阶段 [devplan/PLAN_PHASE2.md](devplan/PLAN_PHASE2.md)（S15~S26）
+
+### 门禁
+
+```bash
+bash scripts/check.sh          # compileall → boot_check → game_profile_check → pytest
+bash scripts/check.sh --fast   # 秒级：语法 + 启动自检 + 档案校验
+```
+
+### 已实测（离线）
+
+| 项 | 结论 | 复核命令 |
+|---|---|---|
+| Python 语法 | 全仓库 `compileall` 通过 | `bash scripts/check.sh --fast` |
+| 单元测试 | **743 用例全绿**（14 个测试文件） | `python -m pytest tests/ -q` |
+| 启动自检 | 本机 ERROR 0 / WARN 6，每条附「修复 + 降级」指引 | `python boot_check.py` |
+| 静态审计 | 跨模块缺失符号 0、kwargs 不匹配 0 | `python tools/static_audit.py` |
+| 游戏档案 | florr / space_invaders 两份 `--strict` 全过 | `python game_profile_check.py --all --strict` |
+| MCP 工具 | 15 个工具可注册 / 可调用 / schema 正确 + 知识库往返保真 | `python tools/mcp_tools_check.py --strict` |
+| CLI | 31 条命令矩阵，0 traceback、0 卡死 | `python tools/cli_smoke.py --strict` |
+| 主循环 | 离线 5 轮跑通：感知 → 预判 → 决策 → 动作 → 记忆 → 复盘 → 汇报 | `UGF_DRY_RUN=1 python agent_main.py --rounds 5` |
+| 统一启动器 | UI 探测 / 选择 / 离线开关透传可验 | `python launcher.py --ui auto --selftest` |
+| 运维脚本 | 启停 dry-run 零副作用；日志轮转与临时清理沙箱实测 | `bash start_all.sh --dry-run` |
+
+### 未验证（受本机环境限制，非代码缺陷）
+
+| 能力 | 阻塞原因 | 降级方式 |
+|---|---|---|
+| 真实 LLM / VLM 决策 | 无 `.env` 密钥 | 走 `_fallback_decide` 规则分支 |
+| 真实截图 + YOLO 感知 | 无 X server、无模型权重 | 感知自动降级到 mock 后端 |
+| 键鼠实际操作 | 无 GUI | dry-run 只记录不执行 |
+| 联网教程检索 / Webhook 推送 | 无外部 MCP、无网络 | 注入假 `requests`、返回降级提示 |
+| 容器镜像构建 | 本机无 docker | 仅静态口径对齐 + headless 替换 |
+| GUI 真实渲染（Tk / PyQt / Streamlit） | 无 X server / 未安装 | 仅验证可用性与命令构造 |
 
 ---
 
@@ -327,7 +371,10 @@
 
 ## v2.0 —— Florr.io 高级拟人玩家
 
-正式深度开发 Florr.io 专属高级功能，达到"像高水平人类玩家"的水平：
+正式深度开发 Florr.io 专属高级功能，达到"像高水平人类玩家"的水平。
+> ⚠️ 排期调整（2026-09-22）：**Florr 深度化依赖实机，本机不可验证**，已后置到第二阶段末尾；
+> v2.0 当前范围是「地基做实 + 通用化闭环」，阶段清单见 `devplan/PLAN.md` 与 `devplan/PLAN_PHASE2.md`。
+
 全局长期战略规划、多人博弈预判、自主战术创新、自适应难度、识破玩家套路（诱骗/假撤退/埋伏）、MCP 多智能体互联组队、高阶花瓣套装体系、全可视化监控、资源调度器（J1900 上 7×24 稳定）、知识库导入导出。
 
 > 详细功能清单在进入 v2.0 开发时再展开。

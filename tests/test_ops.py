@@ -226,14 +226,40 @@ def test_stop_all_cleans_temp_dir_and_rotates_logs(tmp_path):
     fresh.write_text("new")
     (sandbox / "keepme.tmp").write_text("tmp")
 
+    env = {**os.environ, "UGF_PYTHON": PY, "UGF_LOG_KEEP_DAYS": "7",
+           "UGF_DRY_RUN": "", "UGF_KEEP_LOGS": ""}
     r = subprocess.run(["bash", "stop_all.sh"], cwd=str(sandbox),
-                       env={**os.environ, "UGF_PYTHON": PY, "UGF_LOG_KEEP_DAYS": "7"},
-                       capture_output=True, text=True, timeout=120)
-    assert r.returncode == 0, r.stdout + r.stderr
-    assert not (sandbox / "video_frames").exists(), "video_frames 应被清理"
+                       env=env, capture_output=True, text=True, timeout=120)
+    out = r.stdout + r.stderr
+    assert r.returncode == 0, out
+
+    # 宿主可能带「单轮批量删除护栏」：累计删除超阈值后 rm 会被静默拦截。
+    # 这时清理不生效是环境问题而非脚本缺陷 —— 用「Python 侧能否删掉」来判别，
+    # 而不是无脑 skip 或断言通过。
+    def _guard_blocked():
+        try:
+            probe = sandbox / "__probe.tmp"
+            probe.write_text("x")
+            probe.unlink()
+            return probe.exists()
+        except OSError:
+            return True
+
+    if _guard_blocked():
+        pytest.skip("宿主删除护栏已生效（本轮累计删除超阈值），清理路径改由 --dry-run 用例覆盖")
+
+    assert not (sandbox / "video_frames").exists(), "video_frames 应被清理\n" + out
     assert not old.exists(), "过期日志应被轮转"
     assert fresh.exists(), "未过期日志必须保留"
     assert not (sandbox / "keepme.tmp").exists(), "临时探针应被清理"
+
+
+def test_stop_all_cleanup_failure_is_reported_not_silent():
+    """清理失败必须显式告警 —— 静默吞掉会让"磁盘没清干净"变成隐形故障。"""
+    text = open(os.path.join(BASE_DIR, "stop_all.sh"), encoding="utf-8").read()
+    assert "ignore_errors=True" in text  # 允许重试语义，但必须事后自检
+    assert "[warn] 目录清理失败" in text
+    assert "[warn] 文件清理失败" in text
 
 
 def test_stop_all_keep_logs_preserves():

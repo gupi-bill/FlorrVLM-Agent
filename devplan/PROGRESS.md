@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`RELEASED | D线(23:30一次性) | 2026-09-21T23:47 | S12`
+`LOCK | A线(00:00整点) | 2026-09-22T00:04 | S13`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -36,7 +36,7 @@
 | S10 | 游戏档案体系固化 | ✅ 完成 | 23:02~23:2x (C线) | `tests/test_game_profiles.py`(38)、`devplan/PROFILE_SPEC.md`；`florr.yaml` 补 port/sets/tactics、`tools/add_game.py` v2.0（生成即通过 strict 自检）、`agent_cli.py validate` 支持 `--strict`；**652 用例全绿** |
 | S11 | UI 收敛与统一启动器 | ✅ 完成 | 23:16~23:36 (C线) | `launcher.py`（auto/panel/tk/cli + `--selftest`/`--list` + dry-run·mock 透传）、`tests/test_launcher.py`(26)、`ui/legacy/` 归档 pyqt/streamlit（含弃用头 + 路径 bootstrap + `python3`→`sys.executable`）、`admin_panel.py` 运行模式卡片、README 启动章节；**678 用例全绿** |
 | S12 | 运维脚本与容器一致性 | ✅ 完成 | 23:31~00:12 (D线) | `devplan/OPS.md`、`tests/test_ops.py`(26)；`boot_check.py` v2.0 分级自检（core=ERROR / GUI·YOLO·可选库=WARN+降级指引 / 新增 `--strict`·`--json`·`--no-ops` / `check_ops()` 运维口径校验）；`start_all.sh` v2.0（`--dry-run`/`--no-check`/`--help`、`UGF_PYTHON`/`UGF_DRY_RUN`/`UGF_FOREGROUND`、端口改从 config.yaml 现读）；`stop_all.sh` v2.0（dry-run + 优雅终止 + 日志轮转 + 失效 pid 清理）；`watchdog.sh` 解释器覆盖；`Dockerfile` v2.0（opencv→headless、EXPOSE 5001/5002、前台模式）；**704 用例全绿（含根因修复后的回归）** |
-| S13 | 测试套件固化与文档同步 | 🟡 进行中 | 23:50~00:12 (D线，部分) | `scripts/check.sh`（一条命令门禁：compileall → boot_check --fail-fast → game_profile_check --all → pytest，支持 `--fast`/`--help`，失败退出码=环节编号）+ `tests/test_ops.py` 增至 26 用例；**未完成：README/PROJECT_SUMMARY/ROADMAP 文档同步（`tests/conftest.py` 已存在，无需重建）** |
+| S13 | 测试套件固化与文档同步 | ✅ 完成 | 23:50~00:12 (D线) + 00:04~00:2x (A线) | `scripts/check.sh`（一条命令门禁：compileall → boot_check --fail-fast → game_profile_check --all → pytest，支持 `--fast`/`--help`，失败退出码=环节编号）、`tests/test_ops.py` 增至 26 用例、**`tests/test_docs.py`（38 用例文档—代码一致性门禁）**；README/PROJECT_SUMMARY/ROADMAP 三份文档同步（验证状态 / 离线模式 / 门禁 / 未验证清单 / 目录结构 / 版本口径）；**743 用例全绿** |
 | S14 | 最终验收与归档 | ⬜ 待执行 | | |
 | S15 | 第二款游戏端到端跑通（space_invaders） | ⬜ 待执行 | | |
 | S16 | 参考适配器模板与档案规范固化 | ⬜ 待执行 | | |
@@ -83,6 +83,25 @@
     - `research` 的真实联网检索仍未实测（无外部 MCP 配置、无网络），本轮只验证降级分支可读不崩溃。
     - **`ui_pyqt.py` 仍用 `python3` 而非隔离 venv 解释器**调用 CLI。本轮只对齐了参数形状（C4），解释器路径移交 **S11**。
     - `reset_brief` 的 lambda 用海象+元组+`and` 写法，可读性差但行为正确，未重构以免扩大改动面，移交 **S13**。
+
+- **2026-09-22 00:04 · S13 · 测试套件固化与文档同步（收尾：三份文档 + 文档门禁）**
+  - 起点判定：运行锁 `RELEASED`（D 线 23:47 释放），状态表首个非 ✅ 为 S13（🟡 部分完成），当前 00:04 < 2026-09-22 07:00，故续做 S13 未完成部分。（提示词写"从 S9 续跑"，但 S9~S12 均已完成，按 PROGRESS 文件规则从首个非 ✅ 开始。）
+  - 做了什么：
+    1. **新增 `tests/test_docs.py`（38 用例）—— 本阶段最实质的产出**：把"文档说真话"变成可机器复核的门禁，而不只是人工改一遍。覆盖：三份文档存在且非空、devplan 六份文档齐全、门禁脚本 `scripts/check.sh` 四个环节齐全、**三份文档测试基线口径一致（704）**、均链到 PROGRESS、均如实披露「未验证」、禁止失真表述（`连续 2 帧死亡` / `实机已验证` / `全部功能已完成`）、无 `sk-` 密钥字面量、**README 死亡帧数 == `config.yaml death_frame_threshold`**、**README MCP 标题数量 == 表格条目数 == 服务端实际注册清单**（复用 `tools/mcp_tools_check.check_registry()`）、文件结构块含 8 个新目录、本地 markdown 链接全部可达、ROADMAP/SUMMARY 含冲刺章节与状态口径、历史版本表必须带「实机未验证」限定、`tests/` 文件数 ≥14 且有 conftest。
+    2. **README.md 修订**：新增「🧪 离线模式与自测」（4 个开关/参数表 + 5 条复核命令）与「✅ 验证状态」（门禁命令、**已实测 9 项** / **未验证 6 项**两张表 + 口径说明）；修掉与 `config.yaml` 冲突的「连续 2 帧死亡」→ 8 帧；文件结构补 `tests/`、`scripts/check.sh`、`devplan/`、`launcher.py`、`ui/legacy/`、`knowledge_archive/`、`run_logs/`、`space_invaders.yaml` 及 tools 全量；版本进度表 v0.1~v1.9 由无条件「✅ 已完成」改为「代码已落地 ✅ --- 实机未验证 ⚠️」并加口径说明；目录补两项锚点。
+    3. **PROJECT_SUMMARY.md 修订**：新增「十、v2.0 冲刺实测状态」（门禁 + S1~S13 产物一览表 + 已实测 / 未验证），文件结构补全，第八节版本进度加「代码已落地 vs 实机未验证」口径，注意事项补离线跑法；并修掉两处「连续 2 帧」死亡描述。
+    4. **ROADMAP.md 修订**：新增「v2.0 冲刺校准（实测）」章节（门禁 + 10 项已实测 + 6 项未验证）；版本总览下加**状态口径声明**（✅ = 代码已落地且通过离线验证，不等于实机验收）；v2.0 定位改为「地基做实」，并注明 **Florr 深度化因依赖实机、本机不可验证而后置**。
+  - 产物：`tests/test_docs.py`、`README.md`(M)、`PROJECT_SUMMARY.md`(M)、`ROADMAP.md`(M)、`devplan/PROGRESS.md`(M)
+  - 测试结果：
+    - `python -m pytest tests/ -q` → **743 passed**（S12 的 704 + 文档门禁 38 + 清理告警 1，0 failed）✅
+    - `python -m pytest tests/test_docs.py -q` → 38 passed（首轮 37 通过 / 1 失败，失败项正是它抓出的真问题：PROJECT_SUMMARY 仍写「连续 2 帧死亡」，已修）✅
+    - `bash scripts/check.sh --fast` → 退出码 0（语法 OK + 自检 ERROR 0 + 两份档案 ✅）✅
+    - `compileall -q .` 退出码 0 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - `tests/test_docs.py` 的基线常量 `BASELINE_CASES = "704"` 是**硬编码**，后续阶段新增用例后文档与常量需同步上浮；未做成动态采集（`pytest --collect-only` 会让门禁变慢且不稳定）。建议 S21 可观测性阶段再考虑动态化。
+    - 三份文档中的「已实测」结论依赖**离线**结果；一旦补上实机验证，需同步替换口径，不能只改一处。
+    - README 的架构图未画 `perception_server` / `launcher` / 门禁，属示意图简化，未强求与文件结构一致。
+    - `PROJECT_SUMMARY.md` 第三节「外部依赖仓库（需自行 git clone）」涉及联网仓库，未做可达性校验（链接检查只覆盖本地相对路径）。
 
 ---
 

@@ -18,7 +18,7 @@
 5. **组队协同** — 识别队友套装，队友输出→我方辅助，队友抗伤→我方输出
 6. **拟人操作** — 移动抖动 + 随机停顿 + 路径微扰，消除机器感
 7. **BOSS 记忆** — 每 12 秒批量记录 BOSS 行为习惯到知识库
-8. **死亡复盘** — 连续 2 帧死亡才判定，BOSS/组队局自动生成复盘
+8. **死亡复盘** — 连续 8 帧判定死亡（`death_frame_threshold` 可配），BOSS/组队局自动生成复盘
 9. **对话指挥** — `agent_cli.py` 交互式命令，像普通 Agent 一样问答编排（v0.6）
 10. **Skill + 外部 MCP** — 接技能包、主动连外部 MCP（v0.7/v0.8）
 11. **游戏档案化** — 每款游戏一份 YAML 档案，热加载切换（v0.9）
@@ -85,14 +85,21 @@ Universal-Game-Framework/
 ├── boot_check.py           # 启动自检（v1.0）
 ├── watchdog.sh / florr-agent.service.example / Dockerfile  # 稳定性
 ├── admin_panel.py          # 可视化监控大盘（v1.1/v1.6）
+├── launcher.py             # 统一启动入口（自动选 UI + 离线开关透传，v2.0）
+├── ui/legacy/              # 已归档前端：ui_pyqt.py / ui_streamlit.py（DEPRECATED）
 ├── cli_ui.py               # CLI 界面（彩色面板）
 ├── config.py / config.yaml # 参数配置 + 热加载
-├── game_profiles/          # 游戏档案（florr.yaml）
-├── tools/                  # add_game.py / build_dist.py
+├── game_profiles/          # 游戏档案：florr.yaml / space_invaders.yaml
+├── tools/                  # add_game.py / build_dist.py / cli_smoke.py / mcp_tools_check.py / static_audit.py
+├── tests/                  # 14 个测试文件（743 用例，全离线可跑）
+├── scripts/check.sh        # 一条命令门禁（语法 + 自检 + 档案 + 测试）
+├── devplan/                # PLAN / PROGRESS / AUDIT / OPS / TOOLS / PROFILE_SPEC / DIRECTION
 ├── packaging/              # Windows EXE / Android APK 构建
-├── start_all.sh / stop_all.sh
-├── requirements.txt / .env.example / .gitignore
-└── knowledge_md/           # 自动创建，MD 知识库
+├── start_all.sh / stop_all.sh / watchdog.sh
+├── requirements.txt / requirements-dev.txt / .env.example / .gitignore
+├── knowledge_md/           # 自动创建，MD 知识库
+├── knowledge_archive/      # 自动创建，超限归档区
+└── run_logs/               # 自动创建，回合日志 / 汇报 / dry-run 动作明细
 ```
 
 ---
@@ -116,7 +123,7 @@ Universal-Game-Framework/
  11. 每 12 秒批量写 BOSS 行为记忆到 knowledge_md/
 
 死亡处理：
-  - 连续 2 帧 player.alive=false → 判定真实死亡
+  - 连续 8 帧 player.alive=false（`death_frame_threshold`）→ 判定真实死亡
   - 仅 highest_boss/boss/组队局 → kb_write 生成复盘 md
   - 普通小怪局 → 不生成复盘，reset_predictor，节省硬盘
 ```
@@ -230,11 +237,14 @@ Windows EXE / Android APK 构建详见 [packaging/README.md](packaging/README.md
 
 | 版本 | 内容 | 状态 |
 |------|------|------|
-| v0.1~v0.3 | Florr 初版 + 稳定性 + 基础战术扩充 | ✅ 完成 |
-| v0.4~v0.5 | 学习闭环 + 完整 MCP 生态 | ✅ 完成 |
-| v0.6~v0.9 | Agent 形态 + 外部 MCP + Skill + 通用化 | ✅ 完成 |
-| v1.0~v1.9 | 稳定底座 + 大盘/汇报/会话/战绩/自检/安装包 | ✅ 完成 |
-| v2.0 | Florr.io 高级拟人玩家 | 🚧 进行中 |
+| v0.1~v0.3 | Florr 初版 + 稳定性 + 基础战术扩充 | 代码已落地 ✅ --- 实机未验证 ⚠️ |
+| v0.4~v0.5 | 学习闭环 + 完整 MCP 生态 | 代码已落地 ✅ --- 实机未验证 ⚠️ |
+| v0.6~v0.9 | Agent 形态 + 外部 MCP + Skill + 通用化 | 代码已落地 ✅ --- 实机未验证 ⚠️ |
+| v1.0~v1.9 | 稳定底座 + 大盘/汇报/会话/战绩/自检/安装包 | 代码已落地 ✅ --- 实机未验证 ⚠️ |
+| v2.0 | 地基做实：离线可跑通 + 743 用例 + 一条命令门禁 + 文档与代码一致 | 🚧 进行中（S1~S14，见 devplan/PROGRESS.md） |
+
+> ⚠️ **口径**：「✅ 完成」= 功能代码存在且通过**离线**单测/冒烟；真实 LLM 决策、截图感知、键鼠操作在本机无条件实测，故不构成实机验收。
+> 冲刺期实测校准详见第十节。
 
 ---
 
@@ -245,4 +255,54 @@ Windows EXE / Android APK 构建详见 [packaging/README.md](packaging/README.md
 3. **向量检索**：默认关闭，设置环境变量 `FLORR_VECTOR_SEARCH=1` 可开启（需安装 chromadb + sentence-transformers）
 4. **知识库导入导出**：`kb_export` / `kb_import`（或 kb_maintainer.py --export / --import-from），备份文件在 kb_backups/
 5. **API 密钥安全**：`.env` 已加入 `.gitignore`，不要提交到公开仓库
+6. **离线可跑（v2.0）**：无密钥 / 无 X server / 无 YOLO 时用 `UGF_DRY_RUN=1` + `UGF_PERCEPTION_BACKEND=mock` 即可跑通全链路；`bash scripts/check.sh --fast` 一条命令复核地基
+
+---
+
+## 十、v2.0 冲刺实测状态（2026-09-21 ~ 09-22）
+
+> 冲刺目标不是加新功能，而是**把地基做实**：可导入、可离线跑通、有测试、有门禁、文档与代码一致。
+> 计划 [devplan/PLAN.md](devplan/PLAN.md) ｜ 进度 [devplan/PROGRESS.md](devplan/PROGRESS.md) ｜ 运维口径 [devplan/OPS.md](devplan/OPS.md) ｜ 工具清单 [devplan/TOOLS.md](devplan/TOOLS.md) ｜ 档案规范 [devplan/PROFILE_SPEC.md](devplan/PROFILE_SPEC.md)
+
+### 一条命令门禁
+
+```bash
+bash scripts/check.sh          # compileall → boot_check → game_profile_check → pytest
+bash scripts/check.sh --fast   # 秒级：语法 + 启动自检 + 档案校验
+```
+退出码 = 失败环节编号：`1` 语法 / `2` 启动自检 / `3` 游戏档案 / `4` 单元测试。
+
+### 阶段产物一览
+
+| 阶段 | 产物 |
+|---|---|
+| S1 | `.gitattributes`、`.gitignore` 增补、requirements 三段分组（移除 31MB 构建产物出版本库） |
+| S2 | `tools/static_audit.py`、`devplan/AUDIT.md`（mcp<2 兼容、cv2 软依赖） |
+| S3 | `tests/test_predictor.py`（46）—— 抖动惩罚、NaN 防御、分类逐帧重算 |
+| S4 | `tests/test_combat_judge.py`(64)、`test_auto_tuner.py`(26) —— 逃生优先于协同、冷静期、脏数据兜底 |
+| S5 | `tests/test_session.py`(68)、`test_report_notifier.py`(33)、`test_skill_manager.py`(34) |
+| S6 | `perception_server.py` 重写（mock / auto / http + `--selftest`）、`test_perception_server.py`(99) |
+| S7 | `agent_main.py` dry-run 分支、`test_agent_main.py`(87)、`devplan/SMOKE_S7.md` |
+| S8 | `tools/cli_smoke.py`（31 命令矩阵）、`test_agent_cli.py`(48)、`devplan/SMOKE_S8.md` |
+| S9 | `tools/mcp_tools_check.py`、`test_mcp_server.py`(109)、`devplan/TOOLS.md` |
+| S10 | `tools/add_game.py` v2.0、`test_game_profiles.py`(38)、`devplan/PROFILE_SPEC.md` |
+| S11 | `launcher.py`、`test_launcher.py`(26)、`ui/legacy/` 归档 |
+| S12 | `boot_check.py` v2.0、三脚本 v2.0、`Dockerfile` v2.0、`test_ops.py`(26)、`devplan/OPS.md` |
+| S13 | `scripts/check.sh`、`tests/test_docs.py`（文档与代码一致性）、三份文档同步 |
+
+### 已实测（离线）
+
+| 项 | 结论 |
+|---|---|
+| 单元测试 | **743 用例全绿** |
+| 启动自检 | ERROR 0 / WARN 6，每条附降级指引 |
+| MCP 工具 | 15 个全部可注册 / 可调用 / schema 正确 |
+| CLI | 31 条命令矩阵，0 traceback、0 卡死 |
+| 主循环 | 离线 5 轮全链路跑通（感知 → 预判 → 决策 → 动作 → 记忆 → 复盘 → 汇报） |
+| 游戏档案 | florr / space_invaders 两份 `--strict` 全过 |
+
+### 未验证（受本机环境限制）
+
+真实 LLM/VLM 决策（无密钥）· 真实截图 + YOLO（无 X server / 无权重）· 键鼠实操（无 GUI）· 联网检索与 Webhook（无网络）· 容器构建（无 docker）· GUI 真实渲染。
+以上均已内置 mock / dry-run / 降级分支，链路可跑但结论待实机确认。
 6. **反作弊**：florr.io 有 AFK 检测和行为分析，长时间挂机有封号风险

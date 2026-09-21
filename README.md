@@ -27,6 +27,8 @@
 - [⚙️ 快速开始](#️-快速开始)
 - [📦 安装包](#-安装包)
 - [🧩 MCP 工具](#-mcp-工具15-个)
+- [🧪 离线模式与自测](#-离线模式与自测)
+- [✅ 验证状态](#-验证状态)
 - [📁 文件结构](#-文件结构)
 - [🗺️ 路线图](#️-路线图roadmap)
 
@@ -43,7 +45,7 @@
 | 👥 **组队协同** | 识别队友套装，自动分工：输出 / 辅助 / 掩护 |
 | 🕹️ **拟人操作** | 移动抖动 + 随机停顿 + 路径微扰，降低脚本感 |
 | 🧠 **BOSS 记忆** | 每 12s 批量记录 BOSS 行为习惯到知识库 |
-| 📝 **死亡复盘** | 连续 2 帧死亡才判定，BOSS / 组队局自动生成复盘 |
+| 📝 **死亡复盘** | 连续 8 帧判定死亡（`death_frame_threshold` 可配），BOSS / 组队局自动生成复盘 |
 | 💬 **对话指挥** | `agent_cli.py` 交互式命令，像普通 Agent 一样问答编排 |
 | 🎚️ **自动调参** | 按命中率 / 死亡数自动微调战斗阈值，热加载生效 |
 | 🧩 **Skill + 外部 MCP** | 能接技能包、主动连外部 MCP，能力按需装配 |
@@ -132,6 +134,69 @@ bash stop_all.sh     # 优雅停止
 
 ---
 
+## 🧪 离线模式与自测
+
+没有实机、没有 X server、没有 API 密钥，也能把整条链路跑通 —— 冲刺期间所有验证都在这种条件下完成：
+
+| 开关 / 参数 | 作用 |
+|---|---|
+| `UGF_DRY_RUN=1` | 键鼠动作只记录不执行，明细落 `run_logs/dryrun_actions.log` |
+| `UGF_PERCEPTION_BACKEND=mock` | 感知服务改出合成场景（5 实体 + 1 队友，坐标恒定在场内） |
+| `--selftest` | 只探测不启动：`perception_server.py` / `launcher.py` 均支持 |
+| `--strict` | `game_profile_check.py` / `cli_smoke.py` / `mcp_tools_check.py` 的建议项也计入失败 |
+
+```bash
+UGF_DRY_RUN=1 python agent_main.py --rounds 5   # 主循环离线跑 5 轮
+python perception_server.py --selftest          # 感知自检（无 YOLO 自动降级 mock）
+python launcher.py --ui auto --selftest         # UI 可用性探测 + 选择结果
+python tools/cli_smoke.py --strict              # CLI 31 条命令矩阵
+python tools/mcp_tools_check.py --strict        # MCP 15 工具注册 / 调用 / 知识库往返
+```
+
+---
+
+## ✅ 验证状态
+
+> 本节只写**真正跑过的结论**。凡标注「未验证」的，均需实机 / 联网环境才能确认 —— 不做任何推测性宣称。
+
+### 一条命令门禁
+
+```bash
+bash scripts/check.sh          # compileall → boot_check → game_profile_check → pytest
+bash scripts/check.sh --fast   # 秒级：语法 + 启动自检 + 档案校验
+```
+
+退出码即失败环节编号：`1` 语法 / `2` 启动自检 / `3` 游戏档案 / `4` 单元测试。
+
+### 已实测（离线，冲刺窗口 2026-09-21 ~ 09-22）
+
+| 项 | 结论 | 复核命令 |
+|---|---|---|
+| Python 语法 | 全仓库 `compileall` 通过 | `bash scripts/check.sh --fast` |
+| 单元测试 | **743 用例全绿** | `python -m pytest tests/ -q` |
+| 启动自检 | 本机 ERROR 0 / WARN 6，每条附「修复 + 降级」指引 | `python boot_check.py` |
+| 游戏档案 | florr / space_invaders 两份 `--strict` 全过 | `python game_profile_check.py --all --strict` |
+| MCP 工具 | 15 个工具可注册 / 可调用 / schema 正确 + 知识库往返保真 | `python tools/mcp_tools_check.py --strict` |
+| CLI | 31 条命令矩阵，0 traceback、0 卡死 | `python tools/cli_smoke.py --strict` |
+| 主循环 | 离线 5 轮跑通：感知 → 预判 → 决策 → 动作 → 记忆 → 复盘 → 汇报 | `UGF_DRY_RUN=1 python agent_main.py --rounds 5` |
+| 统一启动器 | UI 探测 / 选择 / 离线开关透传全部可验 | `python launcher.py --ui auto --selftest` |
+| 运维脚本 | 启停 dry-run 零副作用；日志轮转与临时清理已沙箱实测 | `bash start_all.sh --dry-run` |
+
+### 未验证（受本机环境限制，非代码缺陷）
+
+| 能力 | 阻塞原因 | 降级方式 |
+|---|---|---|
+| 真实 LLM / VLM 决策 | 无 `.env` 密钥 | 走 `_fallback_decide` 规则分支 |
+| 真实截图 + YOLO 感知 | 无 X server、无模型权重 | 感知自动降级到 mock 后端 |
+| 键鼠实际操作 | 无 GUI | dry-run 只记录不执行 |
+| 联网教程检索 / Webhook 推送 | 无外部 MCP、无网络 | 注入假 `requests`、返回降级提示 |
+| 容器镜像构建 | 本机无 docker | 仅静态口径对齐 + headless 替换 |
+| GUI 真实渲染（Tk / PyQt / Streamlit） | 无 X server / 未安装 | 仅验证可用性与命令构造 |
+
+冲刺全记录见 [devplan/PROGRESS.md](devplan/PROGRESS.md)，阶段计划见 [devplan/PLAN.md](devplan/PLAN.md)，运维口径见 [devplan/OPS.md](devplan/OPS.md)。
+
+---
+
 ## 📦 安装包
 
 ```bash
@@ -178,12 +243,20 @@ Universal-Game-Framework/
 ├── ui/legacy/               # 已归档：ui_pyqt.py / ui_streamlit.py（DEPRECATED）
 ├── cli_ui.py                # 终端界面
 ├── config.py / config.yaml  # 参数 + 热加载
-├── game_profiles/           # 游戏档案（florr.yaml）
+├── ui_tkinter.py            # 离线备选 UI
+├── ui/legacy/               # 已归档：ui_pyqt.py / ui_streamlit.py（DEPRECATED）
+├── cli_ui.py                # 终端界面
+├── game_profiles/           # 游戏档案：florr.yaml / space_invaders.yaml
 ├── skills/                  # 技能包
-├── tools/                   # add_game.py / build_dist.py
+├── tools/                   # add_game.py / build_dist.py / cli_smoke.py / mcp_tools_check.py / static_audit.py
+├── tests/                   # 14 个测试文件（743 用例，离线可跑）
+├── scripts/check.sh         # 一条命令门禁
+├── devplan/                 # PLAN / PROGRESS / AUDIT / OPS / TOOLS / PROFILE_SPEC / DIRECTION
 ├── packaging/               # Windows EXE / Android APK 构建
-├── start_all.sh / stop_all.sh  # 一键启停
-└── knowledge_md/            # 自动创建，MD 知识库
+├── start_all.sh / stop_all.sh / watchdog.sh  # 一键启停 + 看门狗
+├── knowledge_md/            # 自动创建，MD 知识库
+├── knowledge_archive/       # 自动创建，超限归档区
+└── run_logs/                # 自动创建，回合日志 / 汇报 / dry-run 动作明细
 ```
 
 ---
@@ -192,12 +265,14 @@ Universal-Game-Framework/
 
 | 版本 | 主题 | 状态 |
 |------|------|------|
-| ✅ v0.1 ~ v0.9 | 从 Florr 初版 → 完整 MCP / Skill / 游戏档案化 | 已完成 |
-| ✅ v1.0 | 稳定底座版：对话指挥 + 接 MCP + Skill + 一键部署 | 功能就绪（待实机验收） |
-| ✅ v1.1 ~ v1.9 | 监控大盘 / 自动汇报 / 档案登记 / 会话记忆 / 战绩 / 定时汇报 / 档案自检 / 安装包 | 已完成 |
-| 🚧 **v2.0** | **Florr.io 高级拟人玩家** | 进行中 |
+| v0.1 ~ v0.9 | 从 Florr 初版 → 完整 MCP / Skill / 游戏档案化 | 代码已落地 ✅ --- 实机未验证 ⚠️ |
+| v1.0 | 稳定底座版：对话指挥 + 接 MCP + Skill + 一键部署 | 代码已落地 ✅ --- 实机未验证 ⚠️ |
+| v1.1 ~ v1.9 | 监控大盘 / 自动汇报 / 档案登记 / 会话记忆 / 战绩 / 定时汇报 / 档案自检 / 安装包 | 代码已落地 ✅ --- 实机未验证 ⚠️ |
+| 🚧 **v2.0** | **地基做实：可导入 / 可离线跑通 / 有测试 / 有门禁 / 文档与代码一致** | 进行中（S1~S13 见 PROGRESS） |
 
-📚 完整开发计划见 [ROADMAP.md](ROADMAP.md) ｜ 原理与部署详解见 [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)
+> ⚠️ **口径说明**：v0.1~v1.9 的「已完成」指**功能代码已存在且通过离线单测/冒烟**，不代表在真实 Florr.io 对局中验收过 —— 真实 LLM 决策、截图感知、键鼠操作在本机均无条件实测。判定依据见上方 [验证状态](#-验证状态)。
+
+📚 完整开发计划见 [ROADMAP.md](ROADMAP.md) ｜ 原理与部署详解见 [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) ｜ 冲刺进度见 [devplan/PROGRESS.md](devplan/PROGRESS.md)
 
 ---
 
