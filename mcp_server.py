@@ -519,21 +519,67 @@ SET_TO_KEY = {
 }
 
 
+def resolve_set_keys() -> dict:
+    """
+    解析当前游戏的「套装名 → 数字键」映射。
+
+    v2.0 S15 修复：`SET_TO_KEY` 原本把 florr 的 5 个套装名（combat/tank/retreat/chase/team）
+    硬编码进核心模块。任何非 florr 游戏调用 `switch_set` 都必然落到「未知套装」——
+    核心模块认了游戏名，违反「核心只认键的语义」这一设计前提。
+
+    改为按当前档案 `combat.sets` 的声明顺序映射 1~9；档案未声明 sets 时回退 florr 默认
+    （florr.yaml 的 sets 顺序恰好等于原硬编码映射，因此对既有行为零影响）。
+    """
+    sets = config.get("combat.sets")
+    if isinstance(sets, (list, tuple)):
+        names = [str(s).strip().lower() for s in sets if str(s or "").strip()]
+        if names:
+            return {name: str(i + 1) for i, name in enumerate(names) if i < 9}
+    return dict(SET_TO_KEY)
+
+
+def normalize_set_name(set_name: str):
+    """
+    把「抽象决策套装名」翻译成当前游戏档案里的实际套装名；无法翻译时返回 None。
+
+    `combat_judge` 输出的是与游戏无关的决策语义：combat / tank / retreat / chase / team。
+    这些名字只对 florr 恰好等于套装名。非 florr 游戏必须由档案的 `combat.set_map`
+    声明映射关系（决策语义 → 本游戏套装），否则决策层的输出在换套环节必然失败。
+    """
+    set_keys = resolve_set_keys()
+    name = (set_name or "").strip().lower()
+    if not name:
+        return None
+    if name in set_keys:
+        return name
+    mapping = config.get("combat.set_map")
+    if isinstance(mapping, dict):
+        target = str(mapping.get(name) or "").strip().lower()
+        if target in set_keys:
+            return target
+    return None
+
+
 @mcp.tool()
 def switch_set(set_name: str) -> str:
     """
-    切换花瓣套装（v0.3）。
-    set_name: combat / tank / retreat / chase / team。
-    通过按数字键完成切换。
+    切换套装（v0.3 → v2.0 S15 多游戏）。
+    set_name 可取当前游戏档案 `combat.sets` 里的名字（space_invaders: shoot/dodge/
+    focus_mothership），也可取决策层输出的抽象名（combat/tank/retreat/chase/team），
+    后者按档案 `combat.set_map` 翻译。通过按数字键完成切换。
     """
-    key = SET_TO_KEY.get((set_name or "").lower())
-    if key is None:
-        return f"未知套装: {set_name}，可选 {'/'.join(SET_TO_KEY)}"
+    set_keys = resolve_set_keys()
+    resolved = normalize_set_name(set_name)
+    if resolved is None:
+        return f"未知套装: {set_name}，可选 {'/'.join(set_keys)}"
+    key = set_keys[resolved]
+    # 抽象名被翻译过时显式标出，便于核对「决策想要什么 → 实际切了什么」
+    label = f"{set_name} → {resolved}" if resolved != (set_name or "").strip().lower() else resolved
 
     # v2.0 S7：dry-run 只记录换套意图，不按真实按键
     if dry_run():
-        _dryrun_log("switch_set", f"{set_name} (按键 {key})")
-        return f"[dry-run] 套装切换已记录（未真实执行）: {set_name} (按键 {key})"
+        _dryrun_log("switch_set", f"{label} (按键 {key})")
+        return f"[dry-run] 套装切换已记录（未真实执行）: {label} (按键 {key})"
 
     try:
         import pyautogui
@@ -541,7 +587,7 @@ def switch_set(set_name: str) -> str:
         return "错误: 未安装 pyautogui，请执行 pip install pyautogui"
 
     pyautogui.press(key)
-    return f"已切换套装: {set_name} (按键 {key})"
+    return f"已切换套装: {label} (按键 {key})"
 
 
 @mcp.tool()

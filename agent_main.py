@@ -86,13 +86,30 @@ def _mcp_server_env() -> dict:
             env[key] = val
     if DRY_RUN:
         env["UGF_DRY_RUN"] = "1"
+    # v2.0 S15：游戏选择变量也必须透传。此前只转发 UGF_*，AGENT_GAME 在 stdio 子进程里
+    # 丢失 —— 父进程按 space_invaders 决策、MCP 子进程却加载 florr 档案（实体/套装/端口
+    # 全是错的），且退出码仍为 0，属于跨进程静默不一致。
+    # 直接以父进程**已解析**的结果写入，保证父子口径绝对一致，而不依赖透传是否成功。
+    env["AGENT_GAME"] = config.active_game()
+    env["UGF_GAME"] = env["AGENT_GAME"]
     return env
+
+
+def _kb_game() -> str:
+    """
+    知识库的游戏分区名（v2.0 S15）。
+
+    此前所有 kb_write / kb_append 都不带 game_name，写进 knowledge_md/ 根目录 ——
+    多游戏共用一份知识库，第二款游戏的复盘与 BOSS 记忆会串到第一款里，
+    且 `kb_search` 检索到的是别的游戏的经验。改用激活游戏名做分区。
+    """
+    return config.active_game()
 
 
 def _late_report(round_count, total_deaths):
     """v1.7 局中进度汇报：写单文件 + 可选 Webhook，在后台线程跑，不阻塞主循环。"""
     import report_notifier
-    game = config.get("agent.game", "florr")
+    game = config.active_game()
 
     def _run():
         actions = report_notifier.notify_progress(round_count, total_deaths, game)
@@ -405,7 +422,8 @@ async def review_round(session, survived: bool, note: str, state: str):
 
     # v0.4 复盘升级：先检索历史相似对局（同怪物），附上对比，帮助找出改进点
     try:
-        history = await session.call_tool("kb_search", {"keyword": "对局复盘"})
+        history = await session.call_tool("kb_search", {"keyword": "对局复盘",
+                                              "game_name": _kb_game()})
         text = history if isinstance(history, str) else str(history)
         # 粗略提取出历史有效战绩的结论
         content += "\n## 与历史对局对比\n"
@@ -419,6 +437,7 @@ async def review_round(session, survived: bool, note: str, state: str):
     res = await session.call_tool("kb_write", {
         "filename": f"review_{timestamp}",
         "markdown_content": content,
+        "game_name": _kb_game(),
     })
     await session.call_tool("reset_predictor")
     err = _tool_error(res)
@@ -488,6 +507,7 @@ async def write_boss_memory(session, boss_observations: list, boss_samples: dict
     res = await session.call_tool("kb_append", {
         "filename": "boss_behavior_log",
         "markdown_content": content,
+        "game_name": _kb_game(),
     })
     err = _tool_error(res)
     if err:
@@ -698,7 +718,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                     if round_count - _snap_last_round[0] >= SNAPSHOT_EVERY:
                         write_snapshot(round_count, total_deaths, player,
                                        predictions, combat_eval,
-                                       config.get("agent.game", "florr"))
+                                       config.active_game())
 
                     # v1.7 局中定时汇报：每 REPORT_EVERY 轮上报一次进度（0=关闭）
                     if REPORT_EVERY and round_count % REPORT_EVERY == 0:
@@ -807,6 +827,7 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                         summary = [f"- {k}: {col[1]}/{col[0]} 次命中" for k, col in weak.items()]
                         _res = await session.call_tool("kb_append", {
                             "filename": "learning_stats",
+                            "game_name": _kb_game(),
                             "markdown_content": (
                                 f"- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
                                 f"汇总：{'；'.join(summary)}。"

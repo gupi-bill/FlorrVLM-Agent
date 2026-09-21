@@ -42,6 +42,16 @@ combat:
     - shoot                      # 常规射击
     - dodge                      # 躲避弹幕
     - focus_mothership           # 母舰集火
+  # 决策语义 → 本游戏套装的映射（S15 新增）
+  # combat_judge 输出的是与游戏无关的决策语义 combat/tank/retreat/chase/team，
+  # 这些名字只对 florr 恰好等于套装名。任何非 florr 游戏都必须在此声明翻译表，
+  # 否则决策层给出的套装在 switch_set 环节会落到「未知套装」。
+  set_map:
+    combat: shoot              # 常规输出 → 常规射击
+    tank: dodge                # 高威胁缠斗 → 躲避弹幕
+    retreat: dodge             # 逃生 → 躲避弹幕
+    chase: focus_mothership    # 追高价值 → 母舰集火
+    team: shoot                # 组队辅助 → 常规射击
   # 战术模板（会写进知识库，供决策时检索引用）
   tactics:
     - "优先清除最下排外星人：编队下压到炮台高度即判负，宁可放弃母舰分也要清底排"
@@ -71,3 +81,6 @@ perception:
       - {raw_id: alien_drone, rarity: alien_drone, x: 1500, y: 400, vx: -120, vy: 60}
       - {raw_id: alien_boss, rarity: alien_boss, x: 960, y: 180, vx: 60, vy: 0}
       - {raw_id: mothership, rarity: mothership, x: 1700, y: 120, vx: -90, vy: 0}
+    # 单人街机，无队友。显式置空，避免继承到上一款游戏 / DEFAULT 的队友数据
+    # （S15 实测：不声明时会读到 florr 的 player_ally，离线场景串味）
+    teammates: []

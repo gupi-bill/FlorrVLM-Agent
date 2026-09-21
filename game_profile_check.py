@@ -166,6 +166,28 @@ def check_detail(name: str) -> dict:
     if not combat.get("tactics"):
         res["warnings"].append("缺少 combat.tactics（战术模板，写进知识库供决策引用）")
 
+    # —— combat.set_map（v2.0 S15）：决策语义 → 本游戏套装 ——
+    # 决策层输出的 combat/tank/retreat/chase/team 只对 florr 恰好等于套装名；
+    # 非 florr 游戏缺这张表 = switch_set 必然落到「未知套装」，属于离线即可判定的坏档案。
+    set_map = combat.get("set_map")
+    if set_map is not None:
+        if not isinstance(set_map, dict):
+            res["errors"].append("combat.set_map 应为映射（决策语义 → 本游戏套装名）")
+        else:
+            for src, dst in set_map.items():
+                if not isinstance(src, str) or not isinstance(dst, str):
+                    res["errors"].append(f"combat.set_map 的键值都必须是字符串: {src}={dst}")
+                    continue
+                if sets is not None and dst not in sets:
+                    res["errors"].append(
+                        f"combat.set_map['{src}']='{dst}' 不在 combat.sets 里: {sets}")
+    elif sets is not None and not (set(sets) & {"combat", "tank", "retreat", "chase", "team"}):
+        # 只在"完全对不上"时告警：只要有部分同名，至少部分决策能落到真实套装；
+        # 一个都不匹配 = 决策层输出的任何套装都必然落到「未知套装」。
+        res["warnings"].append(
+            "缺少 combat.set_map：套装名与决策语义(combat/tank/retreat/chase/team)完全不匹配，"
+            "switch_set 将落到「未知套装」")
+
     # —— 感知端口 ——
     server = data.get("server") or {}
     if not isinstance(server, dict) or server.get("perception_port") is None:
@@ -252,7 +274,7 @@ def main():
     if not name:
         try:
             import config
-            name = config.get("agent.game", "florr")
+            name = config.active_game()
         except Exception:
             name = "florr"
     detail = check_detail(name)

@@ -194,6 +194,10 @@ def collect(game_name: str = "") -> dict:
         "sets": sets,
         "default_set": default_set,
         "tactics": tactics,
+        # v2.0 S15：自定义套装名与决策语义完全不同名时，必须一并生成翻译表，
+        # 否则生成的档案在 strict 口径下告警（决策层输出无法落到真实套装）。
+        "set_map": ({} if set(sets) & set(DEFAULT_SETS) else
+                    {a: sets[i % len(sets)] for i, a in enumerate(DEFAULT_SETS)}),
     }
 
 
@@ -218,6 +222,12 @@ def render_yaml(data: dict) -> str:
     """渲染完整档案（含推荐字段），保证生成即通过 game_profile_check --strict。"""
     li = [f"    {k}: {_fmt_num(v)}" for k, v in data["threat"].items()]
     sets_lines = "\n".join(f"    - {s}" for s in data["sets"])
+    smap = data.get("set_map") or {}
+    set_map_block = (
+        "  # 决策语义 → 本游戏套装的映射（S15：自定义套装名必须声明）\n"
+        "  set_map:\n"
+        + "".join(f"    {k}: {v}\n" for k, v in smap.items())
+    ) if smap else ""
     tactic_lines = "\n".join(f"    - {_q(t)}" for t in data["tactics"])
     ent_lines = "\n".join(
         "      - {raw_id: %s, rarity: %s, x: %s, y: %s, vx: %s, vy: %s}" % (
@@ -257,7 +267,7 @@ combat:
   # 套装清单：与 combat_judge.recommended_set、mcp_server.switch_set 键位映射同名
   sets:
 {sets_lines}
-  # 战术模板（会写进知识库，供决策时检索引用）
+{set_map_block}  # 战术模板（会写进知识库，供决策时检索引用）
   tactics:
 {tactic_lines}
 

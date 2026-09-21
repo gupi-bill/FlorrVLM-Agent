@@ -142,11 +142,30 @@ def _flatten_default() -> dict:
     return tree
 
 
+def active_game(config_tree=None) -> str:
+    """
+    当前激活的游戏名（唯一事实来源）。
+
+    优先级：`AGENT_GAME` / `UGF_GAME` 环境变量 > config.yaml 的 `agent.game` > "florr"。
+
+    v2.0 S15 修复：此前 `_reload()` 只从 config.yaml 取 `agent.game`，而 PROFILE_SPEC、
+    profile 注释、start_all.sh 都声称「设 AGENT_GAME 即可切游戏」。实测
+    `AGENT_GAME=space_invaders python agent_main.py` 仍然加载 florr 的实体/套装/端口，
+    属于**文档与行为不一致的静默错误**（退出码 0、产物却是错的）。
+    """
+    for var in ("AGENT_GAME", "UGF_GAME"):
+        val = (os.getenv(var) or "").strip()
+        if val:
+            return val
+    tree = _CFG if config_tree is None else config_tree
+    return str((tree.get("agent") or {}).get("game") or "florr")
+
+
 def _reload():
     """按优先级合并（低→高）：DEFAULT < config.yaml < 游戏档案 < tuned_overrides。"""
     tree = _flatten_default()
     _merge(tree, _read_yaml(CONFIG_PATH))
-    game = tree.get("agent", {}).get("game", "florr")
+    game = active_game(tree)
     profile_path = os.path.join(PROFILE_DIR, f"{game}.yaml")
     _merge(tree, _read_yaml(profile_path))
     _merge(tree, _read_yaml(TUNED_PATH))  # v1.0 自动调参覆盖
@@ -177,7 +196,7 @@ _reload()  # 导入即加载一次
 def reload_if_changed() -> bool:
     """检测 config.yaml 或当前游戏档案是否变化，变了就热加载。"""
     last = getattr(reload_if_changed, "_mtime", None)
-    game = _CFG.get("agent", {}).get("game", "florr")
+    game = active_game()
     paths = [CONFIG_PATH, os.path.join(PROFILE_DIR, f"{game}.yaml"), TUNED_PATH]
     mtimes = []
     for p in paths:

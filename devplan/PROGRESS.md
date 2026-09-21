@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`RELEASED | A线(00:00整点) | 2026-09-22T00:38 | S14`
+`RELEASED | A线(01:25整点) | 2026-09-22T02:06 | S15`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -38,7 +38,7 @@
 | S12 | 运维脚本与容器一致性 | ✅ 完成 | 23:31~00:12 (D线) | `devplan/OPS.md`、`tests/test_ops.py`(26)；`boot_check.py` v2.0 分级自检（core=ERROR / GUI·YOLO·可选库=WARN+降级指引 / 新增 `--strict`·`--json`·`--no-ops` / `check_ops()` 运维口径校验）；`start_all.sh` v2.0（`--dry-run`/`--no-check`/`--help`、`UGF_PYTHON`/`UGF_DRY_RUN`/`UGF_FOREGROUND`、端口改从 config.yaml 现读）；`stop_all.sh` v2.0（dry-run + 优雅终止 + 日志轮转 + 失效 pid 清理）；`watchdog.sh` 解释器覆盖；`Dockerfile` v2.0（opencv→headless、EXPOSE 5001/5002、前台模式）；**704 用例全绿（含根因修复后的回归）** |
 | S13 | 测试套件固化与文档同步 | ✅ 完成 | 23:50~00:12 (D线) + 00:04~00:2x (A线) | `scripts/check.sh`（一条命令门禁：compileall → boot_check --fail-fast → game_profile_check --all → pytest，支持 `--fast`/`--help`，失败退出码=环节编号）、`tests/test_ops.py` 增至 26 用例、**`tests/test_docs.py`（38 用例文档—代码一致性门禁）**；README/PROJECT_SUMMARY/ROADMAP 三份文档同步（验证状态 / 离线模式 / 门禁 / 未验证清单 / 目录结构 / 版本口径）；**743 用例全绿** |
 | S14 | 最终验收与归档 | ✅ 完成 | 00:30~00:38 (A线) | `devplan/FINAL_REPORT.md`（交付矩阵 / 743 用例分布 / 16 项真实缺陷 / 验收记录 / 遗留风险 / 下一步建议 / 7 条经验）；tag `v2.0-dev-20260922`；冲刺结论写入工作区记忆 |
-| S15 | 第二款游戏端到端跑通（space_invaders） | ⬜ 待执行 | | |
+| S15 | 第二款游戏端到端跑通（space_invaders） | ✅ 完成 | 01:26~02:05 (A线) | `tests/test_e2e_space_invaders.py`(14)、`devplan/E2E_S15.md`；`config.active_game()`（AGENT_GAME/UGF_GAME 生效，D1）、`agent_main._mcp_server_env()` 透传激活游戏（D2）、`mcp_server.resolve_set_keys()/normalize_set_name()` + 档案 `combat.set_map`（D3）、`agent_main._kb_game()` 知识库按游戏分区（D4）；`perception.mock` 迁回档案（florr.yaml 新增、config.yaml 移除）、space_invaders 补 `teammates: []`；`game_profile_check` 增 set_map 校验、`tools/add_game.py` 自动生成 set_map；PROFILE_SPEC §3/§6/§7 同步；**757 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S16 | 参考适配器模板与档案规范固化 | ⬜ 待执行 | | |
 | S17 | 接入流程一键化（onboard） | ⬜ 待执行 | | |
 | S18 | 知识闭环实证（学→检索→决策→复盘→回写） | ⬜ 待执行 | | |
@@ -482,3 +482,43 @@
   - **回归锁定**：`tests/test_ops.py` 补 3 用例 —— AST 断言 `boot_check.py` 内不得出现 `remove/unlink/rmtree` 调用、`_dir_writable` 对 `run_logs` 返回 True、对「文件冒充目录」返回 False；另把原先会**临时删除 start_all.sh** 的反向用例改为纯 monkeypatch（删仓库文件在并发 pytest 下同样是隐患），并新增「端口漂移」检测用例。
   - 验证：`pytest tests/ -q` 连续两次 **702 / 704 passed**（修复后不再随机失败）；`compileall` 退出码 0；`git status` 干净。
   - 经验（供后续阶段参考）：**本机写测试时禁止在用例里删除仓库内文件**；任何 `os.remove/shutil.rmtree` 在全量测试规模下都可能触发宿主删除护栏，应改走 tmp_path 沙箱或 monkeypatch。
+
+
+- **2026-09-22 01:26~02:05 · S15 · 第二款游戏端到端跑通（space_invaders）**
+  - 做了什么：
+    1. 先按验收口径实测 `AGENT_GAME=space_invaders UGF_DRY_RUN=1 python agent_main.py --rounds 3`，
+       发现**退出码 0 但跑的仍是 florr 数据**（敌人=5 / 队友=1 / 套装=retreat）。以产物内容为判据，
+       定位 4 个静默缺陷（详见 `devplan/E2E_S15.md`）。
+    2. **D1（阻断）**：`config._reload()` 只从 config.yaml 读 `agent.game`，从不读环境变量 ——
+       而 PROFILE_SPEC / 档案注释 / start_all.sh 都声称「设 AGENT_GAME 即可切游戏」。新增
+       `config.active_game()`（`AGENT_GAME`/`UGF_GAME` > config.yaml > florr）作为唯一来源，
+       `_reload()` 与 `reload_if_changed()` 均改用它。
+    3. **D2（阻断，跨进程不一致）**：`agent_main._mcp_server_env()` 只透传 `UGF_*`，`AGENT_GAME`
+       在 MCP stdio 子进程丢失 → 父进程按 space_invaders 决策、子进程按 florr 出数据。改为写入
+       父进程**已解析**的激活游戏，不依赖透传是否成功。
+    4. **D3（高）**：`mcp_server.SET_TO_KEY` 把 florr 五个套装名硬编码进核心模块，非 florr 游戏
+       `switch_set` 必然「未知套装」。新增 `resolve_set_keys()`（按档案 `combat.sets` 顺序映射 1~9）
+       与 `normalize_set_name()`（按档案 `combat.set_map` 翻译决策语义）；florr 的 sets 顺序恰好等于
+       原硬编码映射，对既有行为零影响。
+    5. **D4（中）**：`agent_main` 所有 kb_write/kb_append 不带 `game_name`，多游戏共用一份知识库。
+       新增 `_kb_game()`，知识按激活游戏分区到 `knowledge_md/<game>/`。
+    6. 落实 PROFILE_SPEC §7 两项 S15 移交：`perception.mock` 迁回档案（florr.yaml 新增完整 mock 段、
+       config.yaml 移除）、`space_invaders` 补 `teammates: []`（此前会继承 florr 的 player_ally）。
+    7. `game_profile_check.py` 新增 `combat.set_map` 校验（目标必须 ∈ sets；套装名与决策语义
+       **完全不匹配**且无 set_map 时 WARN，strict 下阻断）；`tools/add_game.py` 生成自定义套装名
+       的档案时自动附带 set_map，保持「生成即通过 validate」。
+    8. 产出 `devplan/E2E_S15.md`（结论表 / 4 缺陷根因与修复 / 移交落地 / 修复前后对比证据 / 遗留）
+       与 `tests/test_e2e_space_invaders.py`（14 用例：环境变量切游戏、mock 场景来自档案、
+       端口隔离、子进程透传、键位映射与 florr 向后兼容、决策语义翻译、strict 校验、
+       **真实子进程 e2e 断言复盘落在本游戏分区且内容为 alien_* 套装 shoot**）。
+  - 产物：`config.py`/`agent_main.py`/`mcp_server.py`/`game_profile_check.py`/`boot_check.py`/
+    `tools/add_game.py` 修复；`game_profiles/florr.yaml`、`game_profiles/space_invaders.yaml`、
+    `config.yaml`、`devplan/PROFILE_SPEC.md`、`devplan/E2E_S15.md`、新增测试 14 用例。
+  - 测试结果：`tests/test_e2e_space_invaders.py` 14 passed；
+    **全量 757 passed**（基线 743 + 新增 14）；`game_profile_check.py --all --strict` 退出码 0；
+    `bash scripts/check.sh` 退出码 0。
+  - 遗留：①日志里「套装=combat」仍是决策抽象名、未展示为 `shoot`（switch_set 已翻译，仅文案）
+    → S16；②`chase`/`team` 在单人街机下的映射贴合度需实机验证；③`knowledge_md/` 根目录下
+    florr 历史文件未归档迁移（数据问题）。
+  - 决策依据：本轮未向用户提问，按 DIRECTION.md「第二款游戏端到端跑通优先级最高」自主选择 S15；
+    4 个缺陷均以「产物内容断言」而非「退出码」为判据，符合「可复现优于可演示」。

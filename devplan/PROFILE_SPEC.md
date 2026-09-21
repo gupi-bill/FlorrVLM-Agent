@@ -39,6 +39,10 @@ config.py 内置 DEFAULT  <  config.yaml（通用项）  <  game_profiles/<agent
 - `sets`：非空字符串列表。**名字必须与 `combat_judge.recommended_set` 一致**
   （`combat / tank / retreat / chase / team`），否则 `switch_set` 会落到「未知套装」
 - `default_set`：必须 ∈ `sets`
+- `set_map`（v2.0 S15）：**决策语义 → 本游戏套装名**的映射，键为
+  `combat / tank / retreat / chase / team`（`combat_judge.recommended_set` 的输出），
+  值必须 ∈ `sets`。florr 因套装名恰与决策语义同名而无需声明；**任何使用自定义套装名的
+  游戏都必须声明**，否则决策层给出的套装在 `switch_set` 环节会落到「未知套装」。
 - `tactics`：字符串列表，会写进知识库供决策检索引用
 
 ### `server`
@@ -53,7 +57,7 @@ config.py 内置 DEFAULT  <  config.yaml（通用项）  <  game_profiles/<agent
 | 级别 | 触发 | 处理 |
 |---|---|---|
 | **ERROR**（退出码 1） | 必填缺失/类型错、稀有度跨档重复、威胁金字塔倒置、负威胁分、`game.name`≠文件名、未知顶层键、`sets` 非法、`default_set` 越界、mock 稀有度未声明 | 阻断 |
-| **WARN**（建议） | 缺 `game.description` / `server.perception_port` / `combat.sets` / `combat.tactics` | `--strict` 时升为阻断 |
+| **WARN**（建议） | 缺 `game.description` / `server.perception_port` / `combat.sets` / `combat.tactics`；套装名与决策语义完全不匹配且缺 `combat.set_map` | `--strict` 时升为阻断 |
 
 命令：
 
@@ -81,18 +85,25 @@ python tools/add_game.py my_game --print                # 只打印 YAML，不�
 - 用户输入（描述/战术）经 JSON 双引号转义，冒号与引号不会写坏 YAML
 - `activate_game()` 只改 `agent:` 段下的 `game:`，不误伤其它同名键
 
-## 6. 现状（2026-09-21 S10 收尾）
+## 6. 现状（2026-09-22 S15 收尾）
 
-| 档案 | 状态 | 端口 | 套装 |
-|---|---|---|---|
-| `florr.yaml` | ✅ strict 通过 | 5001 | combat / tank / retreat / chase / team |
-| `space_invaders.yaml` | ✅ strict 通过 | 5011 | shoot / dodge / focus_mothership |
+| 档案 | 状态 | 端口 | 套装 | set_map |
+|---|---|---|---|---|
+| `florr.yaml` | ✅ strict 通过 | 5001 | combat / tank / retreat / chase / team | 无需（与决策语义同名） |
+| `space_invaders.yaml` | ✅ strict 通过 | 5011 | shoot / dodge / focus_mothership | ✅ 已声明 |
+
+**游戏切换的唯一来源是 `config.active_game()`**：
+`AGENT_GAME` / `UGF_GAME` 环境变量 > `config.yaml` 的 `agent.game` > `florr`。
+此前 `_reload()` 不读环境变量，导致「设 AGENT_GAME 切游戏」实际无效（S15 实测，已修复）。
+`agent_main` 起 MCP 子进程时会把父进程已解析的激活游戏显式写入子进程环境，
+保证父子口径一致。
+
+**离线场景属于档案**：`perception.mock` 由各档案自带（config.yaml 已不再维护 mock 段）。
+切换游戏时实体/队友/玩家状态随档案整体替换，不会残留上一款游戏的数据。
 
 ## 7. 遗留
 
-- space_invaders 的套装名（`shoot`/`dodge`）与 `mcp_server.SET_TO_KEY` 的数字键映射
-  （combat/tank/retreat/chase/team）不同名 → 换套会落到「未知套装」。
-  `switch_set` 的键位映射目前是 florr 专属，**多游戏换套应改为按档案的 `sets` 顺序映射按键**，
-  移交 S15（第二款游戏端到端跑通）。
-- `config.yaml` 的 `perception.mock` 仍是 florr 场景；florr 档案自身未声明 `perception.mock`，
-  离线数据不从档案走。迁移到档案内（真正的"一份档案一份离线场景"）移交 S15。
+- 决策层输出的抽象套装名在日志展示里未翻译成游戏内名字
+  （`switch_set` 已翻译，仅展示文案），移交 S16。
+- `chase` / `team` 两档语义在单人街机类游戏下的映射是否贴合，需实机验证。
+- `knowledge_md/` 根目录下的 florr 历史文件未做归档迁移（数据问题，非契约问题）。

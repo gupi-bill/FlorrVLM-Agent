@@ -250,7 +250,7 @@ def _active_game() -> str:
         if BASE_DIR not in sys.path:
             sys.path.insert(0, BASE_DIR)
         import config
-        return config.get("agent.game", "florr")
+        return config.active_game()
     except Exception:
         return "florr"
 
