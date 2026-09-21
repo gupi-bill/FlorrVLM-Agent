@@ -12,10 +12,18 @@
 #
 # 配合 systemd/supervisor 可作为进程管理器；退出码 143 视为主动停止。
 
+# v2.0（S12）：解释器可用 UGF_PYTHON 覆盖；UGF_DRY_RUN=1 会透传给 agent_main。
 set -u
 cd "$(dirname "$0")"
 
-PY=python
+if [ -n "${UGF_PYTHON:-}" ]; then
+  PY="$UGF_PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PY=python3
+else
+  PY=python
+fi
+export UGF_DRY_RUN="${UGF_DRY_RUN:-0}"
 
 # ---- 可调参数 --------------------------------------------------------
 MAX_RESTARTS=10        # 连续重启上限，超过则放弃（防崩溃-fly）

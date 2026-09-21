@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`RELEASED | C线(23:00一次性) | 2026-09-21T23:38 | S10+S11`
+`RELEASED | D线(23:30一次性) | 2026-09-21T23:47 | S12`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -35,7 +35,7 @@
 | S9 | MCP 工具注册验证 | ✅ 完成 | 06:39~07:10 (B线) | `tools/mcp_tools_check.py`(15 工具核对/调用/往返三检)、`tests/test_mcp_server.py`(109 用例)、`devplan/TOOLS.md`；`mcp_server.py` 10 处修复（路径穿越/向量开关死配置/dry-run 动作校验）、`kb_maintainer.py` 往返保真修复；`requirements.txt` mcp 放宽至 `>=1.0.0` |
 | S10 | 游戏档案体系固化 | ✅ 完成 | 23:02~23:2x (C线) | `tests/test_game_profiles.py`(38)、`devplan/PROFILE_SPEC.md`；`florr.yaml` 补 port/sets/tactics、`tools/add_game.py` v2.0（生成即通过 strict 自检）、`agent_cli.py validate` 支持 `--strict`；**652 用例全绿** |
 | S11 | UI 收敛与统一启动器 | ✅ 完成 | 23:16~23:36 (C线) | `launcher.py`（auto/panel/tk/cli + `--selftest`/`--list` + dry-run·mock 透传）、`tests/test_launcher.py`(26)、`ui/legacy/` 归档 pyqt/streamlit（含弃用头 + 路径 bootstrap + `python3`→`sys.executable`）、`admin_panel.py` 运行模式卡片、README 启动章节；**678 用例全绿** |
-| S12 | 运维脚本与容器一致性 | ⬜ 待执行 | | |
+| S12 | 运维脚本与容器一致性 | ✅ 完成 | 23:31~23:47 (D线) | `devplan/OPS.md`、`tests/test_ops.py`(21)；`boot_check.py` v2.0 分级自检（core=ERROR / GUI·YOLO·可选库=WARN+降级指引 / 新增 `--strict`·`--json`·`--no-ops` / `check_ops()` 运维口径校验）；`start_all.sh` v2.0（`--dry-run`/`--no-check`/`--help`、`UGF_PYTHON`/`UGF_DRY_RUN`/`UGF_FOREGROUND`、端口改从 config.yaml 现读）；`stop_all.sh` v2.0（dry-run + 优雅终止 + 日志轮转 + 失效 pid 清理）；`watchdog.sh` 解释器覆盖；`Dockerfile` v2.0（opencv→headless、EXPOSE 5001/5002、前台模式）；**699 用例全绿** |
 | S13 | 测试套件固化与文档同步 | ⬜ 待执行 | | |
 | S14 | 最终验收与归档 | ⬜ 待执行 | | |
 | S15 | 第二款游戏端到端跑通（space_invaders） | ⬜ 待执行 | | |
@@ -417,3 +417,28 @@
     - `start_all.sh` 仍用 `python3` 直接起 `admin_panel.py`，未改走 launcher（统一收口移交 **S12** 运维脚本）。
     - `launcher.py` 未接 `--port` 覆盖；面板端口仍只能改 `config.yaml` 的 `server.panel_port`。
     - 未做真实 GUI 冒烟（无 X server）：tk/pyqt 的实际渲染与交互未验证，属预期降级。
+
+
+- **2026-09-21 23:47 · S12 · 运维脚本与容器一致性（start_all/stop_all/watchdog/Dockerfile/boot_check）**
+  - 起点判定：运行锁 `RELEASED`，状态表首个非 ✅ 为 S12，当前 23:31 < 2026-09-22 07:00，故开工（提示词写"从 S9 续跑"，但 S9~S11 已于 07:10/23:15/23:36 完成，按 PROGRESS 文件规则从首个 ⬜ 开始）。
+  - 做了什么：
+    1. **`boot_check.py` 升 v2.0（本阶段最实质的问题）**：旧版把 `cv2` / `PIL` 列为 REQUIRED 且判 ERROR，而本机（无 GUI / 无 X / 无 YOLO / 无 .env）这三项全缺 —— `start_all.sh --fail-fast` 会 100% 退出，即"离线链路根本起不来"，与项目定位冲突。现改为三级口径：`CORE_LIBS`（yaml/flask/requests/numpy，缺=ERROR）+ `OPTIONAL_LIBS`（PIL/cv2/pyautogui，缺=WARN，每条附"修复"与"降级"两行指引）+ 运行环境检查（X server 以 `/tmp/.X11-unix` 是否存在为准，不看 DISPLAY —— 本机 DISPLAY=:0 但并无 X；YOLO 权重目录缺失）。新增 `--strict`（WARN 也阻断，供 CI/容器门禁）、`--json`、`--no-ops`、`main(argv)` 可测入口。
+    2. **新增运维口径一致性校验 `check_ops()`**（并入默认自检）：`OPS_REFS` 核对 `start_all.sh`→4 个 py、`watchdog.sh`→`agent_main.py`、`Dockerfile`→`requirements.txt`/`boot_check.py`/`start_all.sh` 是否存在；并用正则反查脚本/文档里的 `perception_port` / `panel_port` 字面量是否与 `config.yaml` 一致（不一致=ERROR）。测试用"临时删 start_all.sh"反向用例锁定校验器自身不失效。
+    3. **`start_all.sh` v2.0**：端口由 `grep` 改为 `port_of()` 现读 `config.yaml`（旧写法 `$(grep perception_port config.yaml)` 会把整行注释一起打印）；`PY=python` 改为 `UGF_PYTHON` 可覆盖 + 自动探测 python3；新增 `--dry-run`（不 fork、不写 .pid、不占端口）、`--no-check`、`--help`、未知参数退出码 2；`UGF_DRY_RUN` export 给子进程；新增 `UGF_FOREGROUND=1` 前台模式（容器 CMD 用，否则容器启动完即退出）。
+    4. **`stop_all.sh` v2.0**：`--dry-run` / `--keep-logs` / `--help`；先 TERM 最多等 5s 再 KILL；清理失效 pid 文件；清理范围扩到 `video_frames/`、`*.tmp`、`.write_probe`，以及 `run_logs/` 按 mtime 轮转（`UGF_LOG_KEEP_DAYS`，默认 7 天，`<=0` 不清理）。
+    5. **`watchdog.sh`**：解释器支持 `UGF_PYTHON` 覆盖，并 `export UGF_DRY_RUN` 透传给 `agent_main`。
+    6. **`Dockerfile` v2.0**：与 `requirements.txt` 对齐 —— 容器内把 `opencv-python` sed 替换为 `opencv-python-headless`（镜像无 GUI，GUI 版会引入无用依赖链）；补 `PIP_NO_CACHE_DIR` / `PYTHONUNBUFFERED` / `TMPDIR`、`EXPOSE 5001 5002`；CMD 改为 `boot_check --fail-fast && UGF_FOREGROUND=1 start_all.sh`（旧 CMD 只跑 watchdog，不会拉起感知/MCP/面板，且与 start_all 口径不一致）。
+    7. 新建 `devplan/OPS.md`：五件套职责口径表、环境变量表、命令速查、**离线降级矩阵**（6 项缺失的旧行为→新行为→降级路径）、一致性自检说明、验收结果、遗留。
+    8. 新建 `tests/test_ops.py`（21 用例）：分级口径 6（本机 0 ERROR / 可选库用 monkeypatch 强制缺失仍判 WARN 且带降级 / 核心库缺判 ERROR / strict 提升 / json schema / fail-fast 退出码）、口径一致 5（端口值、OPS_REFS 存在、当前树 check_ops 干净、删文件反向用例、脚本不得写死 `PY=python`、Dockerfile 与 requirements 对齐）、干跑 8（start --dry-run 退出码 0 且无 .pid 副作用 / 环境变量等价 / 未知参数 2 / help 0 / stop dry-run 0 / **沙箱实测清理与轮转**（删 video_frames、删过期日志、留新日志、清 tmp）/ --keep-logs / watchdog 透传）。
+  - 产物：`devplan/OPS.md`、`tests/test_ops.py`、`boot_check.py`(M v2.0)、`start_all.sh`(M)、`stop_all.sh`(M)、`watchdog.sh`(M)、`Dockerfile`(M)
+  - 测试结果：
+    - `python -m pytest tests/ -q` → **699 passed**（S11 的 678 + 本轮 21，0 failed）✅
+    - `bash start_all.sh --dry-run` → 退出码 0，打印 5001/5002，未创建 .pid ✅；`UGF_DRY_RUN=1 bash start_all.sh` 等价 ✅
+    - `bash stop_all.sh --dry-run` → 0 ✅；沙箱真实清理：video_frames 删除、过期日志轮转、未过期日志保留、tmp 清理 ✅
+    - `python boot_check.py` → ERROR 0 / WARN 6，退出码 0，每条 WARN 均有降级指引 ✅；`--strict` → 退出码 1 ✅；`--json` 输出含 ports ✅
+    - `compileall -q .` 退出码 0；`git status` 仅 7 项预期变更，无 .pid / video_frames / .write_probe 残留 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - 容器镜像**未在本机构建验证**（无 docker、无网络拉基础镜像），仅做静态口径对齐与 headless 替换；真实 `docker build` 需在有 docker 的环境补验。
+    - `stop_all.sh` 只按 mtime 轮转日志，未按体积封顶；磁盘紧张场景可再加 `UGF_LOG_MAX_MB`。
+    - 非 dry-run 的真实启停（4 个进程 + 端口占用）在本机无 GUI 下仍需宿主机实测一次；本轮只保证"不起副作用"的干跑可验收。
+    - 全量 pytest 曾出现一次 8 失败的瞬时结果（同目录下有并发写入），随后独立重跑 699 全绿；疑似与并行自动化线同时写文件有关，未复现。
