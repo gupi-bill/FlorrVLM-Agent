@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`RELEASED | F线 | 2026-09-22T06:08 | S18`
+`RELEASED | F线 | 2026-09-22T05:56 | S19`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -41,8 +41,8 @@
 | S15 | 第二款游戏端到端跑通（space_invaders） | ✅ 完成 | 01:26~02:05 (A线) | `tests/test_e2e_space_invaders.py`(14)、`devplan/E2E_S15.md`；`config.active_game()`（AGENT_GAME/UGF_GAME 生效，D1）、`agent_main._mcp_server_env()` 透传激活游戏（D2）、`mcp_server.resolve_set_keys()/normalize_set_name()` + 档案 `combat.set_map`（D3）、`agent_main._kb_game()` 知识库按游戏分区（D4）；`perception.mock` 迁回档案（florr.yaml 新增、config.yaml 移除）、space_invaders 补 `teammates: []`；`game_profile_check` 增 set_map 校验、`tools/add_game.py` 自动生成 set_map；PROFILE_SPEC §3/§6/§7 同步；**757 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S16 | 参考适配器模板与档案规范固化 | ✅ 完成 | 02:47~03:38 (A线) | `game_profiles/_template.yaml`（全字段注释模板 + `__UGF_*__` 槽位）、`tests/test_add_game.py`(26)、PROFILE_SPEC 新增 §0 模板机制与 §6.1 常见错误表；`tools/add_game.py` 改为**模板驱动渲染**（`load_template`/`template_defaults`/`render_from_template` + 槽位残留硬失败）、`_next_port()` 跳过 `_` 模板；**783 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S17 | 接入流程一键化（onboard） | ✅ 完成 | 04:06~04:26 (E线) | `tools/onboard_game.py`（生成→校验→冒烟→试跑→报告五环节流水线 + `--json`），`tests/test_onboard_game.py`(20)，`devplan/onboard_demo_arcade.md`、`devplan/onboard_space_invaders.md` 两份接入报告（含一款全新虚构游戏 demo_arcade），`game_profiles/demo_arcade.yaml`；`agent_cli.py` 接入 `onboard`（帮助清单 + `-c` 注册表 + 交互分支 + subprocess 导入）；修复 3 个真实缺陷；**803 用例全绿**，`bash scripts/check.sh` 退出码 0 |
-| S18 | 知识闭环实证（学→检索→决策→复盘→回写） | ✅ 完成 | 05:28~06:08 (F线) | `knowledge_loop.py`（seed/检索/战术抽取/三计数指标）、`tests/test_knowledge_loop.py`(32)、`devplan/KB_LOOP_S18.md`；CLI 新增 `kb_seed`/`kb_stats`；`agent_main` 3 处修复：kb_search 补 game_name(D1) / `_fallback_decide` 吃知识(D2) / 指标结构化可查询(D3)；**835 用例全绿**，`bash scripts/check.sh` 退出码 0 |
-| S19 | 学习链路离线化（视频→战术入库） | ⬜ 待执行 | | |
+| S18 | 知识闭环实证（学→检索→决策→复盘→回写） | ✅ 完成 | 05:28~05:45 (F线) | `knowledge_loop.py`（seed/检索/战术抽取/三计数指标）、`tests/test_knowledge_loop.py`(32)、`devplan/KB_LOOP_S18.md`；CLI 新增 `kb_seed`/`kb_stats`；`agent_main` 3 处修复：kb_search 补 game_name(D1) / `_fallback_decide` 吃知识(D2) / 指标结构化可查询(D3)；**835 用例全绿**，`bash scripts/check.sh` 退出码 0 |
+| S19 | 学习链路离线化（视频→战术入库） | ✅ 完成 | 05:45~05:56 (F线) | `tests/test_video_learner.py`(27)、`devplan/LEARN_S19.md`；`video_learner.py` 可注入改造：`synthesize_frames`(纯标准库 PNG)/`extract_frames_offline`/`set_vlm_provider`+`_stub_vlm`/`learn_from_video`(结构化结果)/`set_frame_dir`/`cleanup_temp_frames` 返回 bool；CLI `--synthetic`/`--game`/`--keep-frames`；修复 4 个缺陷：入库不分区致学→检索断链(D4)/短中文战术被丢弃(D5)/去重形同虚设(D6)/清理不可断言(D7)；**862 用例全绿** |
 | S20 | 决策场景矩阵（战斗/组队/心态/边界） | ⬜ 待执行 | | |
 | S21 | 测试门禁与可观测性固化 | ⬜ 待执行 | | |
 | S22 | 稳定性长跑与资源门禁 | ⬜ 待执行 | | |
@@ -585,7 +585,7 @@
     以 PROGRESS.md 实际状态为准）；运行锁为 RELEASED 故正常取锁。未向用户提问，按
     DIRECTION.md「接入新游戏路径产品化」优先级自主执行。
 
-- **2026-09-22 05:28~06:08 · S18 · 知识闭环实证（学→检索→决策→复盘→回写）**
+- **2026-09-22 05:28~05:45 · S18 · 知识闭环实证（学→检索→决策→复盘→回写）**
   - 做了什么：
     1. 新建 `knowledge_loop.py`：`seed_knowledge`（按档案 combat.tactics/predictor 档位生成
        `tactics.md`/`boss_guide.md`，幂等）、`retrieve`（限定游戏分区 + 记账）、
@@ -608,3 +608,28 @@
   - 遗留：① 知识优先级过硬（14 轮全 defend），florr 战术含"撤退/保持距离"导致 cautious_fight 一律降级
     防守，需在 S20 引入权重；② 引用率定义为"命中即引用"偏乐观，S20 补对照口径；
     ③ `knowledge_md/nope/`、`knowledge_md/template/` 为历史测试残留，未清理。
+
+- **2026-09-22 05:45~05:56 · S19 · 学习链路离线化（视频→战术入库）**
+  - 做了什么：
+    1. 抽帧环节离线化：`synthesize_frames` / `extract_frames_offline` —— 用 `zlib`+`struct`
+       手写最小 PNG 编码器（本机无 cv2 / 无 PIL / 无网络），每帧颜色不同以暴露逐帧逻辑缺陷。
+    2. VLM 环节可注入：`set_vlm_provider(fn)` + `vlm_extract_tactic(..., provider=)` +
+       内置 `_stub_vlm`，无密钥也能产出结构化战术；异常被捕获并返回失败标记，不中断链路。
+    3. 新增 `learn_from_video(...)`：一次完整「抽帧 → 逐帧解析 → 入库 → 清理」，返回
+       `{frames, tactics, kept, kb_file, cleaned, residual}`，使门禁可断言而非靠看日志。
+    4. CLI 新增 `--synthetic N` / `--game NAME` / `--keep-frames`，清理不干净时退出码 1。
+    5. **修复 D4（严重，跨阶段）**：`save_tactics_to_kb` 一律写 `knowledge_md/` 根目录，
+       而 S18 之后主循环按 `knowledge_md/<game>/` 检索 —— 视频学到的战术**永远检索不到**。
+       改为按游戏分区，并加跨阶段用例 `test_learned_tactics_are_retrievable` 锁死契约。
+    6. **修复 D5（中）**：`_useful()` 要求 `len(t) > 4`，"战术一"这类短中文战术被静默丢弃 → 阈值改 2。
+    7. **修复 D6（中）**：`_dedup_new` 拿单条战术与整个历史 blob 比相似度，长度差一个数量级导致
+       ratio 只有 0.1~0.3，阈值 0.75 永远不触发、去重形同虚设 → 改为逐条历史战术比对取最大值。
+    8. **修复 D7（中）**：`cleanup_temp_frames` 无返回值（清理只能人眼验证）、`FRAME_DIR` 写死
+       （测试无法重定向）→ 返回 bool + `set_frame_dir()` + `_write_png` 自动建父目录。
+  - 产物：`tests/test_video_learner.py`(27)、`devplan/LEARN_S19.md`、`video_learner.py` 改造。
+  - 测试结果：`pytest tests/test_video_learner.py -q` 27 passed；`pytest tests/ -q` **862 passed**；
+    `bash scripts/check.sh` 退出码 0；`python video_learner.py --synthetic 5 --game space_invaders`
+    实测 5 帧 → 5 条 → 入库 5 条 → 清理成功残留 0，退出码 0。
+  - 遗留：真实 cv2 抽帧与真实 VLM HTTP 分支本机仍不可验证（无 cv2 / 无密钥），需真机补验；
+    去重阈值对近义不同措辞无效（"立即撤退" vs "马上撤"），需语义相似度；`video_sources` 依赖
+    yt-dlp 与联网，本阶段未改造。
