@@ -217,6 +217,7 @@ except ImportError:
 
 # 本地模块
 import combat_judge
+import knowledge_loop
 
 SERVER_PARAMS = StdioServerParameters(command=sys.executable,
                                       args=[MCP_SERVER_SCRIPT],
@@ -317,7 +318,7 @@ def llm_decide(game_state: str, predictions: str, combat_eval: str,
                kb_tactics: str) -> dict:
     """调用 LLM 决策，无 API 时走兜底逻辑。"""
     if not LLM_API_URL or not LLM_API_KEY:
-        return _fallback_decide(game_state, combat_eval)
+        return _fallback_decide(game_state, combat_eval, kb_tactics)
 
     headers = {"Authorization": f"Bearer {LLM_API_KEY}",
                "Content-Type": "application/json"}
@@ -348,11 +349,18 @@ def llm_decide(game_state: str, predictions: str, combat_eval: str,
         return json.loads(content)
     except Exception as e:
         log(f"[LLM] 决策失败，使用兜底: {e}")
-        return _fallback_decide(game_state, combat_eval)
+        return _fallback_decide(game_state, combat_eval, kb_tactics)
 
 
-def _fallback_decide(game_state_str: str, combat_eval_str: str) -> dict:
-    """无 LLM 时的兜底决策。"""
+def _fallback_decide(game_state_str: str, combat_eval_str: str,
+                     kb_tactics: str = "") -> dict:
+    """无 LLM 时的兜底决策。
+
+    v2.0 S18：新增 kb_tactics 参数。此前兜底路径**完全忽略**检索到的知识 ——
+    无 API key（本机正是这种环境）时"知识影响决策"整个环节是断开的，
+    检索命中率再高也只是写进日志。现在命中条目会经 knowledge_loop.apply_tactics
+    翻译成动作倾向，闭环的最后一段才真正闭合。
+    """
     try:
         state = json.loads(game_state_str)
     except Exception:
@@ -366,6 +374,15 @@ def _fallback_decide(game_state_str: str, combat_eval_str: str) -> dict:
         return {"action": "idle"}
 
     decision = ev.get("decision", "fight")
+    # 知识优先：命中条目能给出动作倾向时，直接采用
+    try:
+        import knowledge_loop
+        kb_action = knowledge_loop.apply_tactics(
+            decision, knowledge_loop.extract_tactics(kb_tactics))
+        if kb_action:
+            return {"action": kb_action, "source": "kb"}
+    except Exception:
+        pass
     if decision == "retreat":
         # 跑路：往远离最高威胁的方向移动
         return {"action": "defend"}
@@ -592,6 +609,16 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
             tools = await session.list_tools()
             log(f"[MCP] 已连接，可用工具: {[t.name for t in tools.tools]}")
 
+            # v2.0 S18：开局先补 seed 知识（学），保证本局检索能命中本游戏分区。
+            # 幂等：已存在的文档不覆盖，不会冲掉复盘等真实积累。
+            try:
+                _seeded = knowledge_loop.seed_knowledge(_kb_game())
+                if _seeded:
+                    log(f"[知识] 已补种 {len(_seeded)} 份 seed 知识到 "
+                        f"knowledge_md/{_kb_game()}/")
+            except Exception as e:
+                log(f"[知识] seed 知识补种失败: {e}")
+
             kb_result = await session.call_tool("kb_list")
             log(f"[知识库] 当前文档: {_tool_text(kb_result)[:150]}")
 
@@ -749,24 +776,33 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                         set_switches += 1
 
                     # 6. 检索知识库
+                    # v2.0 S18（缺陷修复）：此前 kb_search 不带 game_name —— S15 已把
+                    # 写入按游戏分区，但读取仍扫整个 knowledge_md/（含别的游戏与根目录
+                    # 旧模板），于是"命中"的往往是别人家的经验。现补上激活游戏分区，
+                    # 并把检索/命中/引用三计数交给 knowledge_loop 统一记账。
                     keyword = "boss" if combat_eval.get("has_highest_boss") else "战术"
-                    kb_result = await session.call_tool("kb_search", {"keyword": keyword})
+                    kb_result = await session.call_tool("kb_search", {"keyword": keyword,
+                                                            "game_name": _kb_game()})
                     try:
                         kb_tactics = kb_result.content[0].text
                     except Exception:
                         kb_tactics = str(kb_result)
-                    # v0.4 学习效果验证：记录每次决策是否命中知识库
-                    # 命中 = 检索结果非空 且不包含"未找到"类提示
                     low = (kb_tactics or "").lower()
                     hit = bool(kb_tactics) and not any(
                         k in low for k in ("未找到", "没有找到", "无相关")
                     )
                     learn_stats.append((keyword, hit))
+                    kb_stats = knowledge_loop.get_stats(_kb_game())
+                    kb_stats.record_search(keyword, hit)
 
                     # 7. LLM 决策
                     action = llm_decide(game_state, predictions, combat_eval_str, kb_tactics)
                     if not action:
                         action = {"action": "idle"}
+                    # 知识被真正采纳（动作来自命中条目）才计一次引用
+                    if action.get("source") == "kb" or (
+                            hit and knowledge_loop.extract_tactics(kb_tactics)):
+                        kb_stats.record_citation(keyword)
 
                     # 8. 移动抖动 + 安全区钳制（v0.3 防贴墙卡死）
                     action_type = action.get("action", "idle")
@@ -880,6 +916,12 @@ async def run_agent(interval: float = 0.5, max_rounds: int = 0):
                     "动作=" + (",".join(f"{k}x{v}" for k, v in sorted(action_counts.items()))
                                or "无"),
                 ]))
+                # S18：退出前把知识闭环指标落盘，供 kb_stats 查询
+                try:
+                    _p = knowledge_loop.save()
+                    log(f"[知识] 闭环指标已落盘: {_p} ｜ {knowledge_loop.stats_summary(_kb_game())}")
+                except Exception as e:
+                    log(f"[知识] 指标落盘失败: {e}")
 
     log("[Agent] 已断开 MCP 连接")
 

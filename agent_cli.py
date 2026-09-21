@@ -293,6 +293,8 @@ HELP_LINES = [
     ("kb_write <文件> [游戏]", "写入知识库文档(模板)，v2.0"),
     ("kb_append <文件> [游戏]", "追加内容到知识库文档，v2.0"),
     ("kb_search <词> [游戏]", "在知识库中全文检索，v2.0"),
+    ("kb_stats [游戏]", "知识闭环指标(检索/命中/引用)，S18"),
+    ("kb_seed [游戏]",  "补种该游戏 seed 知识(幂等)，S18"),
     ("kb_export",      "导出整个知识库为备份包(tar.gz)，v2.0"),
     ("kb_import <包>",  "从备份包恢复知识库(同名覆盖)，v2.0"),
     ("skills",       "列出可用 Skill"),
@@ -694,6 +696,58 @@ def _cmd_kb_append(filename: str, game_name: str = "") -> str:
         return f"❌ 操作失败: {e}"
 
 
+def _cmd_kb_seed(game_name: str = "") -> str:
+    """补种该游戏的 seed 知识（幂等，不覆盖已有文档）。
+
+    用法:
+      kb_seed            - 为当前激活游戏补种
+      kb_seed florr      - 为 florr 补种
+    """
+    try:
+        import knowledge_loop
+    except Exception as e:
+        return f"❌ 知识闭环模块不可用: {e}"
+    game = game_name or config.active_game()
+    written = knowledge_loop.seed_knowledge(game)
+    if not written:
+        return f"✅ {game}: seed 知识已存在，无需补种"
+    return "✅ 已写入:\n  " + "\n  ".join(written)
+
+
+def _cmd_kb_stats(game_name: str = "") -> str:
+    """查询知识闭环指标（检索 / 命中 / 引用）。
+
+    用法:
+      kb_stats           - 全部游戏汇总
+      kb_stats florr     - 仅看 florr
+    """
+    try:
+        import knowledge_loop
+    except Exception as e:
+        return f"❌ 知识闭环模块不可用: {e}"
+    game = (game_name or "").strip()
+    q = knowledge_loop.query_stats(game or None)
+    if game:
+        if not q.get("searches"):
+            return f"（{game} 暂无检索记录）"
+        lines = [
+            f"  检索次数 : {q['searches']}",
+            f"  命中次数 : {q['hits']}  (命中率 {q['hit_rate']:.1%})",
+            f"  引用次数 : {q['citations']}  (引用率 {q['citation_rate']:.1%})",
+        ]
+        for k, col in (q.get("by_keyword") or {}).items():
+            lines.append(f"  - {k}: 检索 {col[0]} / 命中 {col[1]} / 引用 {col[2]}")
+        return "\n".join([f"知识闭环指标 · {game}"] + lines)
+    ov = q["overall"]
+    lines = [f"  游戏数   : {ov['games']}",
+             f"  检索次数 : {ov['searches']}",
+             f"  命中次数 : {ov['hits']}  (命中率 {ov['hit_rate']:.1%})",
+             f"  引用次数 : {ov['citations']}  (引用率 {ov['citation_rate']:.1%})"]
+    for g, d in (q.get("games") or {}).items():
+        lines.append(f"  - {g}: {d['hits']}/{d['searches']} 命中，引用 {d['citations']}")
+    return "\n".join(["知识闭环指标 · 全部游戏"] + lines)
+
+
 def _run_auto(game: str) -> str:
     """全链路自动：detect → brief(若无) → research → ensure。"""
     st = load_state()
@@ -872,6 +926,9 @@ def _command_registry(arg: str = "") -> dict:
         "kb_search": lambda: _cmd_kb_search(arg),
         "kb_write": lambda: _cmd_kb_write(arg),
         "kb_append": lambda: _cmd_kb_append(arg),
+        # S18：知识闭环指标与 seed 补种
+        "kb_stats": lambda: _cmd_kb_stats(arg),
+        "kb_seed": lambda: _cmd_kb_seed(arg),
         "skills": lambda: SKILLS.summary(),
         "load": lambda: _cmd_load(arg),
         "unload": lambda: _cmd_unload(arg),
