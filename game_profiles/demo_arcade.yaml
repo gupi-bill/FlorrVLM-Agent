@@ -1,0 +1,117 @@
+# Universal-Game-Framework 游戏档案 demo_arcade.yaml  (v2.1 / S16 · 由 _template.yaml 渲染)
+# ===================================================================
+# 这是「接入新游戏」的标准答案：全字段 + 全注释 + 安全上下限。
+# 用法（推荐，零手写）：
+#     python tools/add_game.py my_game            # 交互向导
+#     UGF_NONINTERACTIVE=1 python tools/add_game.py my_game
+#     python tools/add_game.py my_game --print    # 只看不落盘
+# 手工用法：复制本文件为 game_profiles/<游戏名>.yaml，把下面所有双下划线占位符槽位换成真实取值，
+#          再把 game.name 改成与文件名同名，最后跑 `python game_profile_check.py <名字> --strict`。
+#
+# 本文件**不参与运行时校验**（game_profile_check 会跳过 _ 开头的文件），
+# 但它是 tools/add_game.py 渲染档案的**唯一结构来源与数值默认来源**。
+#
+# 加载优先级：config.py 内置 DEFAULT < config.yaml(通用项) < 本档案(游戏专属项) < tuned_overrides.yaml
+# 核心模块(predictor/combat_judge/agent_main/mcp_server)只认下面这些键的**语义**，不认游戏名。
+
+# ---------------------------------------------------------------------------
+# 一、游戏元信息（必填）
+# ---------------------------------------------------------------------------
+game:
+  # 类型: str ｜ 取值: 只允许 [\w.-]，且**必须等于文件名**（否则 game_profile_check 报 ERROR）
+  # 缺失兜底: 校验不通过，不可缺失
+  name: "demo_arcade"
+  # 类型: str ｜ 缺失兜底: WARN（大盘与 brief 显示为空，不阻断）
+  description: "demo_arcade 游戏档案"          # 由生成器做 JSON 双引号转义，冒号/引号不会写坏 YAML
+
+# ---------------------------------------------------------------------------
+# 二、感知服务端口（建议必填）
+# ---------------------------------------------------------------------------
+server:
+  # 类型: int ｜ 安全区间: 1024 ~ 65535（0 与 1~1023 为系统保留端口）
+  # 每款游戏一个端口，多游戏并行时不会都挤在 5001。新游戏由 add_game 以步长 10 自动避让。
+  # 缺失兜底: WARN，回落到 config.yaml 的 server.perception_port（默认 5001）
+  perception_port: 5021
+
+# ---------------------------------------------------------------------------
+# 三、实体分类与威胁金字塔（必填）
+# ---------------------------------------------------------------------------
+predictor:
+  # 四个稀有度档位，均为**非空字符串列表**。同一字符串不能出现在两个档位。
+  # 语义: highest_boss(最高威胁/紧急避险) > boss > elite > normal
+  # 缺失兜底: ERROR（必填）；空列表也判 ERROR
+  rarity_highest_boss: ["Unique", "Eternal"]
+  rarity_boss: ["Super"]
+  rarity_elite: ["Ultra", "Mythic", "Legendary", "Epic"]
+  rarity_normal: ["Rare", "Unusual", "Common"]
+  # 分类 -> 威胁分数（7 个键必须齐全，必须为数字、>= 0）
+  # 单调约束: highest_boss >= boss >= elite >= normal（倒置判 ERROR）
+  # 用途: combat_judge 用 threat 值判断 打 / 跑 / 追，predictor 用分类决定置信度曲线
+  # 缺失兜底: ERROR（缺任一键即阻断）
+  threat:
+    highest_boss: 1000      # 建议 500 ~ 5000：出现即避战级别
+    boss: 400               # 建议 200 ~ 1000
+    elite: 120              # 建议 50 ~ 300
+    normal: 15              # 建议 1 ~ 50
+    player_enemy: 150       # 敌方玩家：通常高于 elite，低于 boss
+    player_ally: 0          # 友方玩家：固定 0（负值会干扰威胁求和）
+    unknown: 5              # 未识别实体：建议 <= normal，避免噪声主导决策
+
+# ---------------------------------------------------------------------------
+# 四、战斗配置（必填）
+# ---------------------------------------------------------------------------
+combat:
+  # 类型: str ｜ 取值: highest_boss | boss | elite | normal | player_enemy
+  # 含义: 触发 chase（追击）套所需的最低怪物档次
+  # 缺失兜底: ERROR（必填）；非法值回落到 elite
+  chase_min_category: elite
+  # 类型: str ｜ **必须 ∈ combat.sets**，否则 ERROR
+  # 缺失兜底: 不阻断，但运行时换套会落到「未知套装」
+  default_set: combat
+  # 类型: 非空字符串列表 ｜ 名字是「游戏内真实套装名」
+  # 缺失兜底: WARN；非空校验失败则 ERROR
+  # ⚠ 若套装名与决策语义(combat/tank/retreat/chase/team)完全不同名，必须同时声明 set_map
+  sets:
+    - combat
+    - tank
+    - retreat
+    - chase
+    - team
+  # 决策语义(combat/tank/retreat/chase/team) → 本游戏真实套装名。
+  # 套装名与决策语义完全不同名时**必须**声明，否则 switch_set 必落到「未知套装」。
+  set_map:
+  # 战术模板：字符串列表，会写进 knowledge_md/<game>/ 供决策时检索引用
+  # 缺失兜底: WARN（知识库为空，决策无经验可引用）
+  tactics:
+    - "Unique 出现时优先避战，血量充足再考虑集火"
+    - "面对 Ultra 及以下可主动追击，注意保留逃生手段"
+    - "血量低于 30% 立即切 retreat，不要恋战"
+
+# ---------------------------------------------------------------------------
+# 五、离线 / mock 感知数据（可选，但强烈建议填）
+# ---------------------------------------------------------------------------
+# 无 YOLO、无真机、无密钥时，全链路靠这一段跑通（dry-run + mock 后端）。
+# 缺失兜底: 无 mock 数据时 perception_server 退化为「空场景」，全链路能跑但没有实体可打。
+perception:
+  mock:
+    # 实体是否按 vx/vy 随时间移动（true 时 predictor 才能累积多帧做运动预判）
+    drift: true
+    afk_popup: false
+    player:
+      alive: true
+      hp: 100              # 0 ~ max_hp
+      max_hp: 100          # > 0
+      x: 960               # 屏幕坐标，建议落在 [0, 1920]
+      y: 980               # 屏幕坐标，建议落在 [0, 1080]
+      power_score: 100     # 战力评分，>= 0
+      petal_set: combat   # 必须 ∈ combat.sets
+      talent: none
+    # 每条实体: raw_id / rarity / x / y / vx / vy
+    # rarity **必须属于上面已声明的档位**（含 unknown），否则 ERROR（离线跑不通 = 坏档案）
+    entities:
+      - {raw_id: Unique, rarity: Unique, x: 300, y: 260, vx: 40, vy: 0}
+      - {raw_id: Super, rarity: Super, x: 700, y: 260, vx: 40, vy: 0}
+      - {raw_id: Ultra, rarity: Ultra, x: 1100, y: 320, vx: -60, vy: 30}
+      - {raw_id: Rare, rarity: Rare, x: 1500, y: 400, vx: -120, vy: 60}
+    # 队友：单机游戏请显式写 []（不声明会继承到上一款游戏 / DEFAULT 的队友数据，S15 实测串味）
+    teammates: []

@@ -16,6 +16,7 @@ import argparse
 import asyncio
 import json
 import os
+import subprocess
 import sys
 
 import datetime
@@ -297,6 +298,7 @@ HELP_LINES = [
     ("skills",       "列出可用 Skill"),
     ("load/unload/run_skill", "加载/卸载/运行 Skill"),
     ("auto [游戏]",   "全链路自动：detect→brief→research→ensure→play"),
+    ("onboard <游戏>", "接入新游戏一键流程：生成→校验→冒烟→试跑→报告，v2.0/S17"),
     ("quit/exit/q",  "退出"),
 ]
 
@@ -807,9 +809,37 @@ def interactive():
         elif cmd == "auto":
             print(_run_auto(arg or "florr"))
             print(_cmd_play(0))
+        elif cmd == "onboard":
+            print(_cmd_onboard(arg))
         else:
             print(red(f"未知命令: {cmd}（输入 help 查看）"))
         # 循环内不做事件，交给用户
+
+
+def _cmd_onboard(arg: str = "") -> str:
+    """S17：一条命令跑完「接入一款新游戏」。
+
+    默认带 --no-activate：一键流程常用于试接入，把默认游戏悄悄切走
+    （config.yaml 的 agent.game）会波及后续所有命令，交给用户显式决定。
+    """
+    parts = (arg or "").split()
+    game = parts[0] if parts else ""
+    if not game:
+        return red("用法: onboard <游戏名>   （示例: onboard demo_arcade）")
+    script = os.path.join(BASE_DIR, "tools", "onboard_game.py")
+    cmd = [sys.executable, script, game, "--no-activate"]
+    if "--rounds" in parts:
+        i = parts.index("--rounds")
+        if i + 1 < len(parts):
+            cmd += ["--rounds", parts[i + 1]]
+    try:
+        proc = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True,
+                              text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        return red(f"接入流程超时（>300s）：{game}")
+    out = (proc.stdout or "") + (proc.stderr or "")
+    flag = green("✅ 接入成功") if proc.returncode == 0 else red("⛔ 接入未通过")
+    return f"{out}\n{flag}（退出码 {proc.returncode}）"
 
 
 def _command_registry(arg: str = "") -> dict:
@@ -850,6 +880,7 @@ def _command_registry(arg: str = "") -> dict:
         "play": lambda: _cmd_play(int(arg) if str(arg).isdigit() else 0),
         "auto": lambda: _run_auto(arg or ACTIVE_GAME),
         "auto_search": lambda: _run_auto_search(*(_arg2(arg) or (ACTIVE_GAME, ""))),
+        "onboard": lambda: _cmd_onboard(arg),
     }
 
 

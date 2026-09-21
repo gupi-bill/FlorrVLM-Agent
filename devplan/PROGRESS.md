@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`RELEASED | A线(02:47) | 2026-09-22T03:38 | S16`
+`RELEASED | E线 | 2026-09-22T04:26 | S17`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -40,7 +40,7 @@
 | S14 | 最终验收与归档 | ✅ 完成 | 00:30~00:38 (A线) | `devplan/FINAL_REPORT.md`（交付矩阵 / 743 用例分布 / 16 项真实缺陷 / 验收记录 / 遗留风险 / 下一步建议 / 7 条经验）；tag `v2.0-dev-20260922`；冲刺结论写入工作区记忆 |
 | S15 | 第二款游戏端到端跑通（space_invaders） | ✅ 完成 | 01:26~02:05 (A线) | `tests/test_e2e_space_invaders.py`(14)、`devplan/E2E_S15.md`；`config.active_game()`（AGENT_GAME/UGF_GAME 生效，D1）、`agent_main._mcp_server_env()` 透传激活游戏（D2）、`mcp_server.resolve_set_keys()/normalize_set_name()` + 档案 `combat.set_map`（D3）、`agent_main._kb_game()` 知识库按游戏分区（D4）；`perception.mock` 迁回档案（florr.yaml 新增、config.yaml 移除）、space_invaders 补 `teammates: []`；`game_profile_check` 增 set_map 校验、`tools/add_game.py` 自动生成 set_map；PROFILE_SPEC §3/§6/§7 同步；**757 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S16 | 参考适配器模板与档案规范固化 | ✅ 完成 | 02:47~03:38 (A线) | `game_profiles/_template.yaml`（全字段注释模板 + `__UGF_*__` 槽位）、`tests/test_add_game.py`(26)、PROFILE_SPEC 新增 §0 模板机制与 §6.1 常见错误表；`tools/add_game.py` 改为**模板驱动渲染**（`load_template`/`template_defaults`/`render_from_template` + 槽位残留硬失败）、`_next_port()` 跳过 `_` 模板；**783 用例全绿**，`bash scripts/check.sh` 退出码 0 |
-| S17 | 接入流程一键化（onboard） | ⬜ 待执行 | | |
+| S17 | 接入流程一键化（onboard） | ✅ 完成 | 04:06~04:26 (E线) | `tools/onboard_game.py`（生成→校验→冒烟→试跑→报告五环节流水线 + `--json`），`tests/test_onboard_game.py`(20)，`devplan/onboard_demo_arcade.md`、`devplan/onboard_space_invaders.md` 两份接入报告（含一款全新虚构游戏 demo_arcade），`game_profiles/demo_arcade.yaml`；`agent_cli.py` 接入 `onboard`（帮助清单 + `-c` 注册表 + 交互分支 + subprocess 导入）；修复 3 个真实缺陷；**803 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S18 | 知识闭环实证（学→检索→决策→复盘→回写） | ⬜ 待执行 | | |
 | S19 | 学习链路离线化（视频→战术入库） | ⬜ 待执行 | | |
 | S20 | 决策场景矩阵（战斗/组队/心态/边界） | ⬜ 待执行 | | |
@@ -114,6 +114,32 @@
   - 测试结果：`bash scripts/check.sh` 退出码 0（compileall + boot_check + 两份档案 + **743 用例全绿**）✅
   - 收尾说明（自主决策理由）：S1~S14 全部 ✅，本轮已耗时约 35 分钟（超 25 分钟预算），**S15（第二款游戏端到端跑通）体量较大，半途开工会留下 🟡 半成品状态**，故本轮到此收口并释放运行锁；下一轮（00:30 B 线）从 `devplan/PLAN_PHASE2.md` 的 **S15** 起跑。
   - 遗留：见 `FINAL_REPORT.md` 第五节（8 条技术性遗留 + 6 项环境性未验证）。
+
+- **2026-09-22 04:06~04:26 · S17 · 接入流程一键化（onboard）**
+  - 起点判定：运行锁 `RELEASED`（A 线 03:38 释放 S16），状态表首个 ⬜ 为 S17，当前 04:06 < 2026-09-22 07:00 → 执行 S17。
+  - 做了什么：
+    1. 新建 `tools/onboard_game.py`：把「生成 → 校验 → 冒烟 → 试跑 → 报告」编成一条命令。每环节统一计时 + 异常兜底，返回结构化结果（`--json` 可交 CI）。冒烟与试跑走**真实子进程**并显式透传 `AGENT_GAME`/`UGF_GAME`/`UGF_DRY_RUN`/`UGF_PERCEPTION_BACKEND=mock`（S15 教训：不透传会父子进程游戏不一致）。
+    2. 报告 `devplan/onboard_<game>.md`：结论 / 环节明细表 / 档案摘要 / 发现的问题 / 后续建议 / 复现命令六段，输出目录可注入（测试指 `tmp_path`）。
+    3. 接入 CLI：`agent_cli.py` 新增 `onboard`（HELP_LINES + `_command_registry` + 交互分支 + 补 `import subprocess`），默认带 `--no-activate`。
+    4. 产出两份真实接入报告：全新虚构游戏 **demo_arcade**（从零生成档案 → 全绿，16s）与已有游戏 **space_invaders**（复用档案 → 全绿，16s）。
+    5. 修复 3 个实测发现的真实缺陷：
+       - **O1（中，开关失效）**：`--no-dry-run` 只是给结果打「跳过」标记，子进程**照跑不误**，白等 14 秒 → 改为惰性执行（校验不过或被参数关闭时根本不启动子进程），并加回归用例以耗时反证。
+       - **O2（高，配置被污染）**：原实现在「生成」环节就切 `config.yaml` 的 `agent.game`，一旦校验不通过，默认游戏已被指向一个坏档案（实测 config.yaml 被改成 `game: nope`）→ 改为**先验后切**，校验失败则明确放弃切换并记入 issues。
+       - **O3（中，错误静默）**：`add_game._sanitize_name` 会把空串兜底成 `florr`、`_template` 洗成 `template`，先清洗再校验导致 `onboard ""` / `onboard _template` 静默变成另一款游戏 → 改为对**原始输入**先校验；`--json` 下用 `redirect_stdout` 拦掉向导的人话输出（否则 `json.loads` 直接崩）。
+  - 产物：`tools/onboard_game.py`、`tests/test_onboard_game.py`、`devplan/onboard_demo_arcade.md`、`devplan/onboard_space_invaders.md`、`game_profiles/demo_arcade.yaml`、`agent_cli.py`(M)、`devplan/PROGRESS.md`(M)
+  - 测试结果：
+    - `python -m pytest tests/test_onboard_game.py -q` → **20 passed**（首轮 17 通过 / 3 失败，3 个失败全部指向上述真实缺陷 O1~O3，非测试写错）✅
+    - `python -m pytest tests/ -q` → **803 passed**（S16 的 783 + 本轮 20，0 failed）✅
+    - `bash scripts/check.sh` → 退出码 0（compileall + boot_check + 两份档案 + 803 用例）✅
+    - 端到端：`python tools/onboard_game.py demo_arcade --no-activate` 16.45s 五环节全绿；`agent_cli.py -c "onboard space_invaders"` 退出码 0 且报告非空 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - `game_profiles/demo_arcade.yaml` 是**示范档案**（虚构游戏，用于证明一键流程），已 `--no-activate` 不占默认位；若不想要可整份删除，不影响任何测试（`game_profile_check --all` 仍能过，因为它本身合法）。
+    - 试跑环节固定写 `knowledge_md/<game>/`，反复 onboard 同一游戏会持续追加复盘文件；清理策略移交 S22 稳定性阶段。
+    - onboard 未校验「端口是否被本机其它进程占用」，`_next_port()` 只看已登记档案。上真机前需人工确认。
+    - 报告里的「发现的问题」目前只汇总校验/冒烟/试跑的结构化 issues，尚未分析 dry-run 的动作分布（如全是 defend），该维度移交 S20 决策场景矩阵。
+    - `test_docs.py` 的文档基线常量仍为硬编码，本轮 803 与文档口径未同步（文档门禁未因新增用例失败，但口径已漂移），建议 S21 动态化时一并处理。
+  - 收尾说明（自主决策理由）：本轮已耗时约 20 分钟，下一阶段 **S18（知识闭环实证）** 需造 seed 知识、打通决策引用与命中率指标，体量明显超过剩余预算；按 S14 经验「半途开工会留下 🟡 半成品」，故本轮收口并释放运行锁，下一轮从 **S18** 起跑。
+
 
 ---
 
