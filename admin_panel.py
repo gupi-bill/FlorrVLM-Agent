@@ -110,9 +110,12 @@ def _mode() -> dict:
     大盘只做展示，不替用户决定模式；模式由 launcher.py 的 --dry-run / --mock
     或环境变量 UGF_DRY_RUN / UGF_PERCEPTION_BACKEND 决定。
     """
-    dry = os.environ.get("UGF_DRY_RUN") == "1"
-    backend = os.environ.get("UGF_PERCEPTION_BACKEND") or config.get(
-        "perception.backend", "auto")
+    # v2.0 S21：模式判定此前在本函数里重写了一遍环境变量解析，与 config / agent_main
+    # 各有一套口径，容易"大盘显示 mock、实际在等真机"。改为统一读 config.runtime_mode()，
+    # 本函数只负责 auto 的可用性探测与展示文案。
+    m = config.runtime_mode()
+    dry = m["dry_run"]
+    backend = m["perception_backend"]
     if backend == "auto":
         # auto 的实际结果取决于本机有没有截图工具 + YOLO，这里按依赖可探测性给个提示
         try:
@@ -128,6 +131,11 @@ def _mode() -> dict:
         "label": ("dry-run" if dry else "在线") + " / "
                  + ("mock" if backend_label == "mock" else backend_label),
         "offline": dry or backend_label == "mock",
+        # S21 新增：LLM / VLM / 激活游戏，避免只看得到模式看不到能力开关
+        "llm": m["llm"],
+        "vlm": m["vlm"],
+        "game": m["game"],
+        "summary": config.runtime_mode_text(),
     }
 
 
@@ -236,7 +244,9 @@ async function refresh(){
   document.getElementById('kb').textContent=d.kb_count+' 篇 / '+d.kb_mb+' MB';
   document.getElementById('res').textContent=(d.cpu>=0?d.cpu+'%':'—')+' / '+d.mem_mb+'MB';
   const m=document.getElementById('mode');m.textContent=d.mode.label;
-  m.className=d.mode.offline?'val warn':'val ok';m.title='运行: '+d.mode.run+' ｜ 感知: '+d.mode.perception;
+  m.className=d.mode.offline?'val warn':'val ok';
+  m.title='运行: '+d.mode.run+' ｜ 感知: '+d.mode.perception
+        +' ｜ LLM: '+d.mode.llm+' ｜ VLM: '+d.mode.vlm;
   document.getElementById('sess').textContent=d.session_count+' 场 / '+d.total_rounds+' 回(均 '+d.avg_rounds+' · 最高 '+d.best_rounds+')';
   document.getElementById('hist').innerHTML=d.recent.map(h=>
     '<div class="thr"><span>'+(h.at||'')+'</span>'

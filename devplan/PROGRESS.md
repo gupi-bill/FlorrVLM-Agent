@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`LOCK | F线 | 2026-09-22T06:05 | S20`
+`RELEASED | F线 | 2026-09-22T06:33 | S21`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -44,7 +44,7 @@
 | S18 | 知识闭环实证（学→检索→决策→复盘→回写） | ✅ 完成 | 05:28~05:45 (F线) | `knowledge_loop.py`（seed/检索/战术抽取/三计数指标）、`tests/test_knowledge_loop.py`(32)、`devplan/KB_LOOP_S18.md`；CLI 新增 `kb_seed`/`kb_stats`；`agent_main` 3 处修复：kb_search 补 game_name(D1) / `_fallback_decide` 吃知识(D2) / 指标结构化可查询(D3)；**835 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S19 | 学习链路离线化（视频→战术入库） | ✅ 完成 | 05:45~05:56 (F线) | `tests/test_video_learner.py`(27)、`devplan/LEARN_S19.md`；`video_learner.py` 可注入改造：`synthesize_frames`(纯标准库 PNG)/`extract_frames_offline`/`set_vlm_provider`+`_stub_vlm`/`learn_from_video`(结构化结果)/`set_frame_dir`/`cleanup_temp_frames` 返回 bool；CLI `--synthetic`/`--game`/`--keep-frames`；修复 4 个缺陷：入库不分区致学→检索断链(D4)/短中文战术被丢弃(D5)/去重形同虚设(D6)/清理不可断言(D7)；**862 用例全绿** |
 | S20 | 决策场景矩阵（战斗/组队/心态/边界） | ✅ 完成 | 05:58~06:05 (F线) | `tests/test_decision_scenarios.py`(38)、`devplan/SCENARIOS_S20.md`（11 战斗 + 4 组队 + 7 心态 + 12 闸门实测值）；`knowledge_loop` 新增 `knowledge_gate`/`decide_action`+`KB_GATE_HP`/`KB_GATE_THREAT`；`agent_main._fallback_decide` 由「知识无条件优先」改为「先过局面闸门」；修正 S18 归因：14 轮全 defend 的真实原因是 mock 含 boss(mantis 威胁 400) 决策本就 retreat；**900 用例全绿**，`bash scripts/check.sh` 退出码 0 |
-| S21 | 测试门禁与可观测性固化 | ⬜ 待执行 | | |
+| S21 | 测试门禁与可观测性固化 | ✅ 完成 | 06:05~06:33 (F线) | `tests/test_check_script.py`(20)、`devplan/GATE_S21.md`；`scripts/check.sh` 由 4 环节扩为 **6 环节**（新增 MCP 工具核对 / CLI 全命令冒烟，退出码 5/6，`--fast` 跳过）；`config.runtime_mode()`/`runtime_mode_text()` 作为模式单一真源，`agent_cli` 新增 `mode` 命令，`admin_panel._mode()` 改为调用它并补充 LLM/VLM/游戏字段；README 门禁章节同步；**920 用例全绿**，全量门禁 3m07s 退出码 0 |
 | S22 | 稳定性长跑与资源门禁 | ⬜ 待执行 | | |
 | S23 | 安全与合规加固 | ⬜ 待执行 | | |
 | S24 | 打包分发实证 | ⬜ 待执行 | | |
@@ -653,3 +653,22 @@
     `pytest tests/ -q` **900 passed**；`bash scripts/check.sh` 退出码 0。
   - 遗留：场景期望值是与当前实现一致的基线快照（characterization test），若认为某结论不合理
     应先改实现再改表；组队协同只按队友套装数量判断，未考虑血量/距离。
+
+- **2026-09-22 06:05~06:33 · S21 · 测试门禁与可观测性固化**
+  - 做了什么：
+    1. `scripts/check.sh` 由 4 环节扩为 6 环节：新增 `mcp_tools_check.py --strict`（退出码 5）与
+       `cli_smoke.py --strict --timeout 12`（退出码 6），`--fast` 下两者跳过。
+       此前这两个工具各自能跑但没进门禁 —— 工具表漂移、CLI traceback 在门禁里完全不暴露。
+    2. 新增 `config.runtime_mode()` / `runtime_mode_text()`：模式(dry-run/online)、感知后端、
+       LLM/VLM 开关、激活游戏的单一真源；环境变量优先于 config.yaml；dry-run+auto 时后端显示 mock。
+    3. `agent_cli` 新增 `mode` 命令（命令表 + 帮助清单同步）；`admin_panel._mode()` 改为调用
+       `config.runtime_mode()`，不再自己解析环境变量，新增 llm/vlm/game/summary 字段。
+    4. README 门禁章节改为 6 环节 + 运行模式查询示例，用例基线同步为 920。
+    5. 新增 `tests/test_check_script.py`(20)：脚本存在/语法、`--help`/未知参数退出码、
+       `--fast` 通过、六个环节齐备、六个退出码齐备、解释器探测；`runtime_mode` 各分支与
+       大盘口径一致性。
+  - 产物：`tests/test_check_script.py`(20)、`devplan/GATE_S21.md`、`scripts/check.sh`、
+    `config.py`、`agent_cli.py`、`admin_panel.py`、README。
+  - 测试结果：`pytest tests/test_check_script.py -q` 20 passed；`pytest tests/ -q` **920 passed**；
+    `bash scripts/check.sh` ✅ 全部门禁通过（3m07s，含 31 条 CLI 冒烟 0 traceback）。
+  - 遗留：全量门禁 3 分钟偏慢（pytest ~90s + 冒烟 ~85s），CI 可拆两级；`--timeout 12` 为保守值。

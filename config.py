@@ -193,6 +193,45 @@ def all() -> dict:
 _reload()  # 导入即加载一次
 
 
+def runtime_mode() -> dict:
+    """当前运行模式快照（S21 可观测性）。
+
+    一个进程里到底在跑什么模式，此前只能靠翻启动参数与环境变量推断。
+    这里统一给出：运行模式（dry-run / online）、感知后端、LLM/VLM 是否可用、激活游戏。
+    环境变量优先级高于 config.yaml，与 perception_server / agent_main 的取值口径一致。
+    """
+    import os as _os
+
+    def _flag(name: str) -> bool:
+        return str(_os.getenv(name, "") or "").strip().lower() in ("1", "true", "yes", "on")
+
+    dry = _flag("UGF_DRY_RUN") or _flag("DRY_RUN")
+    backend = (_os.getenv("UGF_PERCEPTION_BACKEND") or "").strip() or \
+        get("perception.backend", "auto")
+    backend = str(backend).lower()
+    if dry and backend == "auto":
+        backend = "mock"      # dry-run 下 auto 必然降级到 mock
+
+    llm_on = bool(_os.getenv("LLM_API_URL") and _os.getenv("LLM_API_KEY"))
+    vlm_on = bool(_os.getenv("VLM_API_URL") and _os.getenv("VLM_API_KEY"))
+
+    return {
+        "mode": "dry-run" if dry else "online",
+        "dry_run": dry,
+        "perception_backend": backend,
+        "llm": "on" if llm_on else "off",
+        "vlm": "on" if vlm_on else "off",
+        "game": active_game(),
+    }
+
+
+def runtime_mode_text() -> str:
+    """人类可读的一行模式摘要（大盘 / CLI / 日志用）。"""
+    m = runtime_mode()
+    return (f"模式={m['mode']} | 感知={m['perception_backend']} | "
+            f"LLM={m['llm']} | VLM={m['vlm']} | 游戏={m['game']}")
+
+
 def reload_if_changed() -> bool:
     """检测 config.yaml 或当前游戏档案是否变化，变了就热加载。"""
     last = getattr(reload_if_changed, "_mtime", None)

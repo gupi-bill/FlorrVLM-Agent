@@ -59,4 +59,18 @@ else
   "$PY" -m pytest tests/ -q || { echo "❌ 单元测试失败"; exit 4; }
 fi
 
+# S21：MCP 工具注册与 CLI 全命令冒烟接进门禁。
+# 这两项此前各自能跑但没有进 check.sh —— "一条命令验证整个项目"名不副实：
+# 工具表漂移、CLI 命令报 traceback 都不会在门禁里暴露。
+if [ "$FAST" = "1" ]; then
+  step 5 "MCP 工具核对（--fast 已跳过）"; echo "⏭  跳过"
+  step 6 "CLI 全命令冒烟（--fast 已跳过）"; echo "⏭  跳过"
+else
+  step 5 "MCP 工具核对 mcp_tools_check"
+  "$PY" tools/mcp_tools_check.py --strict || { echo "❌ MCP 工具核对失败"; exit 5; }
+
+  step 6 "CLI 全命令冒烟 cli_smoke"
+  "$PY" tools/cli_smoke.py --strict --timeout 12 || { echo "❌ CLI 冒烟失败"; exit 6; }
+fi
+
 printf '\n===== ✅ 全部门禁通过 =====\n'

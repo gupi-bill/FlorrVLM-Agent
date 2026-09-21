@@ -295,6 +295,7 @@ HELP_LINES = [
     ("kb_search <词> [游戏]", "在知识库中全文检索，v2.0"),
     ("kb_stats [游戏]", "知识闭环指标(检索/命中/引用)，S18"),
     ("kb_seed [游戏]",  "补种该游戏 seed 知识(幂等)，S18"),
+    ("mode",             "显示运行模式/感知后端/LLM·VLM 状态，S21"),
     ("kb_export",      "导出整个知识库为备份包(tar.gz)，v2.0"),
     ("kb_import <包>",  "从备份包恢复知识库(同名覆盖)，v2.0"),
     ("skills",       "列出可用 Skill"),
@@ -748,6 +749,23 @@ def _cmd_kb_stats(game_name: str = "") -> str:
     return "\n".join(["知识闭环指标 · 全部游戏"] + lines)
 
 
+def _cmd_mode() -> str:
+    """显示当前运行模式（S21 可观测性）。
+
+    模式 / 感知后端 / LLM / VLM / 激活游戏 一目了然，避免"以为在 mock 其实在等真机"。
+    """
+    import config
+    m = config.runtime_mode()
+    lines = [
+        f"  运行模式 : {m['mode']}{'（不碰键鼠、不调外部 LLM）' if m['dry_run'] else ''}",
+        f"  感知后端 : {m['perception_backend']}",
+        f"  LLM     : {m['llm']}",
+        f"  VLM     : {m['vlm']}",
+        f"  激活游戏 : {m['game']}",
+    ]
+    return "\n".join(["运行模式"] + lines)
+
+
 def _run_auto(game: str) -> str:
     """全链路自动：detect → brief(若无) → research → ensure。"""
     st = load_state()
@@ -929,6 +947,8 @@ def _command_registry(arg: str = "") -> dict:
         # S18：知识闭环指标与 seed 补种
         "kb_stats": lambda: _cmd_kb_stats(arg),
         "kb_seed": lambda: _cmd_kb_seed(arg),
+        # S21：运行模式可观测
+        "mode": lambda: _cmd_mode(),
         "skills": lambda: SKILLS.summary(),
         "load": lambda: _cmd_load(arg),
         "unload": lambda: _cmd_unload(arg),
