@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`LOCK | F线 | 2026-09-22T05:28 | S18`
+`RELEASED | F线 | 2026-09-22T06:08 | S18`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -41,7 +41,7 @@
 | S15 | 第二款游戏端到端跑通（space_invaders） | ✅ 完成 | 01:26~02:05 (A线) | `tests/test_e2e_space_invaders.py`(14)、`devplan/E2E_S15.md`；`config.active_game()`（AGENT_GAME/UGF_GAME 生效，D1）、`agent_main._mcp_server_env()` 透传激活游戏（D2）、`mcp_server.resolve_set_keys()/normalize_set_name()` + 档案 `combat.set_map`（D3）、`agent_main._kb_game()` 知识库按游戏分区（D4）；`perception.mock` 迁回档案（florr.yaml 新增、config.yaml 移除）、space_invaders 补 `teammates: []`；`game_profile_check` 增 set_map 校验、`tools/add_game.py` 自动生成 set_map；PROFILE_SPEC §3/§6/§7 同步；**757 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S16 | 参考适配器模板与档案规范固化 | ✅ 完成 | 02:47~03:38 (A线) | `game_profiles/_template.yaml`（全字段注释模板 + `__UGF_*__` 槽位）、`tests/test_add_game.py`(26)、PROFILE_SPEC 新增 §0 模板机制与 §6.1 常见错误表；`tools/add_game.py` 改为**模板驱动渲染**（`load_template`/`template_defaults`/`render_from_template` + 槽位残留硬失败）、`_next_port()` 跳过 `_` 模板；**783 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S17 | 接入流程一键化（onboard） | ✅ 完成 | 04:06~04:26 (E线) | `tools/onboard_game.py`（生成→校验→冒烟→试跑→报告五环节流水线 + `--json`），`tests/test_onboard_game.py`(20)，`devplan/onboard_demo_arcade.md`、`devplan/onboard_space_invaders.md` 两份接入报告（含一款全新虚构游戏 demo_arcade），`game_profiles/demo_arcade.yaml`；`agent_cli.py` 接入 `onboard`（帮助清单 + `-c` 注册表 + 交互分支 + subprocess 导入）；修复 3 个真实缺陷；**803 用例全绿**，`bash scripts/check.sh` 退出码 0 |
-| S18 | 知识闭环实证（学→检索→决策→复盘→回写） | ⬜ 待执行 | | |
+| S18 | 知识闭环实证（学→检索→决策→复盘→回写） | ✅ 完成 | 05:28~06:08 (F线) | `knowledge_loop.py`（seed/检索/战术抽取/三计数指标）、`tests/test_knowledge_loop.py`(32)、`devplan/KB_LOOP_S18.md`；CLI 新增 `kb_seed`/`kb_stats`；`agent_main` 3 处修复：kb_search 补 game_name(D1) / `_fallback_decide` 吃知识(D2) / 指标结构化可查询(D3)；**835 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S19 | 学习链路离线化（视频→战术入库） | ⬜ 待执行 | | |
 | S20 | 决策场景矩阵（战斗/组队/心态/边界） | ⬜ 待执行 | | |
 | S21 | 测试门禁与可观测性固化 | ⬜ 待执行 | | |
@@ -584,3 +584,27 @@
   - 决策依据：本轮开工读取状态总表，S1~S15 全 ✅、首个 ⬜ 为 S16（提示词所述「从 S9 续跑」已过期，
     以 PROGRESS.md 实际状态为准）；运行锁为 RELEASED 故正常取锁。未向用户提问，按
     DIRECTION.md「接入新游戏路径产品化」优先级自主执行。
+
+- **2026-09-22 05:28~06:08 · S18 · 知识闭环实证（学→检索→决策→复盘→回写）**
+  - 做了什么：
+    1. 新建 `knowledge_loop.py`：`seed_knowledge`（按档案 combat.tactics/predictor 档位生成
+       `tactics.md`/`boss_guide.md`，幂等）、`retrieve`（限定游戏分区 + 记账）、
+       `extract_tactics`/`apply_tactics`（命中条目→动作倾向）、`LearningStats`（检索/命中/引用
+       三计数 + 按关键词下钻）、`save`/`query_stats`/`stats_summary`（落盘 run_logs/learning_stats.json）。
+    2. **修复 D1（严重）**：主循环 `kb_search` 不带 `game_name` —— S15 只把写入分区、读取仍扫全库，
+       实测定量：检索「boss」命中 87 个文件，绝大多数是别的游戏的复盘（命中率高但是假的）。
+       补上 `"game_name": _kb_game()` 后 florr 分区命中 13。
+    3. **修复 D2（严重）**：`_fallback_decide` 只有两个参数，`kb_tactics` 在无 API key 时被直接丢弃 ——
+       本机正是无密钥环境，等于知识闭环整体断裂。新增 `kb_tactics` 参数 + `source:"kb"` 标记，
+       并加回归用例「同一状态有/无知识动作必须不同」。
+    4. **修复 D3（中）**：命中指标原先只 append 成 md 文本，只能人读、无引用维度。改为结构化 JSON，
+       新增 CLI `kb_seed [游戏]` / `kb_stats [游戏]`，帮助清单同步。
+    5. 主循环开局自动补种 seed（幂等，不覆盖复盘积累），退出前落盘指标并打印一行摘要。
+  - 产物：`knowledge_loop.py`、`tests/test_knowledge_loop.py`(32)、`devplan/KB_LOOP_S18.md`、
+    `agent_cli.py` 两命令、三款游戏的 seed 知识文档。
+  - 测试结果：`pytest tests/test_knowledge_loop.py -q` 32 passed；`pytest tests/ -q` **835 passed**；
+    `bash scripts/check.sh` 退出码 0；`UGF_DRY_RUN=1 python agent_main.py --rounds 14` 实测
+    检索 14 / 命中 14 / 引用 14（100%），动作 defend×14。
+  - 遗留：① 知识优先级过硬（14 轮全 defend），florr 战术含"撤退/保持距离"导致 cautious_fight 一律降级
+    防守，需在 S20 引入权重；② 引用率定义为"命中即引用"偏乐观，S20 补对照口径；
+    ③ `knowledge_md/nope/`、`knowledge_md/template/` 为历史测试残留，未清理。
