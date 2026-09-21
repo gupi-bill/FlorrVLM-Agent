@@ -48,6 +48,127 @@ MOCK_SPAWN = [
 MOCK_PLAYER = {"alive": True, "hp": 100, "max_hp": 100, "x": 960, "y": 980,
                "power_score": 100}
 
+# v2.1 / S16：模板成为档案的**唯一结构来源与数值默认来源**。
+# 模板里待填充的槽位一律写成 __UGF_XXX__；渲染后不允许有任何残留。
+TEMPLATE_PATH = os.path.join(PROFILE_DIR, "_template.yaml")
+PLACEHOLDER_RE = re.compile(r"^__UGF_[A-Z0-9_]+__$")
+# 块级槽位 → 渲染后每行缩进（与 _template.yaml 中的缩进一致）
+BLOCK_SLOTS = {"__UGF_SETS__": 4, "__UGF_SET_MAP__": 2,
+               "__UGF_TACTICS__": 4, "__UGF_ENTITIES__": 6}
+# 威胁分键序（与 game_profile_check.REQUIRED_THREATS 对齐）
+THREAT_KEYS = ["highest_boss", "boss", "elite", "normal",
+               "player_enemy", "player_ally", "unknown"]
+THREAT_FALLBACK = {"highest_boss": 1000, "boss": 400, "elite": 120, "normal": 15,
+                   "player_enemy": 150, "player_ally": 0, "unknown": 5}
+
+
+def load_template(path: str = None) -> str:
+    """读取档案模板原文（结构与注释的唯一来源）。"""
+    with open(path or TEMPLATE_PATH, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def template_defaults(text: str = None) -> dict:
+    """从模板解析「字面默认值」——改模板即改生成器的默认值。
+
+    形如 __UGF_XXX__ 的槽位表示「必须按游戏填写」，解析结果里置为 None；
+    其余字面量（威胁分 / 端口 / chase 档位 / 玩家状态）直接作为默认。
+    """
+    data = yaml.safe_load(text if text is not None else load_template()) or {}
+
+    def _clean(v):
+        if isinstance(v, str) and PLACEHOLDER_RE.match(v.strip()):
+            return None
+        if isinstance(v, dict):
+            return {k: c for k, x in v.items() if (c := _clean(x)) is not None}
+        if isinstance(v, list):
+            return [c for x in v if (c := _clean(x)) is not None]
+        return v
+    return _clean(data)
+
+
+_TDEF_CACHE = {"v": None}
+
+
+def template_value(path: str, fallback=None):
+    """按 'predictor.threat.boss' 这样的点路径取模板默认值（带兜底）。"""
+    if _TDEF_CACHE["v"] is None:
+        try:
+            _TDEF_CACHE["v"] = template_defaults()
+        except Exception:
+            _TDEF_CACHE["v"] = {}
+    node = _TDEF_CACHE["v"]
+    for part in path.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return fallback
+        node = node[part]
+    return node
+
+
+def _replace_scalar(text: str, slot: str, value) -> str:
+    return text.replace(slot, str(value))
+
+
+def _replace_key(text: str, key: str, value) -> str:
+    """按行替换 `key: 旧值`，保留缩进与行尾注释。"""
+    pat = re.compile(r"(?m)^(\s*%s:\s*)([^#\n]+?)(\s*(?:#.*)?)$" % re.escape(key))
+    return pat.sub(lambda m: f"{m.group(1)}{value}{m.group(3)}", text, count=1)
+
+
+def _replace_block(text: str, slot: str, lines: list, indent: int) -> str:
+    """把整行占位符替换为多行块；lines 为空则整行删除。"""
+    out = []
+    for line in text.split("\n"):
+        # 槽位行可能是 `  __UGF_X__:`（带冒号才是合法 YAML 键），统一按去掉冒号比较
+        if line.strip().rstrip(":").strip() == slot:
+            if not lines:
+                continue
+            out.extend((" " * indent) + l for l in lines)
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+def render_from_template(data: dict, template_text: str = None) -> str:
+    """以 _template.yaml 为唯一结构来源渲染档案。
+
+    渲染后**断言无 __UGF_ 残留**：残留意味着模板新增了槽位而生成器没跟上，
+    产出的档案看起来合法、实则是坏档案 —— 必须硬失败，不能静默生成。
+    """
+    text = template_text if template_text is not None else load_template()
+    text = _replace_scalar(text, "__UGF_NAME__", data["name"])
+    text = _replace_scalar(text, "__UGF_DESC__", _q(data["description"]))
+    for tier in ("rarity_highest_boss", "rarity_boss", "rarity_elite", "rarity_normal"):
+        text = _replace_scalar(text, f"__UGF_{tier.upper()}__", _lst(data[tier]))
+    text = _replace_scalar(text, "__UGF_DEFAULT_SET__", data["default_set"])
+    # 数值型键按行覆盖（模板里的字面值即默认值）
+    text = _replace_key(text, "perception_port", int(data["perception_port"]))
+    text = _replace_key(text, "chase_min_category", data["chase_min_category"])
+    for k in THREAT_KEYS:
+        text = _replace_key(text, k, _fmt_num(data["threat"][k]))
+    # 块级槽位
+    text = _replace_block(text, "__UGF_SETS__",
+                          [f"- {s}" for s in data["sets"]], BLOCK_SLOTS["__UGF_SETS__"])
+    smap = data.get("set_map") or {}
+    # set_map 槽位与 sets 同级（缩进 2），空映射时整段不出现
+    text = _replace_block(text, "__UGF_SET_MAP__",
+                          ["set_map:"] + [f"  {k}: {v}" for k, v in smap.items()],
+                          BLOCK_SLOTS["__UGF_SET_MAP__"])
+    text = _replace_block(text, "__UGF_TACTICS__",
+                          [f"- {_q(t)}" for t in data["tactics"]],
+                          BLOCK_SLOTS["__UGF_TACTICS__"])
+    text = _replace_block(text, "__UGF_ENTITIES__", [
+        "- {raw_id: %s, rarity: %s, x: %s, y: %s, vx: %s, vy: %s}" % (
+            e["raw_id"], e["rarity"], e["x"], e["y"], e["vx"], e["vy"])
+        for e in _mock_entities(data)
+    ], BLOCK_SLOTS["__UGF_ENTITIES__"])
+    # 残留检查
+    left = [s for s in re.findall(r"__UGF_[A-Z0-9_]+__", text)]
+    if left:
+        raise ValueError(f"模板存在未填充的占位符: {sorted(set(left))}"
+                         f"（请在 render_from_template 中补充渲染逻辑）")
+    return text
+
 
 def _ask(label: str, default: str = "") -> str:
     """读输入，空回车返回 default。非终端(管道)或 UGF_NONINTERACTIVE=1 时直接用默认值。
@@ -90,8 +211,8 @@ def _next_port(default: int = 5011) -> int:
     used = set()
     if os.path.isdir(PROFILE_DIR):
         for fn in os.listdir(PROFILE_DIR):
-            if not fn.endswith(".yaml"):
-                continue
+            if not fn.endswith(".yaml") or fn.startswith("_"):
+                continue  # _ 开头的是模板(_template.yaml)，不占端口
             try:
                 with open(os.path.join(PROFILE_DIR, fn), "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f) or {}
@@ -148,15 +269,21 @@ def collect(game_name: str = "") -> dict:
     if not rarity_normal:
         rarity_normal = _split_csv(_ask("normal 稀有度", "Rare,Unusual,Common"))
     # 威胁分，顺序: highest_boss,boss,elite,normal,player_enemy,player_ally,unknown
-    th_text = _ask("威胁分(highest→unknown,7个)", "1000,400,120,15,150,0,5")
-    th = _parse_floats(th_text) or [1000, 400, 120, 15, 150, 0, 5]
+    # S16：威胁分默认取 _template.yaml 的字面值 —— 改模板即改默认值
+    th_defaults = [template_value(f"predictor.threat.{k}", THREAT_FALLBACK[k])
+                   for k in THREAT_KEYS]
+    th_text = _ask("威胁分(highest→unknown,7个)",
+                   ",".join(_fmt_num(v) for v in th_defaults))
+    th = _parse_floats(th_text) or th_defaults
     while len(th) < 7:
         th.append(0)
-    chase = _ask("追击最低档次(highest_boss/boss/elite/normal/player_enemy)", "elite")
+    chase_default = str(template_value("combat.chase_min_category", "elite"))
+    chase = _ask("追击最低档次(highest_boss/boss/elite/normal/player_enemy)", chase_default)
     if chase not in {"highest_boss", "boss", "elite", "normal", "player_enemy"}:
         chase = "elite"
     # v2.0 推荐字段：端口 / 套装 / 战术
-    port_text = _ask("感知服务端口(每款游戏一个，回车自动分配)", str(_next_port()))
+    port_base = int(template_value("server.perception_port", 5011) or 5011)
+    port_text = _ask("感知服务端口(每款游戏一个，回车自动分配)", str(_next_port(port_base)))
     try:
         port = int(float(port_text))
     except (TypeError, ValueError):
@@ -219,7 +346,18 @@ def _q(text) -> str:
 
 
 def render_yaml(data: dict) -> str:
-    """渲染完整档案（含推荐字段），保证生成即通过 game_profile_check --strict。"""
+    """渲染完整档案：优先以 _template.yaml 为唯一来源；模板缺失时降级为内置渲染。
+
+    保留旧签名是为了兼容既有调用方（tests/test_game_profiles.py 等）。
+    """
+    try:
+        return render_from_template(data)
+    except FileNotFoundError:
+        return _render_legacy_yaml(data)
+
+
+def _render_legacy_yaml(data: dict) -> str:
+    """模板缺失时的兜底渲染（含推荐字段），保证生成即通过 game_profile_check --strict。"""
     li = [f"    {k}: {_fmt_num(v)}" for k, v in data["threat"].items()]
     sets_lines = "\n".join(f"    - {s}" for s in data["sets"])
     smap = data.get("set_map") or {}

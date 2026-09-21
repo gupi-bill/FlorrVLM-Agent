@@ -1,8 +1,33 @@
-# 游戏档案规范 PROFILE_SPEC（S10 固化）
+# 游戏档案规范 PROFILE_SPEC（S10 固化 · S16 扩为「模板 + 字段契约」）
 
 > 一句话：**一款游戏一份 YAML，切游戏零改核心。** 本文件是 `game_profiles/*.yaml` 的字段契约，
 > 由 `game_profile_check.py`（语义校验器）、`tools/add_game.py`（生成器）、
-> `tests/test_game_profiles.py`（38 用例）三方共同锁定。改任一处都必须跑 `pytest tests/ -q`。
+> `game_profiles/_template.yaml`（**唯一结构来源与数值默认来源**）、
+> `tests/test_game_profiles.py`（38 用例）+ `tests/test_add_game.py`（26 用例）共同锁定。
+> 改任一处都必须跑 `bash scripts/check.sh`。
+
+## 0. S16 新增：参考模板 `_template.yaml`
+
+`game_profiles/_template.yaml` 是「接入新游戏」的**标准答案**——全字段、全注释、标注了每个字段的
+类型 / 取值域 / 安全上下限 / 缺失时的兜底行为。`tools/add_game.py` **不再用硬编码 f-string 拼档案**，
+而是：
+
+1. `load_template()` 读模板原文 → 结构与注释来自模板；
+2. `template_defaults()` 解析模板字面值 → 威胁分 / 端口 / `chase_min_category` / 玩家状态的默认来自模板；
+3. `render_from_template()` 填充槽位 → **渲染后若残留任何 `__UGF_*__` 槽位即抛 `ValueError` 硬失败**。
+
+设计理由：模板新增槽位而生成器没跟上时，产出的档案「看起来合法、实则是坏档案」，
+必须硬失败而不是静默通过。该行为由 `tests/test_add_game.py::test_render_fails_loudly_on_unknown_slot` 锁定。
+
+| 槽位 | 含义 | 是否可空 |
+|---|---|---|
+| `__UGF_NAME__` / `__UGF_DESC__` | 游戏名（=文件名）与描述 | 必填 |
+| `__UGF_RARITY_{HIGHEST_BOSS,BOSS,ELITE,NORMAL}__` | 四档稀有度列表 | 必填 |
+| `__UGF_DEFAULT_SET__` | 默认套装（同时写入 `player.petal_set`） | 必填 |
+| `__UGF_SETS__` / `__UGF_TACTICS__` / `__UGF_ENTITIES__` | 套装 / 战术 / mock 实体列表 | 必填 |
+| `__UGF_SET_MAP__:` | 决策语义→套装映射；**为空时整段不出现** | 可空 |
+
+> 模板以 `_` 开头，`game_profile_check` 与 `add_game._next_port()` 都会跳过它（模板不能占用端口）。
 
 ## 1. 加载优先级
 
@@ -101,9 +126,25 @@ python tools/add_game.py my_game --print                # 只打印 YAML，不�
 **离线场景属于档案**：`perception.mock` 由各档案自带（config.yaml 已不再维护 mock 段）。
 切换游戏时实体/队友/玩家状态随档案整体替换，不会残留上一款游戏的数据。
 
+## 6.1 常见错误与症状（S16 补齐：错误 → 现象 → 修法）
+
+| 错误写法 | 现象 | 修法 |
+|---|---|---|
+| `game.name` ≠ 文件名 | 校验 ERROR；`config.active_game()` 切过去读到空档案 | 改名使二者一致（`add_game` 已做安全化） |
+| 同一稀有度串写进两个档位 | 分类结果不确定，威胁分随机 | 每档互斥，见 §3 |
+| 威胁金字塔倒置（`boss` > `highest_boss`） | 校验 ERROR | 保证 `highest_boss ≥ boss ≥ elite ≥ normal` |
+| 自定义套装名但漏 `set_map` | 校验仅 WARN，运行时 `switch_set` 落「未知套装」 | 声明 `combat.set_map`，值必须 ∈ `sets` |
+| `set_map` 缩进写成 `sets:` 的子项 | **YAML 解析失败**（块映射混进列表） | `set_map` 必须与 `sets` 同级（缩进 2） |
+| `perception.mock` 里 `teammates` 不声明 | 单机游戏继承到上一款游戏的队友（S15 实测串味） | 显式写 `teammates: []` |
+| mock 实体 `rarity` 不在已声明档位 | 校验 ERROR，离线跑不通 | 补齐档位或改 rarity |
+| 模板新增槽位但未改生成器 | 生成「合法但坏」的档案 | 渲染器按槽位残留硬失败（见 §0） |
+
 ## 7. 遗留
 
 - 决策层输出的抽象套装名在日志展示里未翻译成游戏内名字
-  （`switch_set` 已翻译，仅展示文案），移交 S16。
+  （`switch_set` 已翻译，仅展示文案）—— **S16 已给出可复用路径**：`combat.set_map` 是决策语义
+  →游戏内套装的唯一映射，展示层直接查该表即可，待 S20/S21 接入日志与大盘。
 - `chase` / `team` 两档语义在单人街机类游戏下的映射是否贴合，需实机验证。
 - `knowledge_md/` 根目录下的 florr 历史文件未做归档迁移（数据问题，非契约问题）。
+- 模板目前只覆盖「必填 + 常用」字段；`agent` / `mcp` / `paths` 三个可选顶层键仅有文字说明，
+  未进模板骨架（需要时手工补）。

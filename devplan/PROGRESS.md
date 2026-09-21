@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`RELEASED | A线(01:25整点) | 2026-09-22T02:06 | S15`
+`RELEASED | A线(02:47) | 2026-09-22T03:38 | S16`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -39,7 +39,7 @@
 | S13 | 测试套件固化与文档同步 | ✅ 完成 | 23:50~00:12 (D线) + 00:04~00:2x (A线) | `scripts/check.sh`（一条命令门禁：compileall → boot_check --fail-fast → game_profile_check --all → pytest，支持 `--fast`/`--help`，失败退出码=环节编号）、`tests/test_ops.py` 增至 26 用例、**`tests/test_docs.py`（38 用例文档—代码一致性门禁）**；README/PROJECT_SUMMARY/ROADMAP 三份文档同步（验证状态 / 离线模式 / 门禁 / 未验证清单 / 目录结构 / 版本口径）；**743 用例全绿** |
 | S14 | 最终验收与归档 | ✅ 完成 | 00:30~00:38 (A线) | `devplan/FINAL_REPORT.md`（交付矩阵 / 743 用例分布 / 16 项真实缺陷 / 验收记录 / 遗留风险 / 下一步建议 / 7 条经验）；tag `v2.0-dev-20260922`；冲刺结论写入工作区记忆 |
 | S15 | 第二款游戏端到端跑通（space_invaders） | ✅ 完成 | 01:26~02:05 (A线) | `tests/test_e2e_space_invaders.py`(14)、`devplan/E2E_S15.md`；`config.active_game()`（AGENT_GAME/UGF_GAME 生效，D1）、`agent_main._mcp_server_env()` 透传激活游戏（D2）、`mcp_server.resolve_set_keys()/normalize_set_name()` + 档案 `combat.set_map`（D3）、`agent_main._kb_game()` 知识库按游戏分区（D4）；`perception.mock` 迁回档案（florr.yaml 新增、config.yaml 移除）、space_invaders 补 `teammates: []`；`game_profile_check` 增 set_map 校验、`tools/add_game.py` 自动生成 set_map；PROFILE_SPEC §3/§6/§7 同步；**757 用例全绿**，`bash scripts/check.sh` 退出码 0 |
-| S16 | 参考适配器模板与档案规范固化 | ⬜ 待执行 | | |
+| S16 | 参考适配器模板与档案规范固化 | ✅ 完成 | 02:47~03:38 (A线) | `game_profiles/_template.yaml`（全字段注释模板 + `__UGF_*__` 槽位）、`tests/test_add_game.py`(26)、PROFILE_SPEC 新增 §0 模板机制与 §6.1 常见错误表；`tools/add_game.py` 改为**模板驱动渲染**（`load_template`/`template_defaults`/`render_from_template` + 槽位残留硬失败）、`_next_port()` 跳过 `_` 模板；**783 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S17 | 接入流程一键化（onboard） | ⬜ 待执行 | | |
 | S18 | 知识闭环实证（学→检索→决策→复盘→回写） | ⬜ 待执行 | | |
 | S19 | 学习链路离线化（视频→战术入库） | ⬜ 待执行 | | |
@@ -522,3 +522,39 @@
     florr 历史文件未归档迁移（数据问题）。
   - 决策依据：本轮未向用户提问，按 DIRECTION.md「第二款游戏端到端跑通优先级最高」自主选择 S15；
     4 个缺陷均以「产物内容断言」而非「退出码」为判据，符合「可复现优于可演示」。
+
+- **2026-09-22 02:47~03:38 · S16 · 参考适配器模板与档案规范固化**
+  - 做了什么：
+    1. 新增 `game_profiles/_template.yaml`：**全字段 + 全注释 + 安全上下限**的参考模板，逐字段标注
+       类型 / 取值域 / 缺失时的兜底行为；待填充处统一写成 `__UGF_*__` 槽位（`__UGF_SET_MAP__` 写成
+       `__UGF_SET_MAP__:` 以保证模板本身是合法 YAML）。
+    2. `tools/add_game.py` 从「硬编码 f-string 拼档案」改造为**以模板为唯一结构来源与数值默认来源**：
+       `load_template()` 取结构与注释 → `template_defaults()` 解析字面默认值（威胁分 / 端口 /
+       `chase_min_category` / 玩家状态）→ `render_from_template()` 填充槽位。原 `render_yaml()`
+       保留签名并转为委托（模板缺失时降级 `_render_legacy_yaml`），既有调用方零改动。
+    3. **槽位残留硬失败**：渲染后若仍有 `__UGF_*__` 残留即抛 `ValueError`。设计理由——模板新增槽位
+       而生成器没跟上时，产出的是「看起来合法、实则是坏档案」，必须硬失败而非静默通过。
+    4. 修复 3 个真实缺陷：①`set_map` 槽位原本缩进在 `sets:` 块内，渲染后块映射混进列表，
+       **YAML 直接解析失败** → 改为与 `sets` 同级（缩进 2），空映射时整段不出现；
+       ②列表块缺 `- ` 前缀（套装 / 战术 / mock 实体）→ 渲染时补前缀；
+       ③`_next_port()` 会把模板的 5021 当成已占用端口 → 跳过 `_` 前缀文件。
+    5. `devplan/PROFILE_SPEC.md` 扩写：§0 模板机制与槽位表、§6.1 常见错误→现象→修法（8 条，
+       含本次实测的 set_map 缩进与队友串味）、§7 遗留按 S16 结论更新。
+  - 产物：`game_profiles/_template.yaml`(新)、`tests/test_add_game.py`(新，26 用例)、
+    `tools/add_game.py`(M)、`devplan/PROFILE_SPEC.md`(M)、`devplan/PROGRESS.md`(M)
+  - 测试结果：
+    - `pytest tests/test_add_game.py -q` → **26 passed** ✅
+    - `pytest tests/ -q` → **783 passed**（基线 757 + 新增 26，0 failed）✅
+    - `bash scripts/check.sh` → **退出码 0**（compileall / boot_check / game_profile_check / pytest 四关全过）✅
+    - 端到端实证：`UGF_NONINTERACTIVE=1 python tools/add_game.py s16_probe --no-activate`
+      → 生成即 strict 自检通过（0 错误 0 建议）；`game_profile_check.py s16_probe --strict` 退出码 0；
+      `AGENT_GAME=s16_probe` 下核心读到 `perception_port=5021 / threat.boss=400 /
+      rarity_highest_boss=['Unique','Eternal'] / sets 5 项 / mock 实体 4 条` ✅（探针档案已删除，未入库）
+  - 遗留（未在本轮处理，记录备查）：
+    - 模板未覆盖 `agent` / `mcp` / `paths` 三个可选顶层键（仅文字说明，需手工补）。
+    - 日志展示仍用决策抽象套装名（`combat`）而非游戏内名（`shoot`）；S16 已提供唯一映射表
+      `combat.set_map`，展示层直接查表即可，移交 S20/S21。
+    - `chase` / `team` 在单人街机类游戏下的映射贴合度仍需实机验证。
+  - 决策依据：本轮开工读取状态总表，S1~S15 全 ✅、首个 ⬜ 为 S16（提示词所述「从 S9 续跑」已过期，
+    以 PROGRESS.md 实际状态为准）；运行锁为 RELEASED 故正常取锁。未向用户提问，按
+    DIRECTION.md「接入新游戏路径产品化」优先级自主执行。
