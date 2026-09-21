@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`LOCK | C线(23:00一次性) | 2026-09-21T23:02 | S10`
+`RELEASED | C线(23:00一次性) | 2026-09-21T23:38 | S10+S11`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -34,7 +34,7 @@
 | S8 | CLI 全命令冒烟 | ✅ 完成 | 06:00~06:30 (A线) | `tools/cli_smoke.py`(31 条命令矩阵，可复用为门禁)、`tests/test_agent_cli.py`(48 用例)、`devplan/SMOKE_S8.md`；`agent_cli.py` 9 处修复：补齐未定义的 `_append_log`、`-c` 一次性模式彻底禁用交互提问、补 help/play/auto 与 `--auto search`、`unload` 跨进程恢复、kb_* 支持游戏名第二参数、交互模式补 kb_* 分支、帮助清单补登记、删 `_run_auto` 死代码 |
 | S9 | MCP 工具注册验证 | ✅ 完成 | 06:39~07:10 (B线) | `tools/mcp_tools_check.py`(15 工具核对/调用/往返三检)、`tests/test_mcp_server.py`(109 用例)、`devplan/TOOLS.md`；`mcp_server.py` 10 处修复（路径穿越/向量开关死配置/dry-run 动作校验）、`kb_maintainer.py` 往返保真修复；`requirements.txt` mcp 放宽至 `>=1.0.0` |
 | S10 | 游戏档案体系固化 | ✅ 完成 | 23:02~23:2x (C线) | `tests/test_game_profiles.py`(38)、`devplan/PROFILE_SPEC.md`；`florr.yaml` 补 port/sets/tactics、`tools/add_game.py` v2.0（生成即通过 strict 自检）、`agent_cli.py validate` 支持 `--strict`；**652 用例全绿** |
-| S11 | UI 收敛与统一启动器 | ⬜ 待执行 | | |
+| S11 | UI 收敛与统一启动器 | ✅ 完成 | 23:16~23:36 (C线) | `launcher.py`（auto/panel/tk/cli + `--selftest`/`--list` + dry-run·mock 透传）、`tests/test_launcher.py`(26)、`ui/legacy/` 归档 pyqt/streamlit（含弃用头 + 路径 bootstrap + `python3`→`sys.executable`）、`admin_panel.py` 运行模式卡片、README 启动章节；**678 用例全绿** |
 | S12 | 运维脚本与容器一致性 | ⬜ 待执行 | | |
 | S13 | 测试套件固化与文档同步 | ⬜ 待执行 | | |
 | S14 | 最终验收与归档 | ⬜ 待执行 | | |
@@ -394,3 +394,26 @@
     - florr 的离线 mock 场景仍在 `config.yaml`，档案自身未声明 `perception.mock`（"一份档案一份离线场景"未完全落地），移交 **S15**。
     - 校验器只做静态语义校验，不验证"档案值在实际对局里是否合理"（如威胁分是否过激），需实机数据，本机不可验证。
     - `tools/add_game.py` 的交互向导在无 tty 时全程走默认值，未在真实交互终端下人工试用（本机无交互终端）。
+
+- **2026-09-21 23:36 · S11 · UI 收敛与统一启动器（launcher.py）**
+  - 起点判定：S10 已 ✅ 并提交（`1a0141d`），运行锁仍由本线持有，当前 23:16 < 07:00 且单轮预算有余 → 按「本轮执行规则 2」连做 S11。
+  - 做了什么：
+    1. **前端收敛**：`ui_pyqt.py` / `ui_streamlit.py` 经 `git mv` 移入 `ui/legacy/`，文件头加 `⚠ DEPRECATED` 说明（主 UI / 备选 / 统一入口三行）与 `sys.path` bootstrap（归档后项目根不在搜索路径里，`import config` 会失败）。顺手修掉 **S8 遗留**：`ui_pyqt.py` 用硬编码 `"python3"` 调 CLI → 改为 `sys.executable`（隔离 venv 解释器）。
+    2. **新增 `launcher.py`（v2.0）**：`--ui auto|panel|tk|pyqt|streamlit|cli` + `--selftest` + `--list` + `--dry-run` / `--mock`。可用性探测：`panel` 永可用（纯标准库 http.server）、`tk`/`pyqt` 需 tkinter/PyQt6 且 Linux 下要有 `DISPLAY`/`WAYLAND_DISPLAY`、`streamlit` 需模块可导入。自动顺序 panel > tk > cli（cli 保底）。离线开关经 `child_env()` 以 `UGF_DRY_RUN` / `UGF_PERCEPTION_BACKEND` 透传给子进程，并补 `PYTHONPATH`。退出码：0 正常 / 2 指定 UI 不可用 / 130 Ctrl-C。
+    3. **主 UI 补「运行模式」**：`admin_panel.py` 新增 `_mode()`（在线/dry-run + 感知后端 auto/mock/http，`offline` 标黄），`_status()` 暴露 `mode`，页面新增卡片 + JS 赋值与 tooltip；文件头文档同步。
+    4. **新建 `tests/test_launcher.py`（26 用例）**：UI 清单与归档断言（含 legacy 路径、DEPRECATED 标记、sys.path bootstrap）、可用性探测 5、选择逻辑 4（auto 必选到可用项 / 未知 UI 返回 None / PyQt6·streamlit 不可用时不硬拉起）、命令构造 2（`streamlit run` 形态）、开关透传 3、模式标签 3、自检输出与退出码 3、panel 模式显示 3。
+    5. **README**：「快速开始」新增统一启动入口段落（6 条命令 + 收敛说明），目录树补 `launcher.py` / `ui/legacy/`。
+  - 产物：`launcher.py`、`tests/test_launcher.py`、`ui/legacy/ui_pyqt.py`(M, 移)、`ui/legacy/ui_streamlit.py`(M, 移)、`admin_panel.py`(M)、`README.md`(M)
+  - 测试结果：
+    - `python -m pytest tests/ -q` → **678 passed**（S10 的 652 + 本轮 26，0 failed）✅
+    - 验收命令 `python launcher.py --ui auto --selftest` → 探测 5 项（panel ✅ / tk ✅ / pyqt — PyQt6 未安装 / streamlit — 未安装 / cli ✅），**选择结果 panel，退出码 0** ✅
+    - `python launcher.py --ui pyqt --selftest` → 退出码 **2**（不可用不硬拉起）✅；`--ui cli --selftest` → 0 ✅
+    - `UGF_DRY_RUN=1 UGF_PERCEPTION_BACKEND=mock python launcher.py --ui auto --selftest` → 「离线开关: dry-run / mock 感知」✅
+    - `admin_panel._mode()` 默认 `在线 / auto`（offline=False）；加两个环境变量后 `dry-run / mock`（offline=True），`_status()["mode"]` 同步 ✅
+    - `compileall -q .` 退出码 0；`git status` 仅预期变更（含 2 个 rename）✅
+  - 遗留（未在本轮处理，记录备查）：
+    - 本机 `DISPLAY=:0` 被设置（实际无 X server），故 `tk` 被判为可用；真正的可用性要 `Tk()` 建窗才知道，探测层无法区分（建窗测试可能挂起，未做）。用户若在真无显示环境用 `--ui tk` 会失败——launcher 会把子进程错误原样透出，不会误判成"启动成功"。
+    - `streamlit` 拉起走 `python -m streamlit run`，未实测（模块未安装，磁盘紧张不装）。
+    - `start_all.sh` 仍用 `python3` 直接起 `admin_panel.py`，未改走 launcher（统一收口移交 **S12** 运维脚本）。
+    - `launcher.py` 未接 `--port` 覆盖；面板端口仍只能改 `config.yaml` 的 `server.panel_port`。
+    - 未做真实 GUI 冒烟（无 X server）：tk/pyqt 的实际渲染与交互未验证，属预期降级。

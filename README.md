@@ -107,6 +107,20 @@ python agent_cli.py            # 交互式；help 看全部命令
 python agent_cli.py -c report  # 或跑单条命令
 ```
 
+**统一启动入口（推荐，v2.0 S11）**：
+
+```bash
+python launcher.py                      # 自动挑一个能跑的 UI（大盘 > Tk > CLI）
+python launcher.py --ui panel           # 强制用监控大盘（主 UI）
+python launcher.py --ui tk              # 强制用 Tk 离线备选
+python launcher.py --ui cli             # 直接进命令行（永可用）
+python launcher.py --dry-run --mock     # 离线演示：不碰键鼠 + 合成感知
+python launcher.py --ui auto --selftest # 只探测并打印选择结果（CI 用）
+```
+
+四套前端已收敛：`admin_panel.py`（纯标准库，主 UI）+ `ui_tkinter.py`（离线备选）；
+`ui/legacy/ui_pyqt.py`、`ui/legacy/ui_streamlit.py` 已归档，仅在显式 `--ui pyqt|streamlit` 时拉起。
+
 **一条命令拉起整套**：
 
 ```bash
@@ -114,7 +128,7 @@ bash start_all.sh    # 感知 + MCP + Agent 主循环 + 面板
 bash stop_all.sh     # 优雅停止
 ```
 
-监控面板：浏览器打开 <http://127.0.0.1:5002>
+监控面板：浏览器打开 <http://127.0.0.1:5002>（页面「运行模式」卡片显示在线/dry-run 与感知后端）
 
 ---
 
@@ -158,7 +172,10 @@ Universal-Game-Framework/
 ├── auto_tuner.py            # 自动调参
 ├── game_profile_check.py    # 档案自检
 ├── boot_check.py / watchdog.sh / Dockerfile / florr-agent.service.example  # 稳定性
-├── admin_panel.py           # 监控面板
+├── launcher.py              # 统一启动入口（v2.0：自动选 UI + 离线开关透传）
+├── admin_panel.py           # 监控大盘（主 UI，纯标准库）
+├── ui_tkinter.py            # 离线备选 UI
+├── ui/legacy/               # 已归档：ui_pyqt.py / ui_streamlit.py（DEPRECATED）
 ├── cli_ui.py                # 终端界面
 ├── config.py / config.yaml  # 参数 + 热加载
 ├── game_profiles/           # 游戏档案（florr.yaml）

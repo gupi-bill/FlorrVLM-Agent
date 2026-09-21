@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Universal-Game-Framework 可视化监控大盘 admin_panel.py  (v1.1)
+Universal-Game-Framework 可视化监控大盘 admin_panel.py  (v2.0 / S11：主 UI)
 =====================================================
 浏览器打开 http://127.0.0.1:5002 即可实时查看：
 - 指标卡片：当前游戏 / 会话状态 / 本局回合数 / 累计死亡 / 知识库规模 / 时间
@@ -8,6 +8,7 @@ Universal-Game-Framework 可视化监控大盘 admin_panel.py  (v1.1)
 - 决策信息：当前 decision / mindset / 推荐套装
 - 日志面板：run_logs/ 当天尾部(倒序自动滚动)
 - 资源占用：进程 CPU / 内存（有 psutil 用 psutil，否则回退 /proc）
+- 运行模式：在线 / dry-run + 感知后端（auto/mock/http），离线模式标黄（v2.0 S11）
 - 感知依赖：读不到快照时页面显示红色告警，而不是空白
 
 只读，不修改任何文件。纯标准库（psutil 可选）。
@@ -103,6 +104,33 @@ def _resources() -> dict:
     return {"cpu": -1, "mem_mb": -1}
 
 
+def _mode() -> dict:
+    """S11：当前运行模式（在线 / dry-run、真实感知 / mock 感知）。
+
+    大盘只做展示，不替用户决定模式；模式由 launcher.py 的 --dry-run / --mock
+    或环境变量 UGF_DRY_RUN / UGF_PERCEPTION_BACKEND 决定。
+    """
+    dry = os.environ.get("UGF_DRY_RUN") == "1"
+    backend = os.environ.get("UGF_PERCEPTION_BACKEND") or config.get(
+        "perception.backend", "auto")
+    if backend == "auto":
+        # auto 的实际结果取决于本机有没有截图工具 + YOLO，这里按依赖可探测性给个提示
+        try:
+            import perception_server  # noqa: F401
+            backend_label = "auto"
+        except Exception:
+            backend_label = "auto(不可用)"
+    else:
+        backend_label = backend
+    return {
+        "run": "dry-run（不碰真实键鼠）" if dry else "在线（真实操作）",
+        "perception": backend_label,
+        "label": ("dry-run" if dry else "在线") + " / "
+                 + ("mock" if backend_label == "mock" else backend_label),
+        "offline": dry or backend_label == "mock",
+    }
+
+
 def _status() -> dict:
     snap = _snapshot()
     st = _state()
@@ -134,6 +162,8 @@ def _status() -> dict:
         "avg_rounds": sts["avg_rounds"],
         "best_rounds": sts["best_rounds"],
         "recent": sts["recent"],
+        # v2.0 S11：运行模式（在线/dry-run + 感知后端）
+        "mode": _mode(),
     }
 
 
@@ -173,6 +203,7 @@ PAGE = """<!DOCTYPE html><html lang="zh"><meta charset="utf-8">
   <div class="card"><div class="lab">累计死亡</div><div class="val warn" id="deaths">—</div></div>
   <div class="card"><div class="lab">知识库</div><div class="val" id="kb">—</div></div>
   <div class="card"><div class="lab">CPU / 内存</div><div class="val" id="res">—</div></div>
+  <div class="card"><div class="lab">运行模式</div><div class="val" id="mode">—</div></div>
   <div class="card"><div class="lab">累计场次 / 回合(v1.5)</div><div class="val" id="sess">—</div></div>
 </div>
 <div class="row">
@@ -204,6 +235,8 @@ async function refresh(){
   document.getElementById('deaths').textContent=d.deaths;
   document.getElementById('kb').textContent=d.kb_count+' 篇 / '+d.kb_mb+' MB';
   document.getElementById('res').textContent=(d.cpu>=0?d.cpu+'%':'—')+' / '+d.mem_mb+'MB';
+  const m=document.getElementById('mode');m.textContent=d.mode.label;
+  m.className=d.mode.offline?'val warn':'val ok';m.title='运行: '+d.mode.run+' ｜ 感知: '+d.mode.perception;
   document.getElementById('sess').textContent=d.session_count+' 场 / '+d.total_rounds+' 回(均 '+d.avg_rounds+' · 最高 '+d.best_rounds+')';
   document.getElementById('hist').innerHTML=d.recent.map(h=>
     '<div class="thr"><span>'+(h.at||'')+'</span>'

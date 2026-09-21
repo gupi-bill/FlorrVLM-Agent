@@ -1,3 +1,17 @@
+"""
+⚠ DEPRECATED（S11 归档）：Streamlit 面板已不再是主 UI（依赖重、需常驻进程）。
+主 UI = admin_panel.py（纯标准库）；离线备选 = ui_tkinter.py。
+统一入口：`python launcher.py --ui auto`（可用 --ui streamlit 强制拉起本文件）。
+仅接受缺陷修复，不再新增功能。
+"""
+import os
+import sys
+
+# S11 归档到 ui/legacy/ 后，项目根目录不在 sys.path 里，这里补回
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 import streamlit as st
 import subprocess
 import os

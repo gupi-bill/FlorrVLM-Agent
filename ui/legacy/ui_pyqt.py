@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+"""
+⚠ DEPRECATED（S11 归档）：PyQt 桌面面板已不再是主 UI。
+主 UI = admin_panel.py（纯标准库，无重依赖）；离线备选 = ui_tkinter.py。
+统一入口：`python launcher.py --ui auto`（可用 --ui pyqt 强制拉起本文件）。
+仅接受缺陷修复，不再新增功能。
+"""
+import os
+import sys
+
+# S11 归档到 ui/legacy/ 后，项目根目录不在 sys.path 里，这里补回
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 """Universal Game Framework - PyQt6 Desktop GUI"""
 
 import sys
@@ -127,7 +141,7 @@ class GameFrameworkUI(QMainWindow):
     def on_detect(self):
         game = self.current_game
         self.append_log(f"▶️ 启动实体检测: {game}")
-        self.worker = WorkerThread(["python3", "agent_cli.py", "-c", "detect"], timeout=30)
+        self.worker = WorkerThread([sys.executable, "agent_cli.py", "-c", "detect"], timeout=30)
         self.worker.finished.connect(lambda out: self.append_log(f"✅ 检测完成\n{out[-300:]}"))
         self.worker.error.connect(lambda err: self.append_log(err))
         self.worker.start()
@@ -136,7 +150,7 @@ class GameFrameworkUI(QMainWindow):
         game = self.current_game
         self.append_log(f"▶️ 启动自动学习: {game}")
         self.worker = WorkerThread(
-            ["python3", "agent_cli.py", "--auto", "search", game, "basic guide"], timeout=90
+            [sys.executable, "agent_cli.py", "--auto", "search", game, "basic guide"], timeout=90
         )
         self.worker.finished.connect(lambda out: self.append_log(f"✅ 学习完成\n{out[-300:]}"))
         self.worker.error.connect(lambda err: self.append_log(err))
