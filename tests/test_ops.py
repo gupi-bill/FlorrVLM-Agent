@@ -276,3 +276,26 @@ def test_check_script_fast_gate_exit_zero():
 def test_check_script_rejects_unknown_flag():
     r = _run(["bash", "scripts/check.sh", "--nope"], env={"UGF_PYTHON": PY})
     assert r.returncode == 2
+
+
+# ------------------------------------------- 5. 回归：自检不得触发批量删除护栏
+def test_dir_writable_probe_does_not_delete():
+    """探针必须「零删除」：宿主 safe-delete 护栏（50 次/turn）会在全量测试时拦截
+    os.remove，导致自检误报『目录不可写』并拦下 start_all.sh（S12 实测踩到）。"""
+    import ast
+    src = open(os.path.join(BASE_DIR, "boot_check.py"), encoding="utf-8").read()
+    tree = ast.parse(src)
+    used = [n for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+            and n.func.attr in ("remove", "unlink", "rmtree")]
+    assert not used, f"boot_check 内不得调用删除类 API（会被删除护栏拦截）: {used}"
+    ok, err = boot_check._dir_writable(os.path.join(BASE_DIR, "run_logs"))
+    assert ok, f"run_logs 应可写: {err}"
+
+
+def test_dir_writable_detects_bad_path(tmp_path):
+    """不可写/不可建目录必须被识别（用一个文件冒充目录，makedirs 必然失败）。"""
+    f = tmp_path / "not_a_dir"
+    f.write_text("x")
+    ok, _ = boot_check._dir_writable(str(f))
+    assert not ok

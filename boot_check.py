@@ -95,6 +95,26 @@ def config_ports() -> dict:
     }
 
 
+def _dir_writable(path: str) -> tuple:
+    """可写性探测：返回 (是否可写, 错误描述)。
+
+    ⚠️ 这里**刻意不做 os.remove 清理**：宿主环境有 safe-delete 批量删除护栏
+    （阈值 50 次/turn），全量测试期间累计删除很容易超过阈值，导致探针删除被拦截
+    并抛错 → 自检误报「目录不可写」并把 start_all.sh 拦下（S12 实测踩到）。
+    故探针改为「复用同一个文件 + 追加打开」，全程零删除；残留文件仅一个空文件，
+    由 stop_all.sh 顺带清理。
+    """
+    try:
+        os.makedirs(path, exist_ok=True)
+        if not os.access(path, os.W_OK):
+            return False, "权限不足（os.access W_OK=False）"
+        with open(os.path.join(path, ".write_probe"), "a", encoding="utf-8"):
+            pass
+        return True, ""
+    except OSError as e:
+        return False, str(e)
+
+
 def _issue(level, msg, fix=None, degrade=None) -> dict:
     it = {"level": level, "msg": msg}
     if fix:
@@ -153,14 +173,9 @@ def _check() -> list:
     # 7. 目录可写
     for rel in NEEDED_DIRS:
         d = os.path.join(BASE_DIR, rel)
-        try:
-            os.makedirs(d, exist_ok=True)
-            probe = os.path.join(d, ".write_probe")
-            with open(probe, "w", encoding="utf-8") as f:
-                f.write("ok")
-            os.remove(probe)
-        except OSError as e:
-            issues.append(_issue("ERROR", f"目录不可写: {rel}（{e}）",
+        ok, err = _dir_writable(d)
+        if not ok:
+            issues.append(_issue("ERROR", f"目录不可写: {rel}（{err}）",
                                  f"chmod 或换个可写路径: {rel}"))
 
     # 8. 运维脚本一致性
