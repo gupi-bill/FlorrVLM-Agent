@@ -374,11 +374,24 @@ def _fallback_decide(game_state_str: str, combat_eval_str: str,
         return {"action": "idle"}
 
     decision = ev.get("decision", "fight")
-    # 知识优先：命中条目能给出动作倾向时，直接采用
+    # 知识加权：S20 起需先过「局面闸门」（空场/满血优势局不该被"知识里写了撤退"带偏），
+    # 通过后才由命中条目给出动作倾向。
     try:
         import knowledge_loop
-        kb_action = knowledge_loop.apply_tactics(
-            decision, knowledge_loop.extract_tactics(kb_tactics))
+        pl = state.get("player") if isinstance(state.get("player"), dict) else {}
+        try:
+            hp = float(pl.get("hp", 0) or 0)
+            max_hp = float(pl.get("max_hp", 0) or 0)
+            hp_ratio = hp / max_hp if max_hp > 0 else 1.0
+        except (TypeError, ValueError):
+            hp_ratio = 1.0
+        try:
+            threat_ratio = float(ev.get("threat_ratio", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            threat_ratio = 0.0
+        kb_action = knowledge_loop.decide_action(
+            decision, knowledge_loop.extract_tactics(kb_tactics),
+            hp_ratio=hp_ratio, threat_ratio=threat_ratio)
         if kb_action:
             return {"action": kb_action, "source": "kb"}
     except Exception:

@@ -224,6 +224,43 @@ def apply_tactics(decision: str, tactics: list) -> str:
     return ""
 
 
+# v2.0 S20：S18 实测暴露「知识优先级过硬」—— 空场也一路防守。知识应当是
+# **局面相关的加权意见**，而不是无条件覆盖战斗评估的硬规则。
+KB_GATE_HP = 0.6        # 血量低于此比例时，撤退/保持距离类知识才生效
+KB_GATE_THREAT = 1.0    # 威胁比高于此值时，谨慎类知识生效
+
+
+def knowledge_gate(decision: str, tactics: list, hp_ratio: float = 1.0,
+                   threat_ratio: float = 0.0) -> bool:
+    """判断知识此刻是否应当影响决策。
+
+    - 场上无威胁（threat_ratio<=0）→ 不生效：空场不该因为"知识里写了撤退"就一直防守
+    - retreat            → 生效：知识强化逃生
+    - cautious_fight     → 仅在低血量或高威胁时生效
+    - fight              → 仅在局面占优时生效（知识指导集火）
+    """
+    if not tactics:
+        return False
+    threat_ratio = float(threat_ratio or 0.0)
+    if threat_ratio <= 0:
+        return False
+    if decision == "retreat":
+        return True
+    if decision == "cautious_fight":
+        return float(hp_ratio or 1.0) < KB_GATE_HP or threat_ratio > KB_GATE_THREAT
+    if decision == "fight":
+        return threat_ratio < KB_GATE_THREAT
+    return False
+
+
+def decide_action(decision: str, tactics: list, hp_ratio: float = 1.0,
+                  threat_ratio: float = 0.0) -> str:
+    """闸门 + 规则映射：返回受知识影响的动作，未通过闸门返回空串。"""
+    if not knowledge_gate(decision, tactics, hp_ratio, threat_ratio):
+        return ""
+    return apply_tactics(decision, tactics)
+
+
 def decide_with_knowledge(decision: str, kb_text: str, stats: "LearningStats" = None,
                           keyword: str = "", game: str = None) -> tuple:
     """``(动作, 是否引用了知识)``：命中且产生规则才算一次有效引用。"""

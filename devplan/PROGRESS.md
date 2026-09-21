@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`RELEASED | F线 | 2026-09-22T05:56 | S19`
+`LOCK | F线 | 2026-09-22T06:05 | S20`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -43,7 +43,7 @@
 | S17 | 接入流程一键化（onboard） | ✅ 完成 | 04:06~04:26 (E线) | `tools/onboard_game.py`（生成→校验→冒烟→试跑→报告五环节流水线 + `--json`），`tests/test_onboard_game.py`(20)，`devplan/onboard_demo_arcade.md`、`devplan/onboard_space_invaders.md` 两份接入报告（含一款全新虚构游戏 demo_arcade），`game_profiles/demo_arcade.yaml`；`agent_cli.py` 接入 `onboard`（帮助清单 + `-c` 注册表 + 交互分支 + subprocess 导入）；修复 3 个真实缺陷；**803 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S18 | 知识闭环实证（学→检索→决策→复盘→回写） | ✅ 完成 | 05:28~05:45 (F线) | `knowledge_loop.py`（seed/检索/战术抽取/三计数指标）、`tests/test_knowledge_loop.py`(32)、`devplan/KB_LOOP_S18.md`；CLI 新增 `kb_seed`/`kb_stats`；`agent_main` 3 处修复：kb_search 补 game_name(D1) / `_fallback_decide` 吃知识(D2) / 指标结构化可查询(D3)；**835 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S19 | 学习链路离线化（视频→战术入库） | ✅ 完成 | 05:45~05:56 (F线) | `tests/test_video_learner.py`(27)、`devplan/LEARN_S19.md`；`video_learner.py` 可注入改造：`synthesize_frames`(纯标准库 PNG)/`extract_frames_offline`/`set_vlm_provider`+`_stub_vlm`/`learn_from_video`(结构化结果)/`set_frame_dir`/`cleanup_temp_frames` 返回 bool；CLI `--synthetic`/`--game`/`--keep-frames`；修复 4 个缺陷：入库不分区致学→检索断链(D4)/短中文战术被丢弃(D5)/去重形同虚设(D6)/清理不可断言(D7)；**862 用例全绿** |
-| S20 | 决策场景矩阵（战斗/组队/心态/边界） | ⬜ 待执行 | | |
+| S20 | 决策场景矩阵（战斗/组队/心态/边界） | ✅ 完成 | 05:58~06:05 (F线) | `tests/test_decision_scenarios.py`(38)、`devplan/SCENARIOS_S20.md`（11 战斗 + 4 组队 + 7 心态 + 12 闸门实测值）；`knowledge_loop` 新增 `knowledge_gate`/`decide_action`+`KB_GATE_HP`/`KB_GATE_THREAT`；`agent_main._fallback_decide` 由「知识无条件优先」改为「先过局面闸门」；修正 S18 归因：14 轮全 defend 的真实原因是 mock 含 boss(mantis 威胁 400) 决策本就 retreat；**900 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S21 | 测试门禁与可观测性固化 | ⬜ 待执行 | | |
 | S22 | 稳定性长跑与资源门禁 | ⬜ 待执行 | | |
 | S23 | 安全与合规加固 | ⬜ 待执行 | | |
@@ -633,3 +633,23 @@
   - 遗留：真实 cv2 抽帧与真实 VLM HTTP 分支本机仍不可验证（无 cv2 / 无密钥），需真机补验；
     去重阈值对近义不同措辞无效（"立即撤退" vs "马上撤"），需语义相似度；`video_sources` 依赖
     yt-dlp 与联网，本阶段未改造。
+
+- **2026-09-22 05:58~06:05 · S20 · 决策场景矩阵（战斗/组队/心态/边界）**
+  - 做了什么：
+    1. 新建 `tests/test_decision_scenarios.py`(38)：覆盖 PLAN 点名的全部场景 —— 以少打多 /
+       被包围 / 队友输出型 / 队友抗伤型 / 血量极低 / 实体突增突减 / 感知返回空 / 坐标全 NaN /
+       超高频抖动 / highest_boss 强弱两态 / 未知档位 / 实力为 0。
+    2. `knowledge_loop` 新增 `knowledge_gate()` / `decide_action()` 与阈值 `KB_GATE_HP`(0.6)、
+       `KB_GATE_THREAT`(1.0)：空场一律不干预；retreat 放行；cautious_fight 需低血量或高威胁；
+       fight 仅在占优时放行。`agent_main._fallback_decide` 改为先过闸门再用知识。
+    3. **修正 S18 的归因错误**：S18 把「14 轮动作全是 defend」记为「知识优先级过硬」。
+       本阶段查监控快照发现 mock 场景含 `mantis`(boss 档，威胁 400)，
+       `decision=retreat / mindset=conservative / set=retreat` —— **撤退是正确决策，不是缺陷**。
+       闸门仍有价值（防「空场被知识带偏」），已由用例矩阵锁定，并在 SCENARIOS_S20 §4 说明。
+    4. `tests/test_knowledge_loop.py` 补「空场/优势局不应用知识」回归断言。
+  - 产物：`tests/test_decision_scenarios.py`(38)、`devplan/SCENARIOS_S20.md`、
+    `knowledge_loop` 闸门、`agent_main` 决策加权。
+  - 测试结果：`pytest tests/test_decision_scenarios.py -q` 38 passed；
+    `pytest tests/ -q` **900 passed**；`bash scripts/check.sh` 退出码 0。
+  - 遗留：场景期望值是与当前实现一致的基线快照（characterization test），若认为某结论不合理
+    应先改实现再改表；组队协同只按队友套装数量判断，未考虑血量/距离。

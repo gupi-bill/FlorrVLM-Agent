@@ -182,14 +182,25 @@ def test_fallback_decide_is_knowledge_driven(kb, monkeypatch):
     knowledge_loop.seed_knowledge("florr")
     text, _hit = knowledge_loop.retrieve("florr", "战术")
 
-    ev = json.dumps({"decision": "cautious_fight"}, ensure_ascii=False)
-    state = json.dumps({"afk_popup": False}, ensure_ascii=False)
+    # 低血量 + 高威胁：知识应当生效（S20 闸门放行）
+    ev = json.dumps({"decision": "cautious_fight", "threat_ratio": 1.5},
+                    ensure_ascii=False)
+    state = json.dumps({"afk_popup": False, "player": {"hp": 20, "max_hp": 100}},
+                       ensure_ascii=False)
 
     without_kb = agent_main._fallback_decide(state, ev)
     with_kb = agent_main._fallback_decide(state, ev, text)
     # 有知识与无知识的动作必须不同，否则说明知识没进入决策
     assert with_kb.get("source") == "kb"
     assert with_kb != without_kb
+
+    # S20 回归：空场/满血优势局不该被"知识里写了撤退"带偏
+    safe_ev = json.dumps({"decision": "cautious_fight", "threat_ratio": 0.0},
+                         ensure_ascii=False)
+    safe_state = json.dumps({"afk_popup": False, "player": {"hp": 100, "max_hp": 100}},
+                            ensure_ascii=False)
+    safe = agent_main._fallback_decide(safe_state, safe_ev, text)
+    assert safe.get("source") != "kb"
 
 
 # ---------------------------------------------------------------------------
