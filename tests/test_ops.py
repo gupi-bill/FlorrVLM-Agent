@@ -236,3 +236,29 @@ def test_watchdog_python_override_and_dry_run_passthrough():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+# ---------------------------------------------------------------- 4. 门禁（S13 预热）
+def test_check_script_fast_gate_exit_zero():
+    r = _run(["bash", "scripts/check.sh", "--fast"], env={"UGF_PYTHON": PY}, timeout=300)
+    assert r.returncode == 0, r.stdout + r.stderr
+    for stage in ("语法编译", "启动自检", "游戏档案校验", "pytest"):
+        assert stage in r.stdout, f"门禁应逐阶段打印: {stage}"
+
+
+def test_check_script_rejects_unknown_flag():
+    r = _run(["bash", "scripts/check.sh", "--nope"], env={"UGF_PYTHON": PY})
+    assert r.returncode == 2
+
+
+# ---------------------------------------------------------------- 4. 门禁（S13 预热）
+def test_check_script_fast_gate_exit_zero():
+    r = _run(["bash", "scripts/check.sh", "--fast"], env={"UGF_PYTHON": PY}, timeout=300)
+    assert r.returncode == 0, r.stdout + r.stderr
+    for stage in ("语法编译", "启动自检", "游戏档案校验", "pytest"):
+        assert stage in r.stdout, f"门禁应逐阶段打印: {stage}"
+
+
+def test_check_script_rejects_unknown_flag():
+    r = _run(["bash", "scripts/check.sh", "--nope"], env={"UGF_PYTHON": PY})
+    assert r.returncode == 2

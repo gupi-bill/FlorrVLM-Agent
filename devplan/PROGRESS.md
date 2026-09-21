@@ -36,7 +36,7 @@
 | S10 | 游戏档案体系固化 | ✅ 完成 | 23:02~23:2x (C线) | `tests/test_game_profiles.py`(38)、`devplan/PROFILE_SPEC.md`；`florr.yaml` 补 port/sets/tactics、`tools/add_game.py` v2.0（生成即通过 strict 自检）、`agent_cli.py validate` 支持 `--strict`；**652 用例全绿** |
 | S11 | UI 收敛与统一启动器 | ✅ 完成 | 23:16~23:36 (C线) | `launcher.py`（auto/panel/tk/cli + `--selftest`/`--list` + dry-run·mock 透传）、`tests/test_launcher.py`(26)、`ui/legacy/` 归档 pyqt/streamlit（含弃用头 + 路径 bootstrap + `python3`→`sys.executable`）、`admin_panel.py` 运行模式卡片、README 启动章节；**678 用例全绿** |
 | S12 | 运维脚本与容器一致性 | ✅ 完成 | 23:31~23:47 (D线) | `devplan/OPS.md`、`tests/test_ops.py`(21)；`boot_check.py` v2.0 分级自检（core=ERROR / GUI·YOLO·可选库=WARN+降级指引 / 新增 `--strict`·`--json`·`--no-ops` / `check_ops()` 运维口径校验）；`start_all.sh` v2.0（`--dry-run`/`--no-check`/`--help`、`UGF_PYTHON`/`UGF_DRY_RUN`/`UGF_FOREGROUND`、端口改从 config.yaml 现读）；`stop_all.sh` v2.0（dry-run + 优雅终止 + 日志轮转 + 失效 pid 清理）；`watchdog.sh` 解释器覆盖；`Dockerfile` v2.0（opencv→headless、EXPOSE 5001/5002、前台模式）；**699 用例全绿** |
-| S13 | 测试套件固化与文档同步 | ⬜ 待执行 | | |
+| S13 | 测试套件固化与文档同步 | 🟡 进行中 | 23:50~23:56 (D线，部分) | `scripts/check.sh`（一条命令门禁：compileall → boot_check --fail-fast → game_profile_check --all → pytest，支持 `--fast`/`--help`，失败退出码=环节编号）+ `tests/test_ops.py` 增至 23 用例；**未完成：README/PROJECT_SUMMARY/ROADMAP 文档同步（`tests/conftest.py` 已存在，无需重建）** |
 | S14 | 最终验收与归档 | ⬜ 待执行 | | |
 | S15 | 第二款游戏端到端跑通（space_invaders） | ⬜ 待执行 | | |
 | S16 | 参考适配器模板与档案规范固化 | ⬜ 待执行 | | |
@@ -442,3 +442,5 @@
     - `stop_all.sh` 只按 mtime 轮转日志，未按体积封顶；磁盘紧张场景可再加 `UGF_LOG_MAX_MB`。
     - 非 dry-run 的真实启停（4 个进程 + 端口占用）在本机无 GUI 下仍需宿主机实测一次；本轮只保证"不起副作用"的干跑可验收。
     - 全量 pytest 曾出现一次 8 失败的瞬时结果（同目录下有并发写入），随后独立重跑 699 全绿；疑似与并行自动化线同时写文件有关，未复现。
+
+2026-09-21 23:56 · S13(部分) · 本轮 25 分钟预算内 S12 完成后仍有余量，按「预算有余则继续下一阶段」规则开工 S13 的可验收核心：新建 `scripts/check.sh` 一条命令门禁（compileall → boot_check --fail-fast → game_profile_check --all → pytest，`--fast` 秒级跑、`--help`、未知参数退 2、失败退出码=环节编号），`tests/test_ops.py` 补 2 用例（门禁 fast 全程退 0 且逐阶段打印 / 未知参数 2），现 23 用例。实测 `bash scripts/check.sh --fast` 退出码 0（语法 OK + 自检 ERROR 0/WARN 5 + 两份档案 ✅）。**未做**：README / PROJECT_SUMMARY / ROADMAP 三份文档同步（工作量大，超出本轮余量），移交下一轮；故 S13 标记为 🟡 而非 ✅。
