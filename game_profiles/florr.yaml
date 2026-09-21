@@ -28,5 +28,25 @@ predictor:
     player_ally: 0
     unknown: 5
 
+# 感知端口：每款游戏一个端口，多游戏并行时不会都挤在 5001
+#（florr 用默认 5001；space_invaders 用 5011）
+server:
+  perception_port: 5001
+
 combat:
   chase_min_category: elite      # 追击套最低怪物档次（默认取本档案的高价值怪）
+  default_set: combat            # 必须出现在下面的 sets 里
+  # 套装清单：与 combat_judge 的 recommended_set、mcp_server.switch_set 的键位映射
+  #（combat→1 / tank→2 / retreat→3 / chase→4 / team→5）保持同名，否则换套会落到「未知套装」
+  sets:
+    - combat                     # 常规输出
+    - tank                       # 高威胁缠斗，保命优先
+    - retreat                    # 逃生跑图
+    - chase                      # 追击高价值怪
+    - team                       # 组队辅助
+  # 战术模板（会写进知识库，供决策时检索引用）
+  tactics:
+    - "低血量且附近有 Ultra 及以上怪物时立即切 retreat，不要恋战"
+    - "Unique/Eternal 级 BOSS 出现即避战，等其转移或队友吸引仇恨后再回场"
+    - "Mythic/Legendary 在血量充足且距离安全时可主动 chase，注意留一个位移技能"
+    - "组队时优先保护队友输出位，team 套的收益高于个人击杀数"

@@ -441,17 +441,31 @@ def _cmd_report() -> str:
 
 
 def _cmd_validate(game: str) -> str:
-    """v1.8 游戏档案自检。"""
+    """v2.0 游戏档案自检：区分 ERROR 与建议项，支持 `--strict`（建议项也算不通过）。
+
+    例：`validate florr` / `validate space_invaders --strict`
+    """
     try:
         import game_profile_check
-        name = (game or "").strip() or None
-        if name is None:
-            name = ACTIVE_GAME
-        ok, problems = game_profile_check.check_one(name)
-        lines = [f"[{'✅' if ok else '❌'}] 档案自检: {name}"] + \
-                [f"  - {p}" for p in problems]
-        lines.append("  ✓ 档案完整，可以 play" if ok
-                     else "  ✗ 请先修复或用 tools/add_game.py 重新登记")
+        parts = (game or "").split()
+        strict = "--strict" in parts
+        parts = [p for p in parts if not p.startswith("--")]
+        name = (parts[0] if parts else "") or ACTIVE_GAME
+        if hasattr(game_profile_check, "check_detail"):
+            detail = game_profile_check.check_detail(name)
+            ok = detail["ok"] and not (strict and detail["warnings"])
+            lines = [f"[{'✅' if ok else '❌'}] 档案自检: {name}"
+                     + ("（strict：建议项也算不通过）" if strict else "")]
+            lines += [f"  ✗ {p}" for p in detail["errors"]]
+            lines += [f"  ⚠ {p}" for p in detail["warnings"]]
+        else:  # 老版本兼容
+            ok, problems = game_profile_check.check_one(name)
+            lines = [f"[{'✅' if ok else '❌'}] 档案自检: {name}"] + \
+                    [f"  - {p}" for p in problems]
+        if ok:
+            lines.append("  ✓ 档案完整，可以 play")
+        else:
+            lines.append("  ✗ 请先修复或用 tools/add_game.py 重新登记")
         return "\n".join(lines)
     except Exception as e:
         return chip(f"自检不可用: {e}", "err")

@@ -13,7 +13,7 @@
 
 ### 运行锁
 
-`RELEASED | — | 2026-09-21T21:40 | —`
+`LOCK | C线(23:00一次性) | 2026-09-21T23:02 | S10`
 
 （格式：`状态 | 线名 | ISO时间 | 阶段`。取锁时改为 `LOCK | <线名> | <时间> | <阶段>`）
 
@@ -33,7 +33,7 @@
 | S7 | 主循环 dry-run | ✅ 完成 | 05:11~05:34 (A线) | `agent_main.py` dry-run 分支 + `--rounds` 别名 + 软失败检测；`mcp_server.py` 补注册 `kb_append`、stdout→stderr、进程内 mock 感知降级；`perception_server.py` mock 漂移改累计时间基准；`tests/test_agent_main.py`(87)；`devplan/SMOKE_S7.md`；457 用例全绿 |
 | S8 | CLI 全命令冒烟 | ✅ 完成 | 06:00~06:30 (A线) | `tools/cli_smoke.py`(31 条命令矩阵，可复用为门禁)、`tests/test_agent_cli.py`(48 用例)、`devplan/SMOKE_S8.md`；`agent_cli.py` 9 处修复：补齐未定义的 `_append_log`、`-c` 一次性模式彻底禁用交互提问、补 help/play/auto 与 `--auto search`、`unload` 跨进程恢复、kb_* 支持游戏名第二参数、交互模式补 kb_* 分支、帮助清单补登记、删 `_run_auto` 死代码 |
 | S9 | MCP 工具注册验证 | ✅ 完成 | 06:39~07:10 (B线) | `tools/mcp_tools_check.py`(15 工具核对/调用/往返三检)、`tests/test_mcp_server.py`(109 用例)、`devplan/TOOLS.md`；`mcp_server.py` 10 处修复（路径穿越/向量开关死配置/dry-run 动作校验）、`kb_maintainer.py` 往返保真修复；`requirements.txt` mcp 放宽至 `>=1.0.0` |
-| S10 | 游戏档案体系固化 | 🟡 进行中（23:00 自动化接手） | | 人工预改：`game_profile_check.py` 语义版、`space_invaders.yaml` 重排金字塔 |
+| S10 | 游戏档案体系固化 | ✅ 完成 | 23:02~23:2x (C线) | `tests/test_game_profiles.py`(38)、`devplan/PROFILE_SPEC.md`；`florr.yaml` 补 port/sets/tactics、`tools/add_game.py` v2.0（生成即通过 strict 自检）、`agent_cli.py validate` 支持 `--strict`；**652 用例全绿** |
 | S11 | UI 收敛与统一启动器 | ⬜ 待执行 | | |
 | S12 | 运维脚本与容器一致性 | ⬜ 待执行 | | |
 | S13 | 测试套件固化与文档同步 | ⬜ 待执行 | | |
@@ -373,3 +373,24 @@
   - 验证：`game_profile_check.py --all` → florr ✅(3 条建议) + space_invaders ✅；`pytest -q` → **614 passed**（无回归）。
   - **待 23:00 自动化续做**：① florr.yaml 补 sets/tactics/port（3 条建议）② `tools/add_game.py` 的 `render_yaml` 要吐出推荐字段，保证"生成即通过 validate" ③ `tests/test_game_profiles.py`（≥12 用例：重复档位/金字塔倒置/负分/名字不一致/未知键/default_set 越界/mock rarity 未声明/切 AGENT_GAME 后核心读到新值）④ `devplan/PROFILE_SPEC.md` ⑤ 全量 pytest 后提交并改本表 S10 为 ✅。
 2026-09-21 22:28 · — · 用户澄清：不要人工提前做，由 23:00 的自动化实施。人工部分到此为止（仅保留上面两处地基改动，已验证无回归）。
+
+- **2026-09-21 23:15 · S10 · 游戏档案体系固化（game_profiles/ + game_profile_check.py）**
+  - 起点判定：运行锁为 `RELEASED`（21:40 释放），S10 是首个非 ✅ 阶段（🟡 人工预改），当前 23:02 < 07:00，故开工。（提示词写"从 S9 续跑"，但 S9 已于 07:10 完成、PROGRESS 也点名"23:00 首轮直接从 S10 开始"，按文件规则执行。）
+  - 做了什么：
+    1. **`florr.yaml` 补齐 3 条建议项**：`server.perception_port: 5001`、`combat.sets`（combat/tank/retreat/chase/team，与 `combat_judge.recommended_set` + `mcp_server.SET_TO_KEY` 键位同名）、`combat.default_set: combat`、`combat.tactics` 4 条。至此两份档案 `--strict` 全过。
+    2. **`tools/add_game.py` 升 v2.0（生成即通过 validate）**：`render_yaml` 由 6 段扩到全字段（port / sets / default_set / tactics / `perception.mock` 实体按已声明档位合成）；新增 `_next_port()` 扫描已占用端口按步长 10 避让、`_sanitize_name()` 保证「文件名 == game.name」、`_q()` 用 JSON 双引号转义描述与战术（冒号/引号不再写坏 YAML）；`activate_game()` 改为精确命中 `agent:` 段下的 `game:`（旧版 `count=1` 全局替换会误伤其它同名键）；新增 `selfcheck()` 按 **strict 口径**（ERROR 与 WARN 均为 0）自检，非 0 时进程退出码 1；新增 `--print` / `--no-activate`；`_ask()` 增加 `UGF_NONINTERACTIVE` 开关（本机 stdin 判定为 tty，无人值守会卡死 —— 实测触发过一次后台挂起，已修）。
+    3. **新建 `tests/test_game_profiles.py`（38 用例）**：真实档案 strict 通过 4；语义错误 12（跨档重复 / 金字塔倒置 2 组 / 负分 / 名字不一致 / 未知顶层键 / default_set 越界 / sets 非字符串 / mock 稀有度未声明 / 缺 threat 键 / 档案不存在 / YAML 语法错 / 根节点非映射）；建议项只降级不阻断 1；`check_all` 口径 5（含"退出码永远 0"回归、`_` 模板跳过、strict 计建议）；**切游戏核心读到新值** 3（space_invaders boss=800/port=5011/sets=shoot… ↔ florr 400/5001/…，并锁"列表是替换而非拼接"不串档）；生成器 5（strict 自检 / mock 稀有度合法 / 特殊字符转义 / 端口避让 / 名字安全化）；`activate_game` 3。
+    4. **`agent_cli.py` 的 `validate` 支持 `--strict`**：改用 `check_detail()` 分别列出 ✗ ERROR 与 ⚠ 建议项，保留老 API 兼容分支。
+    5. 新增 `devplan/PROFILE_SPEC.md`：优先级链、顶层键表、字段细则、ERROR/WARN 分级与命令、新增游戏流程、现状表、遗留。
+  - 产物：`tests/test_game_profiles.py`、`devplan/PROFILE_SPEC.md`、`tools/add_game.py`(M v2.0)、`game_profiles/florr.yaml`(M)、`agent_cli.py`(M)
+  - 测试结果：
+    - `python -m pytest tests/ -q` → **652 passed**（S9 的 614 + 本轮 38，0 failed）✅
+    - `python game_profile_check.py --all --strict` → florr ✅ + space_invaders ✅，退出码 0（此前 florr 有 3 条建议）✅
+    - `agent_cli.py -c "validate florr"` / `... space_invaders` 均 ✅ 通过；加 `--strict` 同样 ✅；`validate nope` 给出可读报错 ✅
+    - 生成器实证：`render_yaml(collect('demo_game'))` 解析后 keys 齐全（port 5021 / 5 套装 / 4 个 mock 实体 rarity 全部合法），落盘后 strict 自检 `ok=True errors=[] warnings=[]` ✅
+    - `compileall -q .` 退出码 0；`git status` 仅 6 项预期变更，无临时档案残留 ✅
+  - 遗留（未在本轮处理，记录备查）：
+    - **`switch_set` 的键位映射是 florr 专属**（`SET_TO_KEY` 写死 combat/tank/retreat/chase/team→1~5），space_invaders 的 `shoot`/`dodge` 换套会落到"未知套装"。多游戏应按档案 `sets` 顺序映射按键，移交 **S15**。
+    - florr 的离线 mock 场景仍在 `config.yaml`，档案自身未声明 `perception.mock`（"一份档案一份离线场景"未完全落地），移交 **S15**。
+    - 校验器只做静态语义校验，不验证"档案值在实际对局里是否合理"（如威胁分是否过激），需实机数据，本机不可验证。
+    - `tools/add_game.py` 的交互向导在无 tty 时全程走默认值，未在真实交互终端下人工试用（本机无交互终端）。
