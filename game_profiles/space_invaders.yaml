@@ -1,33 +1,73 @@
-# Universal-Game-Framework 游戏档案 florr.yaml
-# ====================================
-# v0.9 —— 每个游戏一份档案。核心模块(predictor/combat_judge/agent_main)只认这些
-# 键的语义，不认具体游戏名。切换游戏 = 设 AGENT_GAME 指向另一份档案，核心零改动。
+# Universal-Game-Framework 游戏档案 space_invaders.yaml
+# ====================================================
+# 一款游戏一份档案。核心模块(predictor/combat_judge/agent_main)只认这些键的语义，
+# 不认具体游戏名。切换游戏 = 设 AGENT_GAME / config.yaml 的 agent.game 指向本档案，核心零改动。
 #
-# 优先级：DEFAULT 兜底 < config.yaml(通用项) < 本档案(游戏专属项)。
-# config.py 启动/热加载时读取 AGENT_GAME(=config.yaml 里 agent.game) 合并本档案。
+# 优先级：DEFAULT 兜底 < config.yaml(通用项) < 本档案(游戏专属项) < tuned_overrides.yaml。
+#
+# S10 修订说明：原档案把 "boss" 同时写进 highest_boss 与 boss 两档（分档自相矛盾，
+# 分类结果不确定），且母舰/无人机/群兵的档位与其注释互相打架。现按实体体系重排金字塔。
 
 # 游戏元信息
 game:
   name: space_invaders
-  description: 经典街机游戏，控制光子射击者防御地球，消灭入侵的外星人。
+  description: 经典街机射击，控制光子炮台消灭层层下压的外星人编队，母舰出现时高分高威胁。
+
+# 感知端口：每款游戏一个端口，多游戏并行时不会都挤在 5001
+server:
+  perception_port: 5011
 
 # 实体分类（太空侵略者实体体系）
-# 定义： player, mothership, alien_drone, alien_swarmer, alien_boss
+# 金字塔：mothership(最高) > alien_boss > alien_drone > alien_swarmer
 predictor:
-  # 稀有度链（此处保持框架默认，实际游戏中可自定义）
-  rarity_highest_boss: ["boss"]   # 最高威胁 - 邪恶母舰
-  rarity_boss: ["boss"]           # BOSS 类别
-  rarity_elite: ["mothership"]    # 精英 - 母舰
-  rarity_normal: ["alien_drone", "alien_swarmer"]  # 普通 - 基本外星人
-  # 分类 -> 威胁分数（战斗评估判断打/跑/追）
+  rarity_highest_boss: ["mothership"]      # 母舰 —— 高分且高威胁，出现即优先集火
+  rarity_boss: ["alien_boss"]              # 编队首领
+  rarity_elite: ["alien_drone"]            # 无人机 —— 会俯冲，中等威胁
+  rarity_normal: ["alien_swarmer"]         # 群兵 —— 数量多，单体低威胁
+  # 分类 -> 威胁分数（战斗评估判断打/跑/追，必须满足 highest_boss ≥ boss ≥ elite ≥ normal）
   threat:
-    highest_boss: 2000            # 邪恶母舰 - 极高威胁
-    boss: 800                      # 母舰 - 高威胁
-    elite: 100                     # 基本外星人 - 中等威胁
-    normal: 20                     # 最小外星人 - 低威胁
-    player_enemy: 100              # 对手玩家/军团威胁
-    player_ally: 0                 # 队友 - 无威胁
-    unknown: 10                    # 未知实体
+    highest_boss: 2000
+    boss: 800
+    elite: 100
+    normal: 20
+    player_enemy: 100
+    player_ally: 0
+    unknown: 10
 
 combat:
   chase_min_category: elite      # 追击套最低怪物档次
+  default_set: shoot             # 必须出现在下面的 sets 里
+  # 套装清单（切套装与大盘展示会用到；实际切换动作仍由 game_action 的 switch_set 执行）
+  sets:
+    - shoot                      # 常规射击
+    - dodge                      # 躲避弹幕
+    - focus_mothership           # 母舰集火
+  # 战术模板（会写进知识库，供决策时检索引用）
+  tactics:
+    - "优先清除最下排外星人：编队下压到炮台高度即判负，宁可放弃母舰分也要清底排"
+    - "母舰出现时切 focus_mothership 集火，高分且会持续增加编队压力"
+    - "保持横向机动躲弹，不站桩输出；被两侧夹击时优先向弹幕稀疏侧转移"
+    - "编队只剩少量残兵时降低风险，避免为追最后一两只被俯冲无人机撞死"
+
+# 离线 / mock 感知数据：无 YOLO、无真机时用于跑通全链路与演示
+# rarity 必须落在上面已声明的档位里，否则 game_profile_check 会报错
+perception:
+  mock:
+    drift: true
+    afk_popup: false
+    player:
+      alive: true
+      hp: 100
+      max_hp: 100
+      x: 960
+      y: 980
+      power_score: 100
+      petal_set: shoot
+      talent: none
+    entities:
+      - {raw_id: alien_swarmer, rarity: alien_swarmer, x: 300, y: 260, vx: 40, vy: 0}
+      - {raw_id: alien_swarmer, rarity: alien_swarmer, x: 700, y: 260, vx: 40, vy: 0}
+      - {raw_id: alien_swarmer, rarity: alien_swarmer, x: 1100, y: 320, vx: 40, vy: 0}
+      - {raw_id: alien_drone, rarity: alien_drone, x: 1500, y: 400, vx: -120, vy: 60}
+      - {raw_id: alien_boss, rarity: alien_boss, x: 960, y: 180, vx: 60, vy: 0}
+      - {raw_id: mothership, rarity: mothership, x: 1700, y: 120, vx: -90, vy: 0}

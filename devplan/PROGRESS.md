@@ -33,7 +33,7 @@
 | S7 | 主循环 dry-run | ✅ 完成 | 05:11~05:34 (A线) | `agent_main.py` dry-run 分支 + `--rounds` 别名 + 软失败检测；`mcp_server.py` 补注册 `kb_append`、stdout→stderr、进程内 mock 感知降级；`perception_server.py` mock 漂移改累计时间基准；`tests/test_agent_main.py`(87)；`devplan/SMOKE_S7.md`；457 用例全绿 |
 | S8 | CLI 全命令冒烟 | ✅ 完成 | 06:00~06:30 (A线) | `tools/cli_smoke.py`(31 条命令矩阵，可复用为门禁)、`tests/test_agent_cli.py`(48 用例)、`devplan/SMOKE_S8.md`；`agent_cli.py` 9 处修复：补齐未定义的 `_append_log`、`-c` 一次性模式彻底禁用交互提问、补 help/play/auto 与 `--auto search`、`unload` 跨进程恢复、kb_* 支持游戏名第二参数、交互模式补 kb_* 分支、帮助清单补登记、删 `_run_auto` 死代码 |
 | S9 | MCP 工具注册验证 | ✅ 完成 | 06:39~07:10 (B线) | `tools/mcp_tools_check.py`(15 工具核对/调用/往返三检)、`tests/test_mcp_server.py`(109 用例)、`devplan/TOOLS.md`；`mcp_server.py` 10 处修复（路径穿越/向量开关死配置/dry-run 动作校验）、`kb_maintainer.py` 往返保真修复；`requirements.txt` mcp 放宽至 `>=1.0.0` |
-| S10 | 游戏档案体系固化 | ⬜ 待执行 | | |
+| S10 | 游戏档案体系固化 | 🟡 进行中（23:00 自动化接手） | | 人工预改：`game_profile_check.py` 语义版、`space_invaders.yaml` 重排金字塔 |
 | S11 | UI 收敛与统一启动器 | ⬜ 待执行 | | |
 | S12 | 运维脚本与容器一致性 | ⬜ 待执行 | | |
 | S13 | 测试套件固化与文档同步 | ⬜ 待执行 | | |
@@ -368,3 +368,8 @@
 现状：S1~S9 已完成（614 用例全绿），本轮从 **S10** 起跑。
 说明：automation_update 调度工具在当前上下文不可用，无法再加触发线，故维持 30 分钟周期（23:00/23:30 一次性 + 之后整点/半点双线，至 06:30 共 17 轮）；加大工作量的方式改为「单轮连做多个阶段（预算 25 分钟内做完一个就接着做下一个）」+ 新增 12 个第二阶段任务，总计待办 17 个阶段。
 2026-09-21 22:00 · — · 按用户要求改为「17 条内容各自不同的一次性任务」，间隔压缩到 25 分钟（23:00~05:40）；新增 devplan/AUTOMATION_TASKS.md（含每条 prompt 正文 + 交付物 + 验收 + 用户视角价值）。automation_update 工具仍不可用，17 条待创建；创建前需先 PAUSED 旧的 4 条。
+2026-09-21 22:28 · S10（人工预改，交付 23:00 自动化续做）· 只做了不易出错的地基部分，其余留给自动化：
+  - 已做：`game_profile_check.py` 升级为语义版（新增：稀有度跨档重复、威胁分金字塔倒置、负威胁分、game.name 与文件名不一致、未知顶层键、sets/default_set 合法性、mock 实体 rarity 未声明 → ERROR；缺 description/port/sets/tactics → WARN；新增 `check_all()` 修掉"退出码永远 0"的 bug；`--strict` 让建议项也阻断；`--all` 跳过 `_` 开头模板）。`space_invaders.yaml` 按实体体系重排金字塔（原档案把 "boss" 同时写进 highest_boss 与 boss 两档），并补齐 port 5011 / sets / tactics / mock 实体。
+  - 验证：`game_profile_check.py --all` → florr ✅(3 条建议) + space_invaders ✅；`pytest -q` → **614 passed**（无回归）。
+  - **待 23:00 自动化续做**：① florr.yaml 补 sets/tactics/port（3 条建议）② `tools/add_game.py` 的 `render_yaml` 要吐出推荐字段，保证"生成即通过 validate" ③ `tests/test_game_profiles.py`（≥12 用例：重复档位/金字塔倒置/负分/名字不一致/未知键/default_set 越界/mock rarity 未声明/切 AGENT_GAME 后核心读到新值）④ `devplan/PROFILE_SPEC.md` ⑤ 全量 pytest 后提交并改本表 S10 为 ✅。
+2026-09-21 22:28 · — · 用户澄清：不要人工提前做，由 23:00 的自动化实施。人工部分到此为止（仅保留上面两处地基改动，已验证无回归）。
