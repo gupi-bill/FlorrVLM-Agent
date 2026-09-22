@@ -49,6 +49,12 @@ class TestMcpDescriptions(unittest.TestCase):
         for name, doc in self.tools.items():
             self.assertIn("返回", doc, f"{name} 描述没写清「返回」什么")
 
+    def test_description_has_three_sections(self):
+        """统一四段式：做什么（首行）+ 入参 + 返回 + 下一步。"""
+        for name, doc in self.tools.items():
+            for kw in ("入参", "返回", "下一步"):
+                self.assertIn(kw, doc, f"{name} 描述缺少「{kw}」段")
+
     def test_no_internal_path_leak(self):
         for name, doc in self.tools.items():
             for bad in FORBIDDEN:

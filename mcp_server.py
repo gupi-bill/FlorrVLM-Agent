@@ -259,6 +259,7 @@ def kb_write(filename: str, markdown_content: str, game_name: str = "") -> str:
     入参：filename 文件名（不要带路径）；markdown_content 正文；game_name 可选，用于分类到子文件夹。
     返回：成功为「已写入知识库: <路径> (N 字符)」；失败返回「错误: ...」。
     注意：这是覆盖写。想追加请用 kb_append。
+    下一步：想追加而不是覆盖，用 kb_append；写完可用 kb_search 抽查内容。
     """
     # v2.0 S9：文件名来自 LLM/外部客户端，先清洗再拒绝空名，
     # 杜绝 `../../` 穿越写到知识库之外、以及空名落到 KB_DIR 目录本身。
@@ -364,6 +365,7 @@ def kb_import(backup_path: str) -> str:
 
     入参：backup_path，备份文件的绝对路径或相对项目根目录的路径。
     返回：恢复结果文本（含恢复的文件数）。
+    下一步：kb_list 确认恢复结果，kb_search 抽查具体内容。
     """
     import kb_maintainer
     kb, arch = _kb_dirs()
@@ -507,6 +509,7 @@ def game_action(action_type: str,
           切换套装请用 switch_set，不要用本工具。
     返回：动作执行结果文本。默认 dry-run（UGF_DRY_RUN=1）只校验参数并返回描述，
           不会真的动键鼠；只有在获得授权的环境里才关闭 dry-run。
+    下一步：回到 perceive_game → predict_all_entities 的循环；遇到 AFK 弹窗用 handle_afk。
     """
     action_type = (action_type or "").lower()
 
@@ -609,6 +612,7 @@ def switch_set(set_name: str) -> str:
           （combat / tank / retreat / chase / team），后者按档案 combat.set_map 翻译。
     返回：「已切换套装: <名称> (按键 N)」；dry-run 下返回
           「[dry-run] 套装切换已记录（未真实执行）」；传错名字时返回「未知套装: ...」并列出可选值。
+    下一步：perceive_game 确认切换生效，再继续决策。
     """
     set_keys = resolve_set_keys()
     resolved = normalize_set_name(set_name)
@@ -678,6 +682,7 @@ def clean_cache(target: str = "all") -> str:
     入参：target 取 all（默认，清全部）/ predict（只清预判历史）/ frames（只清临时帧目录）。
     返回：清理结果文本。
     用途：长时间运行后释放磁盘；换局前保证预判数据干净。
+    下一步：清完预判历史后重新连续 perceive_game 积累帧；长时间运行前可先清 frames 省磁盘。
     """
     done = []
     if target in ("all", "predict"):
