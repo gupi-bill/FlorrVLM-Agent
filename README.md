@@ -115,7 +115,7 @@ python admin_panel.py          # 或 python launcher.py --ui auto
 
 ## 🔌 作为 MCP 服务被其他 Agent 调用
 
-`mcp_server.py` 以 **stdio** 形式对外暴露 15 个工具，可直接注册进任意支持 MCP 的客户端：
+`mcp_server.py` 以 **stdio** 形式对外暴露 16 个工具，可直接注册进任意支持 MCP 的客户端：
 
 ```json
 {
@@ -226,7 +226,7 @@ python agent_cli.py -c mode     # 模式 / 感知后端 / LLM / VLM / 激活游�
 | 单元测试 | **920 用例全绿** | `python -m pytest tests/ -q` |
 | 启动自检 | 本机 ERROR 0 / WARN 6，每条附「修复 + 降级」指引 | `python boot_check.py` |
 | 游戏档案 | florr / space_invaders 两份 `--strict` 全过 | `python game_profile_check.py --all --strict` |
-| MCP 工具 | 15 个工具可注册 / 可调用 / schema 正确 + 知识库往返保真 | `python tools/mcp_tools_check.py --strict` |
+| MCP 工具 | 16 个工具可注册 / 可调用 / schema 正确 + 知识库往返保真 | `python tools/mcp_tools_check.py --strict` |
 | CLI | 31 条命令矩阵，0 traceback、0 卡死 | `python tools/cli_smoke.py --strict` |
 | 主循环 | 离线 5 轮跑通：感知 → 预判 → 决策 → 动作 → 记忆 → 复盘 → 汇报 | `UGF_DRY_RUN=1 python agent_main.py --rounds 5` |
 | 统一启动器 | UI 探测 / 选择 / 离线开关透传全部可验 | `python launcher.py --ui auto --selftest` |
@@ -257,7 +257,7 @@ Windows EXE / Android APK 见 [packaging/README.md](packaging/README.md)。
 
 ---
 
-## 🧩 MCP 工具（15 个）
+## 🧩 MCP 工具（16 个）
 
 | 类别 | 工具 |
 |------|------|
@@ -265,6 +265,7 @@ Windows EXE / Android APK 见 [packaging/README.md](packaging/README.md)。
 | 👁️ 感知 | `perceive_game` `predict_all_entities` `reset_predictor` |
 | 🕹️ 动作 | `game_action` `switch_set` `handle_afk` |
 | 🧹 维护 | `clean_cache` `query_boss_history` `switch_tactic` |
+| 📖 手册 | `ugf_guide`（返回本服务使用手册，第一次接入先调它） |
 
 ---
 

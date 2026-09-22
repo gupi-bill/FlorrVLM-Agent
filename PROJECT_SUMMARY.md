@@ -70,7 +70,7 @@ git clone https://github.com/OpenCloserOrg/OpenClaw.git
 Universal-Game-Framework/
 ├── agent_cli.py            # 对话指挥入口（交互 + -c 单命令）——主入口
 ├── agent_main.py           # MCP Client 主循环
-├── mcp_server.py           # MCP 服务端（15 个工具，MD 知识库）
+├── mcp_server.py           # MCP 服务端（16 个工具，MD 知识库）
 ├── mcp_connector.py        # 外部 MCP 主动连接（v0.7）
 ├── skill_manager.py / skills/  # 技能包机制（v0.8）
 ├── predictor.py            # 全实体运动预判 + 置信度
@@ -174,7 +174,7 @@ detect(这是什么游戏) → brief(开玩前了解) → research(去查资料)
 
 ---
 
-## 六、MCP 工具列表（15 个）
+## 六、MCP 工具列表（16 个）
 
 | 工具 | 参数 | 说明 |
 |------|------|------|
@@ -296,7 +296,7 @@ bash scripts/check.sh --fast   # 秒级：语法 + 启动自检 + 档案校验
 |---|---|
 | 单元测试 | **743 用例全绿** |
 | 启动自检 | ERROR 0 / WARN 6，每条附降级指引 |
-| MCP 工具 | 15 个全部可注册 / 可调用 / schema 正确 |
+| MCP 工具 | 16 个全部可注册 / 可调用 / schema 正确 |
 | CLI | 31 条命令矩阵，0 traceback、0 卡死 |
 | 主循环 | 离线 5 轮全链路跑通（感知 → 预判 → 决策 → 动作 → 记忆 → 复盘 → 汇报） |
 | 游戏档案 | florr / space_invaders 两份 `--strict` 全过 |

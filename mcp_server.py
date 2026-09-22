@@ -10,15 +10,17 @@ Universal-Game-Framework MCP Server mcp_server.py
   - 目录为空时自动写入基础模板文件（v0.2）
   - 默认纯文本关键词检索；向量检索预留开关，默认关闭
 
-MCP 工具（15 个，v2.0 S9 实测与 README 表格一致）：
+MCP 工具（16 个，README 表格与运行时清单由 mcp_tools_check 锁死）：
   kb_list, kb_search, kb_write, kb_append, kb_export, kb_import,
   perceive_game, predict_all_entities, reset_predictor,
   game_action, switch_set, handle_afk,
-  query_boss_history, clean_cache, switch_tactic
+  query_boss_history, clean_cache, switch_tactic, ugf_guide
 
 SDK 兼容：mcp 1.x 用 FastMCP，2.x 改名 MCPServer；两条路径均在 S9 实测可注册、
 可列举、可调用（本机实际为 2.2.0）。
 """
+import asyncio
+import inspect
 import json
 import os
 import random
@@ -715,6 +717,99 @@ def switch_tactic(tactic_file: str) -> str:
     except OSError as e:
         return f"写入当前战术标记失败: {e}"
     return f"已切换当前战术为: {tactic_file}"
+
+
+# ---------------------------------------------------------------------------
+# 内置使用手册（M3）
+# ---------------------------------------------------------------------------
+# 目的：本服务是「装到别的 Agent 上的能力包」，外部模型不一定读得到仓库 README。
+# 所以它必须能自助回答「你有什么能力 / 该怎么用」——工具清单从运行时动态取，永不写死、不会漂移。
+
+_GUIDE_CHAINS = """推荐调用链（可直接照抄）：
+
+1) 摸清局面
+   perceive_game() → predict_all_entities() → kb_search(keyword=当前最强敌人)
+
+2) 打一局
+   perceive_game → predict_all_entities → 自行评估打/跑 → game_action(action_type, x, y)
+   → 每若干轮 kb_append(战术/观察) → 结束 kb_write(本局总结)
+
+3) 学一轮
+   kb_search(关键词) → 发现缺口 → kb_write(学到的战术) → 下一局 switch_tactic 引用
+"""
+
+_GUIDE_NOTES = """注意事项：
+
+- 默认 dry-run（环境变量 UGF_DRY_RUN=1）：game_action / switch_set 只校验参数并返回描述，
+  不会真的动键鼠。只有在获得明确授权的环境里才关闭 dry-run。
+- 感知服务不是必须的：没有 YOLO/感知服务时 perceive_game 会降级为进程内合成帧，
+  返回值带 _fallback 标记，整条链路照样能跑通，方便先联调再上真机。
+- predict_all_entities 需要至少 3 帧 perceive_game 历史才有效；confidence < 0.65 时
+  prediction_trusted=false，此时不要相信预判坐标。
+- 切局 / 重生后先 reset_predictor()，避免用旧轨迹误判。
+- 合规：仅用于本地 / 自建 / 已授权环境，不提供任何绕过他人服务条款的手段。
+"""
+
+
+def _runtime_tools() -> list:
+    """从运行时的 tool manager 取工具清单（名称 + 描述首行），取不到则退化为空列表。"""
+    out = []
+    try:
+        tm = getattr(mcp, "_tool_manager", None)
+        if tm is None:
+            return out
+        res = tm.list_tools()
+        if inspect.isawaitable(res):  # mcp 1.x 部分版本是协程
+            res = asyncio.run(res)
+        for t in res:
+            name = getattr(t, "name", "") or ""
+            desc = (getattr(t, "description", "") or "").strip().splitlines()
+            out.append((name, desc[0] if desc else ""))
+    except Exception:
+        return []
+    return [x for x in out if x[0]]
+
+
+@mcp.tool()
+def ugf_guide(section: str = "all") -> str:
+    """返回本服务的使用手册（给刚接进来的 Agent 看，不用读仓库也能上手）。
+
+    用途：第一次连接时先调用它，了解能力边界、工具清单和推荐调用顺序。
+    入参：section 取 all（默认，全部）/ quick（一屏速览）/ tools（工具清单）/
+          chains（调用链）/ notes（注意事项与常见坑）。
+    返回：Markdown 文本手册。工具清单由运行时动态生成，与实际注册的工具始终一致。
+    下一步：按手册里的调用链开始 perceive_game → predict_all_entities → game_action。
+    """
+    tools = _runtime_tools()
+    tool_block = "\n".join(f"- `{n}`：{d}" for n, d in tools) if tools else \
+        "- （运行时工具清单不可用，请改用客户端的 tools/list 查看）"
+
+    sec = (section or "all").strip().lower()
+    parts = []
+    if sec in ("all", "quick"):
+        parts.append(
+            "# Universal-Game-Framework · 游戏能力包\n\n"
+            "给 Agent 用的 MCP 服务：看画面 → 预判 → 查资料 → 出动作 → 复盘学习。\n"
+            f"当前共 {len(tools)} 个工具，见 section=tools。\n"
+        )
+    if sec in ("all", "tools"):
+        parts.append("## 工具清单\n\n" + tool_block + "\n")
+    if sec in ("all", "chains"):
+        parts.append("## " + _GUIDE_CHAINS)
+    if sec in ("all", "notes"):
+        parts.append("## " + _GUIDE_NOTES)
+    if not parts:
+        return f"未知章节: {section}，可选 all/quick/tools/chains/notes"
+    return "\n".join(parts)
+
+
+# 资源形式（部分客户端支持 resources；注册失败不影响工具可用性）
+try:
+    @mcp.resource("ugf://guide")
+    def _ugf_guide_resource() -> str:
+        return ugf_guide("all")
+except Exception:  # pragma: no cover - 取决于 SDK 版本是否支持 resource
+    pass
 
 
 # ---------------------------------------------------------------------------

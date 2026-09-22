@@ -25,7 +25,7 @@ python tools/install_mcp.py --target custom --path /绝对路径/mcp.json   # �
 
 ---
 
-## 二、它给你什么能力（15 个 MCP 工具）
+## 二、它给你什么能力（16 个 MCP 工具）
 
 | 类别 | 工具 | 说明 |
 |---|---|---|
@@ -40,6 +40,7 @@ python tools/install_mcp.py --target custom --path /绝对路径/mcp.json   # �
 | 决策 | `switch_tactic` | 切换当前战术 |
 | 维护 | `query_boss_history` | 查某个 BOSS 的历史习性 |
 | 维护 | `clean_cache` | 清理临时文件 |
+| 手册 | `ugf_guide` | 返回本服务使用手册（能力/工具清单/调用链/注意事项），第一次接入先调它 |
 
 ---
 
@@ -96,7 +97,7 @@ kb_search(关键词) → 有缺口 → kb_write(学到的战术) → 下一局�
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}' \
   | python mcp_server.py
 
-# 2) 工具清单核对（15 个）
+# 2) 工具清单核对（16 个）
 python tools/mcp_tools_check.py --strict
 
 # 3) 安装器看到没有

@@ -33,7 +33,7 @@ class TestMcpDescriptions(unittest.TestCase):
         self.tools = _tools()
 
     def test_tool_count(self):
-        self.assertEqual(len(self.tools), 15, "工具数量应为 15")
+        self.assertEqual(len(self.tools), 16, "工具数量应为 16")
 
     def test_every_tool_has_description(self):
         for name, doc in self.tools.items():

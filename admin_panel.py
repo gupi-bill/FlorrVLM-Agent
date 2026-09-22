@@ -409,7 +409,7 @@ SETTINGS_PAGE = """<!doctype html><html lang="zh-CN"><meta charset="utf-8">
 </div>
 <div class="box" style="margin-top:12px">
   <h2>MCP 服务</h2>
-  <div class="muted">以 stdio 形式对外暴露 15 个工具（kb_* / perceive_game / predict_all_entities / game_action …）。
+  <div class="muted">以 stdio 形式对外暴露 16 个工具（kb_* / perceive_game / predict_all_entities / game_action …）。
   已在 <code>~/.workbuddy/mcp.json</code> 注册为 <code>ugf</code>，在连接器里信任后即可被其他 Agent 调用。</div>
 </div>
 <script>

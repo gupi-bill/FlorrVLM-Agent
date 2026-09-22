@@ -58,7 +58,7 @@ bash scripts/check.sh --fast   # 秒级：语法 + 启动自检 + 档案校验
 | 启动自检 | 本机 ERROR 0 / WARN 6，每条附「修复 + 降级」指引 | `python boot_check.py` |
 | 静态审计 | 跨模块缺失符号 0、kwargs 不匹配 0 | `python tools/static_audit.py` |
 | 游戏档案 | florr / space_invaders 两份 `--strict` 全过 | `python game_profile_check.py --all --strict` |
-| MCP 工具 | 15 个工具可注册 / 可调用 / schema 正确 + 知识库往返保真 | `python tools/mcp_tools_check.py --strict` |
+| MCP 工具 | 16 个工具可注册 / 可调用 / schema 正确 + 知识库往返保真 | `python tools/mcp_tools_check.py --strict` |
 | CLI | 31 条命令矩阵，0 traceback、0 卡死 | `python tools/cli_smoke.py --strict` |
 | 主循环 | 离线 5 轮跑通：感知 → 预判 → 决策 → 动作 → 记忆 → 复盘 → 汇报 | `UGF_DRY_RUN=1 python agent_main.py --rounds 5` |
 | 统一启动器 | UI 探测 / 选择 / 离线开关透传可验 | `python launcher.py --ui auto --selftest` |
