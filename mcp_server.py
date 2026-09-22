@@ -130,7 +130,13 @@ def _dryrun_log(kind: str, detail: str):
     except Exception:
         pass
 
-mcp = FastMCP("Universal-Game-Framework")
+# 版本号（M5）：对外暴露在 MCP 握手返回的 serverInfo 里，客户端能看出接的是哪一版
+VERSION = "2.1.0-mcp"
+
+try:
+    mcp = FastMCP("Universal-Game-Framework", version=VERSION)
+except TypeError:  # 老版本 SDK 不接受 version 参数
+    mcp = FastMCP("Universal-Game-Framework")
 
 
 # ---------------------------------------------------------------------------
@@ -825,7 +831,12 @@ def _run_args():
                         help=f"传输方式（默认取自 config.yaml: {default_transport}）")
     parser.add_argument("--host", default=config.get("mcp.host", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=config.get("mcp.streamable_port", 5050))
-    return parser.parse_args()
+    parser.add_argument("--version", action="store_true", help="打印版本号并退出")
+    args = parser.parse_args()
+    if args.version:
+        print(f"Universal-Game-Framework {VERSION}")
+        raise SystemExit(0)
+    return args
 
 
 if __name__ == "__main__":
