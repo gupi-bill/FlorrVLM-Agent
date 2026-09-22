@@ -15,8 +15,12 @@ Universal-Game-Framework 可视化监控大盘 admin_panel.py  (v2.0 / S11：主
 """
 import json
 import os
+import re
+import subprocess
+import sys
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
 
 import config
 import session  # v1.6 会话记忆 & 多局战绩
@@ -199,10 +203,24 @@ PAGE = """<!DOCTYPE html><html lang="zh"><meta charset="utf-8">
  .logline{border-bottom:1px solid #1c2336;padding:2px 0;font-size:12px}
  .muted{color:var(--mut)}.ok{color:var(--ok)}.warn{color:var(--warn)}.err{color:var(--err)}
  .banner{background:var(--err);color:#fff;padding:8px 10px;border-radius:8px;margin-bottom:10px;display:none}
+ .nav{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+ .btn{display:inline-block;background:var(--card);border:1px solid var(--line);color:var(--tx);
+      text-decoration:none;padding:7px 12px;border-radius:9px;font-size:13px}
+ .btn:hover{border-color:var(--acc)}
+ .btn.primary{background:var(--acc);border-color:var(--acc);color:#0b101d;font-weight:600}
+ .btn.danger{background:#3a1d24;border-color:#7f2d3a;color:#fca5a5}
+ .gm-hero{background:linear-gradient(135deg,#16233d,#1b2b4a);border:1px solid var(--line);
+          border-radius:14px;padding:14px;margin-bottom:12px}
+ .gm-hero h2{margin:0 0 6px;font-size:16px}
+ .kv{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--mut)}
  @media(max-width:700px){.row{grid-template-columns:1fr}}
 </style>
 <h1>Universal-Game-Framework 监控大盘</h1>
 <div class="sub" id="time">加载中…</div>
+<div class="nav">
+  <a class="btn" href="/settings">⚙ 设置</a>
+  <a class="btn primary" href="/game">🎮 打开游戏模式</a>
+</div>
 <div class="banner" id="banner">⚠ 未检测到 Agent 运行快照（可能还没 `play`，或感知服务未启动）</div>
 <div class="grid">
   <div class="card"><div class="lab">游戏</div><div class="val" id="game">—</div></div>
@@ -263,21 +281,277 @@ refresh();setInterval(refresh,3000);
 </script></html>"""
 
 
+# ---------------------------------------------------------------------------
+# 设置页 / 游戏模式（主界面入口）
+# ---------------------------------------------------------------------------
+GAME_PROC = {"popen": None, "mode": None, "started": None, "last": ""}
+
+
+def _local_only(handler) -> bool:
+    """控制类接口只允许本机访问（面板监听 0.0.0.0，不能让局域网谁都能起停进程）。"""
+    return handler.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
+
+def _profiles() -> list:
+    d = os.path.join(BASE_DIR, "game_profiles")
+    if not os.path.isdir(d):
+        return []
+    return sorted(f[:-5] for f in os.listdir(d)
+                  if f.endswith(".yaml") and not f.startswith("_"))
+
+
+def _switch_game(name: str) -> str:
+    path = os.path.join(BASE_DIR, "config.yaml")
+    if not os.path.exists(path):
+        return "config.yaml 不存在"
+    if name not in _profiles():
+        return f"档案不存在: {name}"
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+    new = re.sub(r"(?m)^(\s*game:\s*)([\w.-]+)",
+                 lambda m: f"{m.group(1)}{name}", text, count=1)
+    if new == text:
+        return "未找到可切换的 game: 行"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(new)
+    return f"已切换当前游戏 → {name}（下轮生效）"
+
+
+def _start_game(rounds: int = 0, dry: bool = True) -> str:
+    p = GAME_PROC.get("popen")
+    if p is not None and p.poll() is None:
+        return "Agent 已在运行中，无需重复启动"
+    env = dict(os.environ)
+    env["UGF_DRY_RUN"] = "1" if dry else "0"
+    cmd = [sys.executable, "agent_main.py"]
+    if rounds:
+        cmd += ["--rounds", str(rounds)]
+    try:
+        GAME_PROC["popen"] = subprocess.Popen(
+            cmd, cwd=BASE_DIR, env=env,
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    except Exception as e:
+        return f"启动失败: {e}"
+    GAME_PROC["mode"] = "dry-run" if dry else "online"
+    GAME_PROC["started"] = datetime.now().strftime("%H:%M:%S")
+    return "已启动（%s，%s）" % (GAME_PROC["mode"],
+                              "无限轮" if not rounds else f"{rounds} 轮")
+
+
+def _stop_game() -> str:
+    p = GAME_PROC.get("popen")
+    if p is None or p.poll() is not None:
+        GAME_PROC["popen"] = None
+        return "当前没有运行中的 Agent"
+    p.terminate()
+    try:
+        p.wait(timeout=5)
+    except Exception:
+        p.kill()
+    GAME_PROC["popen"] = None
+    return "已停止"
+
+
+def _game_running() -> bool:
+    p = GAME_PROC.get("popen")
+    return p is not None and p.poll() is None
+
+
+SHARED_CSS = """
+:root{--bg:#0b101d;--card:#141b2c;--line:#26314a;--tx:#e6e8ee;--mut:#8b96ad;
+      --ok:#34d399;--warn:#fbbf24;--err:#f87171;--acc:#60a5fa}
+*{box-sizing:border-box}
+body{font-family:ui-sans-serif,system-ui;background:var(--bg);color:var(--tx);margin:0;padding:18px}
+h1{font-size:17px;margin:0 0 8px}
+h2{font-size:12px;color:var(--acc);margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.card .lab{color:var(--mut);font-size:11px;text-transform:uppercase}
+.card .val{font-size:22px;font-weight:600;margin-top:4px}
+.nav{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.btn{display:inline-block;background:var(--card);border:1px solid var(--line);color:var(--tx);
+     text-decoration:none;padding:7px 12px;border-radius:9px;font-size:13px;cursor:pointer;font-family:inherit}
+.btn:hover{border-color:var(--acc)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#0b101d;font-weight:600}
+.btn.danger{background:#3a1d24;border-color:#7f2d3a;color:#fca5a5}
+.gm-hero{background:linear-gradient(135deg,#16233d,#1b2b4a);border:1px solid var(--line);
+         border-radius:14px;padding:14px;margin-bottom:12px}
+.gm-hero h2{margin:0 0 6px;font-size:16px}
+.kv{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--mut)}
+.thr{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #223}
+.thr:last-child{border:0}
+.logline{border-bottom:1px solid #1c2336;padding:2px 0;font-size:12px}
+.muted{color:var(--mut)}.ok{color:var(--ok)}.warn{color:var(--warn)}.err{color:var(--err)}
+@media(max-width:700px){.row{grid-template-columns:1fr}}
+"""
+
+SETTINGS_PAGE = """<!doctype html><html lang="zh-CN"><meta charset="utf-8">
+<title>设置 · Universal-Game-Framework</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/static">
+<h1>⚙ 设置</h1>
+<div class="nav">
+  <a class="btn" href="/">← 返回监控大盘</a>
+  <a class="btn primary" href="/game">🎮 打开游戏模式</a>
+</div>
+<div class="box">
+  <h2>运行模式</h2>
+  <div id="mode" class="muted">读取中…</div>
+</div>
+<div class="box" style="margin-top:12px">
+  <h2>游戏档案</h2>
+  <div class="muted" style="margin-bottom:8px">当前：<b id="cur">—</b></div>
+  <select id="prof" class="btn"></select>
+  <button class="btn" onclick="sw()">切换</button>
+  <div id="swmsg" class="muted" style="margin-top:8px"></div>
+</div>
+<div class="box" style="margin-top:12px">
+  <h2>MCP 服务</h2>
+  <div class="muted">以 stdio 形式对外暴露 15 个工具（kb_* / perceive_game / predict_all_entities / game_action …）。
+  已在 <code>~/.workbuddy/mcp.json</code> 注册为 <code>ugf</code>，在连接器里信任后即可被其他 Agent 调用。</div>
+</div>
+<script>
+async function load(){
+  const r=await fetch('/api/game/state');const d=await r.json();
+  document.getElementById('mode').innerHTML='<b>'+d.mode_text+'</b>';
+  document.getElementById('cur').textContent=d.game;
+  const s=document.getElementById('prof');
+  s.innerHTML=d.profiles.map(p=>'<option value="'+p+'"'+(p===d.game?' selected':'')+'>'+p+'</option>').join('');
+}
+async function sw(){
+  const v=document.getElementById('prof').value;
+  const r=await fetch('/api/game/switch?name='+encodeURIComponent(v));
+  document.getElementById('swmsg').textContent=(await r.json()).msg;
+  load();
+}
+load();
+</script>
+"""
+
+GAME_PAGE = """<!doctype html><html lang="zh-CN"><meta charset="utf-8">
+<title>游戏模式 · Universal-Game-Framework</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/static">
+<div class="gm-hero">
+  <h2>🎮 游戏模式</h2>
+  <div class="kv">
+    <span>状态：<b id="run">—</b></span>
+    <span>模式：<b id="mode">—</b></span>
+    <span>档案：<b id="game">—</b></span>
+    <span>启动于：<span id="at">—</span></span>
+  </div>
+</div>
+<div class="nav">
+  <button class="btn primary" onclick="act('/api/game/start?dry=1&rounds=20')">▶ 试跑 20 轮（dry-run）</button>
+  <button class="btn" onclick="act('/api/game/start?dry=1')">▶ 持续试跑</button>
+  <button class="btn danger" onclick="act('/api/game/stop')">■ 停止</button>
+  <a class="btn" href="/settings">⚙ 设置</a>
+  <a class="btn" href="/">← 监控大盘</a>
+</div>
+<div class="grid">
+  <div class="card"><div class="lab">回合数</div><div class="val ok" id="round">—</div></div>
+  <div class="card"><div class="lab">累计死亡</div><div class="val warn" id="deaths">—</div></div>
+  <div class="card"><div class="lab">当前决策</div><div class="val" id="decision" style="font-size:16px">—</div></div>
+  <div class="card"><div class="lab">知识库</div><div class="val" id="kb">—</div></div>
+</div>
+<div class="row">
+  <div class="box"><h2>威胁预判（前 6）</h2><div id="threats" class="muted">等待数据…</div></div>
+  <div class="box"><h2>运行日志</h2><div id="log"></div></div>
+</div>
+<div id="msg" class="muted"></div>
+<script>
+async function act(u){
+  const r=await fetch(u);const d=await r.json();
+  document.getElementById('msg').textContent=(d.msg||'')+(d.note?' ｜ '+d.note:'');
+  st();
+}
+async function st(){
+  const r=await fetch('/api/game/state');const d=await r.json();
+  const run=document.getElementById('run');
+  run.textContent=d.running?'运行中':'已停止';
+  run.className=d.running?'ok':'muted';
+  document.getElementById('mode').textContent=d.mode_text;
+  document.getElementById('game').textContent=d.game;
+  document.getElementById('at').textContent=d.started||'—';
+  const s=await fetch('/api/status');const x=await s.json();
+  document.getElementById('round').textContent=x.round;
+  document.getElementById('deaths').textContent=x.deaths;
+  document.getElementById('decision').textContent=x.decision+' / '+x.mindset;
+  document.getElementById('kb').textContent=x.kb_count+' 篇';
+  document.getElementById('threats').innerHTML=x.threats.map(t=>
+    '<div class="thr"><span>'+(t.name||t.cat)+'</span><span class="muted">威胁 '+t.threat+'</span></div>'
+  ).join('')||'<div class="muted">暂无数据</div>';
+  document.getElementById('log').innerHTML=x.log.slice(0,12).map(l=>'<div class="logline">'+l+'</div>').join('')
+    ||'<div class="muted">暂无日志</div>';
+}
+st();setInterval(st,3000);
+</script>
+"""
+
+
 class Handler(BaseHTTPRequestHandler):
+    def _json(self, obj, code=200):
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _html(self, text, code=200):
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(text.encode("utf-8"))
+
     def do_GET(self):
-        if self.path == "/api/status":
-            body = json.dumps(_status(), ensure_ascii=False).encode("utf-8")
+        u = urlparse(self.path)
+        path, q = u.path, parse_qs(u.query)
+
+        if path == "/api/status":
+            return self._json(_status())
+
+        if path == "/api/game/state":
+            return self._json({
+                "running": _game_running(),
+                "mode": GAME_PROC.get("mode"),
+                "started": GAME_PROC.get("started"),
+                "game": config.get("agent.game", "florr"),
+                "profiles": _profiles(),
+                "mode_text": (config.runtime_mode_text()
+                              if hasattr(config, "runtime_mode_text") else "-"),
+            })
+
+        if path == "/static":
             self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Type", "text/css; charset=utf-8")
             self.end_headers()
-            self.wfile.write(body)
-        else:
-            body = PAGE.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(body)
+            return self.wfile.write(SHARED_CSS.encode("utf-8"))
+
+        if path in ("/api/game/start", "/api/game/stop", "/api/game/switch"):
+            if not _local_only(self):
+                return self._json({"msg": "仅允许本机访问控制接口"}, 403)
+            if path == "/api/game/start":
+                try:
+                    rounds = int((q.get("rounds") or ["0"])[0])
+                except ValueError:
+                    rounds = 0
+                dry = (q.get("dry") or ["1"])[0] not in ("0", "false", "no")
+                msg = _start_game(rounds=rounds, dry=dry)
+            elif path == "/api/game/stop":
+                msg = _stop_game()
+            else:
+                msg = _switch_game((q.get("name") or [""])[0])
+            return self._json({"msg": msg, "note": "dry-run 不做真实键鼠操作"})
+
+        if path == "/game":
+            return self._html(GAME_PAGE)
+        if path == "/settings":
+            return self._html(SETTINGS_PAGE)
+        return self._html(PAGE)
 
     def log_message(self, *a):
         pass  # 不打印每次访问，保持日志干净

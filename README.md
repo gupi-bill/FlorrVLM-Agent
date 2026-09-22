@@ -2,11 +2,16 @@
 
 # 🎮 Universal-Game-Framework
 
-**一个会自己玩游戏的通用 Agent · From Florr.io → 所有游戏**
+**不是 Agent —— 是装到别的 Agent 身上的「游戏能力包」（MCP 服务）**
 
-融合 **YOLO 视觉识别** + **MCP 标准 Agent 架构**的游戏智能体。
-不只会打 Florr.io —— 它已经是一条通用流水线：
+把它注册进任意支持 MCP 的客户端（Kilo / Codex / OpenCode / WorkBuddy / Claude Desktop），
+那个 Agent 就立刻拥有 **看画面 → 预判 → 评估 → 出动作 → 查/写知识库 → 复盘** 一整套游戏能力。
+
+融合 **YOLO 视觉识别** + **MCP 标准协议**，从 Florr.io 出发，目标是通用到所有游戏：
 **detect 问游戏 → research 查资料 → ensure 确认能力 → play 开玩 → report 汇报**
+
+> 🚀 **三分钟装上别的 Agent**：见 [docs/MCP_INSTALL.md](./docs/MCP_INSTALL.md) ｜
+> 一条命令：`python tools/install_mcp.py --target workbuddy`
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://www.python.org)
 [![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-标准%20Agent-green)](https://modelcontextprotocol.io)
@@ -90,6 +95,41 @@
 ```
 
 ---
+
+## 🎮 主界面：设置 → 游戏模式
+
+浏览器打开监控大盘后，顶部有两个入口：
+
+| 入口 | 路径 | 作用 |
+|---|---|---|
+| ⚙ 设置 | `/settings` | 查看运行模式、切换游戏档案、查看 MCP 注册信息 |
+| 🎮 打开游戏模式 | `/game` | 一键试跑 / 停止、实时看回合、死亡、决策、威胁预判与日志 |
+
+```bash
+python admin_panel.py          # 或 python launcher.py --ui auto
+# 打开 http://127.0.0.1:5002  →  ⚙ 设置  →  🎮 打开游戏模式
+```
+
+游戏模式里的「试跑 20 轮（dry-run）」**不会操作真实键鼠**，只跑完整链路，用来确认接线和配置没问题；确认无误后再关掉 dry-run 上真机。
+（面板监听 `0.0.0.0`，但 `/api/game/start|stop|switch` 三个控制接口**只接受本机 127.0.0.1 访问**，局域网无法起停进程。）
+
+## 🔌 作为 MCP 服务被其他 Agent 调用
+
+`mcp_server.py` 以 **stdio** 形式对外暴露 15 个工具，可直接注册进任意支持 MCP 的客户端：
+
+```json
+{
+  "mcpServers": {
+    "ugf": {
+      "command": "<你的 venv>/bin/python",
+      "args": ["/绝对路径/Universal-Game-Framework/mcp_server.py"],
+      "env": { "UGF_DRY_RUN": "1" }
+    }
+  }
+}
+```
+
+本项目已写入本机 `~/.workbuddy/mcp.json`（服务名 `ugf`）；在连接器管理页把它设为信任后即可被其他 Agent 调用。
 
 ## ⚙️ 快速开始
 
