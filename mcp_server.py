@@ -19,6 +19,7 @@ MCP 工具（16 个，README 表格与运行时清单由 mcp_tools_check 锁死�
 SDK 兼容：mcp 1.x 用 FastMCP，2.x 改名 MCPServer；两条路径均在 S9 实测可注册、
 可列举、可调用（本机实际为 2.2.0）。
 """
+import argparse
 import asyncio
 import inspect
 import json
@@ -815,9 +816,27 @@ except Exception:  # pragma: no cover - 取决于 SDK 版本是否支持 resourc
 # ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
+def _run_args():
+    """命令行参数：默认按 config.yaml 的 mcp.streamable_http 决定传输方式。"""
+    parser = argparse.ArgumentParser(description="Universal-Game-Framework MCP 服务")
+    default_transport = "streamable-http" if config.get("mcp.streamable_http", False) else "stdio"
+    parser.add_argument("--transport", default=default_transport,
+                        choices=["stdio", "streamable-http", "sse"],
+                        help=f"传输方式（默认取自 config.yaml: {default_transport}）")
+    parser.add_argument("--host", default=config.get("mcp.host", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=config.get("mcp.streamable_port", 5050))
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
     _stderr(f"[MCP] Universal-Game-Framework 服务启动")
     _stderr(f"[MCP] 知识库目录: {KB_DIR}")
     _stderr(f"[MCP] 向量检索: {'开启' if USE_VECTOR_SEARCH else '关闭(默认)'}")
     _stderr(f"[MCP] dry-run: {'开启(不执行真实键鼠)' if dry_run() else '关闭'}")
-    mcp.run()
+    args = _run_args()
+    if args.transport == "stdio":
+        _stderr("[MCP] 传输: stdio")
+        mcp.run()
+    else:
+        _stderr(f"[MCP] 传输: {args.transport} @ http://{args.host}:{args.port}/mcp")
+        mcp.run(transport=args.transport, host=args.host, port=args.port)
