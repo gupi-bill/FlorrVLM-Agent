@@ -62,7 +62,7 @@ def _fake_requests(monkeypatch, code=None, exc=None):
 # ---------------------------------------------------------------------------
 def test_report_minimal(rn):
     txt = report_notifier.generate_report()
-    assert "# FlorrVLM-Agent 对局报告" in txt
+    assert "# Universal-Game-Framework 对局报告" in txt
     assert "尚未做过 brief" in txt
     assert "暂无威胁数据" in txt
     assert "离线" in txt                      # v2.0 离线标注

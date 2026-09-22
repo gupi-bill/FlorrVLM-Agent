@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 系统安装包打包  tools/build_dist.py  (v1.9)
+Universal-Game-Framework 系统安装包打包  tools/build_dist.py  (v1.9)
 =========================================================
 把一个仓库做成可直接分发的安装包，覆盖四类平台：
 
@@ -96,7 +96,7 @@ def build_deb() -> str:
 
         # 文档
         with open(os.path.join(doc, "README.txt"), "w", encoding="utf-8") as f:
-            f.write("FlorrVLM-Agent v%s\n查看项目 README.md 了解用法。\n" % VERSION)
+            f.write("Universal-Game-Framework v%s\n查看项目 README.md 了解用法。\n" % VERSION)
 
         # Debian control / 维护脚本
         debin = os.path.join(rootpkg, "DEBIAN")
@@ -109,7 +109,7 @@ def build_deb() -> str:
                 "Priority: optional\n"
                 "Architecture: amd64\n"
                 "Depends: python3, python3-yaml, python3-requests, python3-dotenv\n"
-                "Maintainer: FlorrVLM-Agent <noreply@example.com>\n"
+                "Maintainer: Universal-Game-Framework <noreply@example.com>\n"
                 "Description: Universal game operation agent (CLI + MCP + dashboard)\n"
                 " A visual game agent. Install then run: florrvlm-agent\n"
                 % (PKG, VERSION)

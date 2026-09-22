@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 视频来源注册表 video_sources.py
+Universal-Game-Framework 视频来源注册表 video_sources.py
 =================================================
 v0.4：教程视频"自动找 → 学 → 用完即删"闭环里"自动找"的部分。
 

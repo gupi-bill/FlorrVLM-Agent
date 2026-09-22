@@ -45,6 +45,19 @@
 
 **三分钟，让任何一个支持 MCP 的 Agent 获得游戏能力。**
 
+### 方式 A：装包（推荐）
+
+```bash
+pip install universal-game-framework
+
+ugf-install --list                 # 看能装到哪些客户端
+ugf-install --target workbuddy     # 装进 WorkBuddy
+ugf-mcp                            # 起服务（stdio）
+ugf-check                          # 装不上时先体检
+```
+
+### 方式 B：从源码
+
 ```bash
 cd Universal-Game-Framework
 python3 -m venv venv && source venv/bin/activate

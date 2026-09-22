@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 预判模块 predictor.py
+Universal-Game-Framework 预判模块 predictor.py
 =====================================
 纯内存运算，不写任何磁盘文件。
 

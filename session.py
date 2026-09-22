@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 会话记忆 & 断点续玩  session.py  (v1.4)
+Universal-Game-Framework 会话记忆 & 断点续玩  session.py  (v1.4)
 ======================================================
 把"上次玩到哪、死了几次、加载了哪些技能、什么游戏"记在 agent_state.json。
 下次启动自动读出并汇报"续玩"，进度不丢。

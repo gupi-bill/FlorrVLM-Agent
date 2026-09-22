@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FlorrVLM-Agent 看门狗 watchdog.sh（v1.0 稳定性保障）
+# Universal-Game-Framework 看门狗 watchdog.sh（v1.0 稳定性保障）
 # ==================================================
 # 作用:
 #   1. 崩溃自动重启: agent_main 异常退出后自动拉起（带退避，防崩溃-fly）

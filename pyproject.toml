@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "universal-game-framework"
+# PyPI 只接受 PEP 440 版本号，所以这里是 2.1.0；
+# 服务自己上报的 VERSION 带 -mcp 后缀（见 mcp_server.VERSION / git tag）。
+version = "2.1.0"
+description = "不是 Agent —— 装到别的 Agent 上的游戏能力包（MCP 服务）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "gupi-bill" }]
+keywords = ["mcp", "game", "agent", "yolo", "automation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+# 运行 MCP 服务所需的最小依赖。GUI / 图像相关的重依赖保持可选，
+# 因为「被别的 Agent 调用」通常是无头环境。
+dependencies = [
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.0",
+    "psutil>=5.9.0",
+    "mcp>=1.0.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+panel = ["flask>=3.0.0"]                                # 本地监控大盘（调试件）
+vision = ["pillow>=10.0.0", "opencv-python-headless>=4.8.0"]
+input = ["pyautogui>=0.9.54"]                           # 真实键鼠；无头环境别装
+
+[project.urls]
+Homepage = "https://github.com/gupi-bill/Universal-Game-Framework"
+Issues = "https://github.com/gupi-bill/Universal-Game-Framework/issues"
+
+# 装上之后：ugf-mcp 起服务，ugf-install 装到客户端，ugf-check 体检
+[project.scripts]
+ugf-mcp = "ugf_cli:mcp_main"
+ugf-install = "ugf_cli:install_main"
+ugf-check = "ugf_cli:check_main"
+
+[tool.setuptools]
+py-modules = [
+    "ugf_cli", "mcp_server", "config", "predictor", "kb_maintainer",
+    "combat_judge", "session", "report_notifier", "knowledge_loop",
+    "game_profile_check", "perception_server",
+]

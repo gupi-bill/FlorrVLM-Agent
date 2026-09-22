@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent Skill 管理器 skill_manager.py
+Universal-Game-Framework Skill 管理器 skill_manager.py
 =============================================
 v0.8 —— 引入"技能包(Skill)"：像普通 Agent 一样按需装配能力。
 

@@ -844,8 +844,9 @@ def _run_args():
     return args
 
 
-if __name__ == "__main__":
-    _stderr(f"[MCP] Universal-Game-Framework 服务启动")
+def console_main() -> int:
+    """控制台入口（`ugf-mcp` 命令 / `python mcp_server.py` 都走这里）。"""
+    _stderr(f"[MCP] Universal-Game-Framework 服务启动 v{VERSION}")
     _stderr(f"[MCP] 知识库目录: {KB_DIR}")
     _stderr(f"[MCP] 向量检索: {'开启' if USE_VECTOR_SEARCH else '关闭(默认)'}")
     _stderr(f"[MCP] dry-run: {'开启(不执行真实键鼠)' if dry_run() else '关闭'}")
@@ -856,3 +857,8 @@ if __name__ == "__main__":
     else:
         _stderr(f"[MCP] 传输: {args.transport} @ http://{args.host}:{args.port}/mcp")
         mcp.run(transport=args.transport, host=args.host, port=args.port)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(console_main())

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 自动汇报 & 多渠道通知 report_notifier.py  (v1.2)
+Universal-Game-Framework 自动汇报 & 多渠道通知 report_notifier.py  (v1.2)
 ===============================================================
 打完一局/被手动触发时，自动生成一份 markdown 报告，并可推送到本地文件 / Webhook。
 
@@ -66,7 +66,7 @@ def generate_report() -> str:
 
     brief = st.get("brief") or {}
     lines = []
-    lines.append("# FlorrVLM-Agent 对局报告")
+    lines.append("# Universal-Game-Framework 对局报告")
     lines.append("")
     lines.append(f"- 生成时间：{now}")
     lines.append(f"- 当前游戏：{snap.get('game') or st.get('game') or 'florr'}")
@@ -193,7 +193,7 @@ def notify_progress(rounds: int, deaths: int, game: str = "florr") -> list:
 def _progress_text(rounds: int, deaths: int, game: str = "florr") -> str:
     snap = _read_json(SNAP_PATH)
     return (
-        f"# FlorrVLM-Agent 局中进度\n\n"
+        f"# Universal-Game-Framework 局中进度\n\n"
         f"- 更新：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         f"- 游戏：{game}\n"
         f"- 回合：{rounds}\n"

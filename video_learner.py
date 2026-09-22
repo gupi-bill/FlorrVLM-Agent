@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FlorrVLM-Agent 视频学习模块 video_learner.py
+Universal-Game-Framework 视频学习模块 video_learner.py
 ==============================================
 读取本地 florr.io 教程视频，逐帧 VLM 提取战术，写入 Markdown 知识库。
 
@@ -471,7 +471,7 @@ def learn_from_video(video_path: str = None, game: str = None,
 
 
 def main():
-    parser = argparse.ArgumentParser(description="FlorrVLM-Agent 视频战术学习")
+    parser = argparse.ArgumentParser(description="Universal-Game-Framework 视频战术学习")
     parser.add_argument("video", nargs="?", default=None,
                         help="本地教程视频文件路径 (mp4)")
     parser.add_argument("--auto", action="store_true",
@@ -500,7 +500,7 @@ def main():
         return 0 if res["cleaned"] and not res["residual"] else 1
 
     print("=" * 55)
-    print("  FlorrVLM-Agent 视频学习模块")
+    print("  Universal-Game-Framework 视频学习模块")
     print("=" * 55)
 
     # v0.4 自动获取：搜索 → 下载 → 学完删源文件
