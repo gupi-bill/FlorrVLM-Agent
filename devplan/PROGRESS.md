@@ -694,3 +694,13 @@
 - HTTP（streamable-http）握手必须发 `notifications/initialized`，否则后续 `tools/list`、`tools/call` 会被拒——踩过一次坑，测试里已固化。
 - 路径穿越的既有行为是「清洗后写回库内」而不是报错；安全测试按「是否越界」判定，不按「是否报错」判定。
 - `text/event-stream` 响应没带 charset，`requests` 会按 latin-1 解码导致中文乱码，测试里显式设 `r.encoding='utf-8'`。
+
+### 收尾（00:1x ~ 00:2x）
+
+- 新增 `docs/FAQ.md`（装不上 / 看不见工具 / 传输 / dry-run / 预判 / 合规），README 与 MCP_INSTALL 互链。
+- **新机器模拟**：新建干净 venv 只装 core 依赖（flask / requests / python-dotenv / pyyaml / psutil / mcp / numpy），
+  `python mcp_server.py --version` 正常输出 `2.1.0-mcp` —— 说明最小安装即可对外提供 MCP 服务（无需 GUI / 无需可选依赖）。
+- 逐工具复核：补齐 5 个工具缺失的「下一步」说明，16 个工具描述统一四段式，并由
+  `tests/test_mcp_descriptions.py::test_description_has_three_sections` 锁死。
+- 清理一次性脚本 `tools/rewrite_tool_docs.py`（需时可从 git 历史取回）。
+- 全量测试：**961 passed**；`git tag v2.1.0-mcp`。
