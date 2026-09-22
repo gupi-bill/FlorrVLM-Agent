@@ -65,12 +65,17 @@ fi
 if [ "$FAST" = "1" ]; then
   step 5 "MCP 工具核对（--fast 已跳过）"; echo "⏭  跳过"
   step 6 "CLI 全命令冒烟（--fast 已跳过）"; echo "⏭  跳过"
+  step 7 "MCP 安装契约（--fast 已跳过）"; echo "⏭  跳过"
 else
   step 5 "MCP 工具核对 mcp_tools_check"
   "$PY" tools/mcp_tools_check.py --strict || { echo "❌ MCP 工具核对失败"; exit 5; }
 
   step 6 "CLI 全命令冒烟 cli_smoke"
   "$PY" tools/cli_smoke.py --strict --timeout 12 || { echo "❌ CLI 冒烟失败"; exit 6; }
+
+  # M 阶段：本项目对外交付形态是 MCP 服务，安装器与真实握手必须进门禁。
+  step 7 "MCP 安装契约 install_mcp --check"
+  "$PY" tools/install_mcp.py --check || { echo "❌ MCP 安装契约失败"; exit 7; }
 fi
 
 printf '\n===== ✅ 全部门禁通过 =====\n'

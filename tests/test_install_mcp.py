@@ -82,6 +82,12 @@ class TestInstallMcp(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("mcp_servers.ugf", r.stdout)
 
+    def test_check_reports_healthy(self):
+        r = run("--check")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("握手成功", r.stdout)
+        self.assertIn("ugf_guide", r.stdout)
+
     def test_mcp_install_doc_exists_and_mentions_installer(self):
         doc = os.path.join(BASE, "docs", "MCP_INSTALL.md")
         self.assertTrue(os.path.exists(doc), "缺少 docs/MCP_INSTALL.md")

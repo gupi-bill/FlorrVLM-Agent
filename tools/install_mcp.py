@@ -19,6 +19,7 @@ Universal-Game-Framework · MCP 一键安装器  tools/install_mcp.py
 import argparse
 import json
 import os
+import subprocess
 import sys
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -96,6 +97,88 @@ def cmd_list() -> int:
     return 0
 
 
+def cmd_check() -> int:
+    """体检：把「装到别的 Agent 上」这条路上可能卡住的点逐个查一遍。"""
+    print("=== UGF MCP 安装体检 ===\n")
+    ok = True
+
+    print(f"1) 服务入口文件: {SERVER_PY}")
+    if os.path.exists(SERVER_PY):
+        print("   ✅ 存在")
+    else:
+        print("   ❌ 不存在 —— 请在项目根目录运行本脚本")
+        return 1
+
+    print(f"\n2) 解释器: {sys.executable}")
+    print("   ✅ 可用（配置里会写这个绝对路径）")
+
+    print("\n3) 依赖检查")
+    required = {"mcp": "MCP SDK（必装）", "requests": "HTTP（必装）", "yaml": "config.yaml（必装）"}
+    optional = {"flask": "管理面板", "psutil": "资源占用显示", "numpy": "预判引擎"}
+    for mod, desc in required.items():
+        r = subprocess.run([sys.executable, "-c", f"import {mod}"],
+                           capture_output=True, text=True)
+        print(f"   {'✅' if r.returncode == 0 else '❌'} {mod:<10} {desc}")
+        ok &= (r.returncode == 0)
+    for mod, desc in optional.items():
+        r = subprocess.run([sys.executable, "-c", f"import {mod}"],
+                           capture_output=True, text=True)
+        print(f"   {'✅' if r.returncode == 0 else '⚠ 可选'} {mod:<10} {desc}")
+
+    print("\n4) stdio 握手（真实拉起服务一次）")
+    payloads = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+         "params": {"protocolVersion": "2025-06-18", "capabilities": {},
+                    "clientInfo": {"name": "ugf-check", "version": "0"}}},
+        {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+    ]
+    stdin_data = "".join(json.dumps(p) + "\n" for p in payloads)
+    try:
+        env = dict(os.environ, UGF_DRY_RUN="1")
+        p = subprocess.run([sys.executable, SERVER_PY], input=stdin_data,
+                           capture_output=True, text=True, env=env, timeout=90)
+        out = p.stdout
+        names = set()
+        for line in out.splitlines():
+            if '"name"' in line and '"tools"' not in line:
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                for t in (obj.get("result", {}) or {}).get("tools", []) or []:
+                    names.add(t.get("name", ""))
+        # 兜底：整段文本里找工具名
+        if not names:
+            import re as _re
+            names = set(_re.findall(r'"name":\s*"([a-z_]+)"', out))
+        names = {n for n in names if n and n != "ugf"}
+        if names:
+            print(f"   ✅ 握手成功，拿到 {len(names)} 个工具")
+            print(f"      {', '.join(sorted(names))}")
+        else:
+            print("   ❌ 握手没拿到工具清单（看下面的输出排查）")
+            print(out[:500])
+            ok = False
+    except subprocess.TimeoutExpired:
+        print("   ❌ 握手超时（90s）—— 服务可能被阻塞，检查感知服务或依赖")
+        ok = False
+    except Exception as e:
+        print(f"   ❌ 握手失败: {e}")
+        ok = False
+
+    print("\n5) 结论")
+    if ok:
+        print("   ✅ 服务本身没问题。装不上就是客户端那一侧的事：")
+        print("      - 配置写进去了吗？ python tools/install_mcp.py --list")
+        print("      - ugf 设为信任了吗？（新服务默认不信任）")
+        print("      - 客户端重启了吗？（多数只在启动时拉起 MCP）")
+        print("      - 仍不行看 docs/FAQ.md")
+        return 0
+    print("   ❌ 有必装依赖缺失或握手失败，先按上面 ❌ 项修。")
+    return 1
+
+
 def _resolve(name: str, custom_path: str = "") -> tuple:
     if name == "custom":
         if not custom_path:
@@ -169,6 +252,7 @@ def main() -> int:
     ap.add_argument("--path", default="", help="--target custom 时的配置文件绝对路径")
     ap.add_argument("--dry-run", action="store_true", help="只打印将要写入的内容，不落盘")
     ap.add_argument("--remove", action="store_true", help="移除已注册的 ugf")
+    ap.add_argument("--check", action="store_true", help="体检：检查依赖与握手是否正常")
     ap.add_argument("--online", action="store_true",
                     help="不设 UGF_DRY_RUN=1（允许真实键鼠操作，仅在授权环境下使用）")
     args = ap.parse_args()
@@ -179,6 +263,9 @@ def main() -> int:
 
     if args.list:
         return cmd_list()
+
+    if args.check:
+        return cmd_check()
 
     name = args.target
     if not name:
