@@ -15,6 +15,10 @@ A：三件事依次确认：
 2. 客户端的「连接器 / MCP 设置」页里有没有把 `ugf` 设为**信任**（新服务默认不信任）；
 3. 重启客户端——大多数客户端只在启动时拉起 MCP 服务。
 
+**Q：有没有一步到位看出卡在哪的办法？**
+A：有，`python tools/install_mcp.py --check`：查入口文件、解释器、依赖，并真实拉起服务做一次握手，
+最后打印实际拿到的工具数量。
+
 **Q：服务起来了，但报 `ModuleNotFoundError`？**
 A：配置里的 `command` 必须是**装了依赖的那个 Python**。用 `tools/install_mcp.py` 自动写入时
 它会填当前 `sys.executable`（也就是你正在用的 venv）；手写配置时别忘了换成绝对路径。

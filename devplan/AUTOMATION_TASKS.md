@@ -52,3 +52,5 @@
 - 2026-09-23 00:0x：M4~M7 完成（HTTP 传输 / 版本化 / 安全边界 / 无头冷启动），全量 960 测试绿，提交并打 tag `v2.1.0-mcp`。
 - 2026-09-23 00:1x：M8 示例文档、M9 文档重写、M10 结项报告 `devplan/FINAL_REPORT_MCP.md` 完成。
 - 2026-09-23 00:2x：新机器模拟（干净 venv 只装 core 依赖即可启动服务）+ `docs/FAQ.md` 完成。
+- 2026-09-23 00:2x：新增 `install_mcp.py --check`（体检：入口/解释器/依赖/真实 stdio 握手），
+  并接进 `scripts/check.sh` 第 7 环节；全量门禁 7 环节全过（含 31 条 CLI 冒烟 0 traceback）。
