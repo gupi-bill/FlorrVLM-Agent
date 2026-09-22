@@ -672,3 +672,25 @@
   - 测试结果：`pytest tests/test_check_script.py -q` 20 passed；`pytest tests/ -q` **920 passed**；
     `bash scripts/check.sh` ✅ 全部门禁通过（3m07s，含 31 条 CLI 冒烟 0 traceback）。
   - 遗留：全量门禁 3 分钟偏慢（pytest ~90s + 冒烟 ~85s），CI 可拆两级；`--timeout 12` 为保守值。
+
+---
+
+## M 阶段（2026-09-22 深夜）：定位变更为「MCP 能力包」
+
+背景：用户明确指示 **项目不是 Agent，而是装到其他 Agent 上的 MCP 服务**。
+原 S22~S26 暂缓，改走 `devplan/PLAN_MCP.md` 的 M1~M10。
+
+| 阶段 | 内容 | 提交 | 结果 |
+|---|---|---|---|
+| M1 | 定位改写 + `tools/install_mcp.py` 一键安装器 + `docs/MCP_INSTALL.md` + 契约测试(8) | `3c3c2d6` | ✅ |
+| M2 | 15 个工具描述改为「外部模型可读」（用途/入参/返回/下一步）+ 描述契约测试 | `77c59e5` | ✅ 934 passed |
+| M3 | 新增 `ugf_guide`（手册，工具清单运行时动态生成）+ 资源 `ugf://guide`；工具数 15→16 | `5dea52f` | ✅ |
+| M4 | `--transport streamable-http/--host/--port`；HTTP 传输一致性测试(2) | — | ✅ 16 工具一致 |
+| M5 | 版本 `2.1.0-mcp`（`--version` + serverInfo）+ CHANGELOG + 文档一致性测试(6) | — | ✅ |
+| M6 | 安全边界测试(8)：越界/注入/dry-run 不碰键鼠/错误可读不吐 traceback | `da404e8` | ✅ |
+| M7 | 无头冷启动测试(3)：无感知服务时全链路降级不抛异常 | — | ✅ |
+
+关键点记录：
+- HTTP（streamable-http）握手必须发 `notifications/initialized`，否则后续 `tools/list`、`tools/call` 会被拒——踩过一次坑，测试里已固化。
+- 路径穿越的既有行为是「清洗后写回库内」而不是报错；安全测试按「是否越界」判定，不按「是否报错」判定。
+- `text/event-stream` 响应没带 charset，`requests` 会按 latin-1 解码导致中文乱码，测试里显式设 `r.encoding='utf-8'`。

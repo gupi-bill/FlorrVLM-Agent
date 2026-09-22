@@ -2,7 +2,7 @@
 """
 v2.0 S9 · MCP 服务端工具注册验证（tests/test_mcp_server.py）
 
-目标：README 宣称的 15 个 MCP 工具，必须逐个「能被列举 + 能被真实调用」。
+目标：README 宣称的 16 个 MCP 工具，必须逐个「能被列举 + 能被真实调用」。
 
 与本仓库其它测试的差异：
   * 走 **真实 SDK 路径** —— 通过 `mcp.call_tool()` 调用，而不是直接调底层函数，
@@ -13,7 +13,7 @@ v2.0 S9 · MCP 服务端工具注册验证（tests/test_mcp_server.py）
 
 覆盖：
   1. 工具清单与 README 表格逐字一致（含分类归属）
-  2. 15 个工具全部可列举、全部可调用、返回可读文本且无 is_error
+  2. 16 个工具全部可列举、全部可调用、返回可读文本且无 is_error
   3. 参数 schema 与函数签名一致（必填参数确实必填）
   4. 知识库工具：路径穿越防护、空名防护、按游戏分目录
   5. kb_export / kb_import 往返一致性（子目录保真 + 归档不被复活）
@@ -42,6 +42,7 @@ README_TOOLS = [
     "perceive_game", "predict_all_entities", "reset_predictor",
     "game_action", "switch_set", "handle_afk",
     "clean_cache", "query_boss_history", "switch_tactic",
+    "ugf_guide",          # M3：内置使用手册
 ]
 
 
@@ -100,15 +101,15 @@ class TestRegistryMatchesReadme:
     def test_sdk_importable(self):
         assert M.MCP_SDK_VERSION in (1, 2)
 
-    def test_list_tools_returns_15(self):
-        assert len(listed_names()) == 15
+    def test_list_tools_returns_16(self):
+        assert len(listed_names()) == 16
 
     def test_names_exactly_match_readme(self):
         assert sorted(listed_names()) == sorted(README_TOOLS)
 
     def test_readme_declares_15_in_heading(self):
         txt = open(README, encoding="utf-8").read()
-        assert re.search(r"MCP 工具（15 个）", txt), "README 标题未声明 15 个工具"
+        assert re.search(r"MCP 工具（16 个）", txt), "README 标题未声明 16 个工具"
 
     def test_every_readme_tool_is_backtick_listed(self):
         txt = open(README, encoding="utf-8").read()
@@ -118,7 +119,7 @@ class TestRegistryMatchesReadme:
     def test_module_docstring_count_matches(self):
         # 文件头 docstring 曾写"13 个"，实际 15 个，属文档漂移
         m = re.search(r"MCP 工具（(\d+) 个", M.__doc__ or "")
-        assert m and int(m.group(1)) == 15
+        assert m and int(m.group(1)) == 16
 
     def test_no_duplicate_tool_names(self):
         names = listed_names()
@@ -140,7 +141,7 @@ class TestRegistryMatchesReadme:
 
 
 # ---------------------------------------------------------------------------
-# 2. 15 个工具逐个真实可调
+# 2. 16 个工具逐个真实可调
 # ---------------------------------------------------------------------------
 class TestEveryToolCallable:
     def test_kb_list(self, kb):
