@@ -15,7 +15,7 @@ python-dotenv>=1.0.0        # .env 加载（无 .env 时自动降级，不阻断
 pyyaml>=6.0.0               # config.yaml / game_profiles/*.yaml / tuned_overrides
 psutil>=5.9.0               # 监控大盘 CPU/内存占用显示（缺失时降级为 0）
 # mcp 1.x 用 mcp.server.fastmcp.FastMCP，2.x 改名 mcp.server.mcpserver.MCPServer。
-# mcp_server.py 已做双版本兼容；v2.0 S9 在 2.2.0 上实测：15 个工具全部可列举、
+# mcp_server.py 已做双版本兼容；v2.1 在 2.2.0 上实测：16 个工具全部可列举、
 # 可调用、schema 正确（见 devplan/TOOLS.md），故不再锁 <2.0.0。
 # ⚠️ 注意两版差异：2.x 的 Tool 字段是 input_schema（1.x 别名 inputSchema）；
 #    进程内 call_tool 对「未知工具」抛 ToolError（1.x 只塞 is_error 结果）。
