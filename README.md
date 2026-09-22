@@ -26,12 +26,13 @@
 
 ## 目录
 
+- [🚀 装到你的 Agent 上（MCP）](#-装到你的-agent-上mcp)
 - [✨ 核心能力](#-核心能力)
 - [🔬 稀有度体系](#-稀有度体系)
 - [🏗️ 当前架构](#️-当前架构)
-- [⚙️ 快速开始](#️-快速开始)
+- [⚙️ 快速开始（调试用 CLI / 大盘）](#️-快速开始)
 - [📦 安装包](#-安装包)
-- [🧩 MCP 工具](#-mcp-工具15-个)
+- [🧩 MCP 工具](#-mcp-工具16-个)
 - [🧪 离线模式与自测](#-离线模式与自测)
 - [✅ 验证状态](#-验证状态)
 - [📁 文件结构](#-文件结构)
@@ -39,7 +40,36 @@
 
 ---
 
+## 🚀 装到你的 Agent 上（MCP）
+
+**三分钟，让任何一个支持 MCP 的 Agent 获得游戏能力。**
+
+```bash
+cd Universal-Game-Framework
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+python tools/install_mcp.py --list                 # 看能装到哪些客户端
+python tools/install_mcp.py --target workbuddy     # WorkBuddy
+python tools/install_mcp.py --target opencode      # OpenCode
+python tools/install_mcp.py --target custom --path /绝对路径/mcp.json
+```
+
+装完在客户端的「连接器 / MCP 设置」里把 `ugf` 设为信任，重启即可调用。
+完整接入说明见 [docs/MCP_INSTALL.md](./docs/MCP_INSTALL.md)，可照抄的调用链见 [docs/MCP_EXAMPLES.md](./docs/MCP_EXAMPLES.md)。
+
+| 传输 | 用法 | 场景 |
+|---|---|---|
+| stdio（默认） | `python mcp_server.py` | 单个客户端，最省事 |
+| streamable-http | `python mcp_server.py --transport streamable-http --port 5050` | 多个客户端同时接入 |
+
+> 第一次接入先调 `ugf_guide`，它会把能力、工具清单、调用链一次性讲清楚。
+
+---
+
 ## ✨ 核心能力
+
+> 下面这些能力通过 MCP 提供给接入的 Agent；本仓库自带的 CLI 与监控大盘只是**调试件**，不是门面。
 
 | 能力 | 说明 |
 |------|------|
@@ -131,7 +161,10 @@ python admin_panel.py          # 或 python launcher.py --ui auto
 
 本项目已写入本机 `~/.workbuddy/mcp.json`（服务名 `ugf`）；在连接器管理页把它设为信任后即可被其他 Agent 调用。
 
-## ⚙️ 快速开始
+## ⚙️ 快速开始（调试用 CLI / 大盘）
+
+> 本节是**本地调试**用的：自带的对话 CLI、主循环、监控大盘。
+> 如果你只是想让别的 Agent 获得游戏能力，请回到 [🚀 装到你的 Agent 上（MCP）](#-装到你的-agent-上mcp)。
 
 ```bash
 # 1. 安装依赖

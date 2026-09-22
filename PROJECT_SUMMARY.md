@@ -6,8 +6,14 @@
 
 ## 一、项目定位
 
-基于 MCP (Model Context Protocol) 标准的游戏智能体，融合 YOLO 视觉识别、全实体运动预判、战斗评估、拟人操作、自我进化知识库。
-已从 Florr.io 专用演化为**通用游戏 Agent**：一款游戏一份档案，切换游戏零改核心。
+**不是 Agent —— 是装到别的 Agent 上的「游戏能力包」（MCP 服务）。**
+
+基于 MCP (Model Context Protocol) 标准，把 YOLO 视觉识别、全实体运动预判、战斗评估、拟人操作、自我进化知识库
+打包成 16 个 MCP 工具，供任意支持 MCP 的客户端（WorkBuddy / OpenCode / Kilo / Codex / Claude Desktop …）调用。
+已从 Florr.io 专用演化为**通用游戏能力层**：一款游戏一份档案，切换游戏零改核心。
+
+> 装上只需一条命令：`python tools/install_mcp.py --target workbuddy`（详见 `docs/MCP_INSTALL.md`）。
+> 仓库自带的对话 CLI / 主循环 / 监控大盘仅用于本地调试。
 
 ### 核心能力
 
