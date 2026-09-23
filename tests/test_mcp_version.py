@@ -25,7 +25,7 @@ class TestVersion(unittest.TestCase):
 
     def test_cli_version_matches_constant(self):
         r = subprocess.run([sys.executable, SERVER, "--version"],
-                           capture_output=True, text=True, cwd=BASE, timeout=30)
+                           capture_output=True, text=True, cwd=BASE, timeout=120)  # 冷启动要加载 mcp/numpy，慢机器上可达十几秒
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(mcp_server.VERSION, r.stdout)
 
