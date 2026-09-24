@@ -54,10 +54,11 @@ fi
   echo '```'
 } >> "$LOG"
 
-# 5) 提交 + 绕代理推远端
+# 5) 提交 + 绕代理推远端（显式 HOME，记录退出码便于排查）
+export HOME=/home/g-bill
 git add -A 2>/dev/null
 git commit -q -m "cron: $SLOT 健康检查 @ $TS" 2>/dev/null || true
-env -u http_proxy -u https_proxy -u HTTPS_PROXY timeout 70 git push origin main 2>&1 | tail -1 >> "$LOG"
+env -u http_proxy -u https_proxy -u HTTPS_PROXY timeout 90 git push origin main >> "$LOG" 2>&1; echo "[$TS] push exit=$?" >> "$LOG"
 
 # 6) 推进指针：仅在「headless 真跑成功」或「该格已在 PROGRESS.md 标记 done（活会话 AI 做的）」时推进
 #    否则只做心跳/体检/日志，原地等活会话 AI 来收割，绝不跳过未执行的计划项。
