@@ -11,3 +11,10 @@
 - **S2（README/改名死链审计）— DONE**：活动代码/文档已无旧名 `FlorrVLM`（残留仅在 `run_logs/` 历史报告与我的记忆笔记中，属归档/记录，不改动）；README 链接均为有效地址/本地 demo。
 - **S3（SECURITY.md）— DONE**：新增 `SECURITY.md`，依据 `mcp_server.py` 实测写准：dry-run 默认、路径沙箱、动作白名单、进程内 mock 降级、HTTP 传输鉴权要求。
 - 下一步指针：S4（GitHub Actions CI）。
+
+- **S4（GitHub Actions CI）— DONE**：新增 `.github/workflows/ci.yml`。
+  - 触发：push/PR 跑全量 `pytest tests/`；`schedule` 每 2 小时跑冒烟（import + 两个核心测试文件）；支持 workflow_dispatch。
+  - 环境：`UGF_DRY_RUN=1`（无头），单版本 py3.11 矩阵（避免定时额度翻倍），concurrency 防并发堆积。
+  - 依赖：只装 core（`pip install -e .`）+ dev；**刻意跳过** requirements.txt 的 optional 段（pyautogui/pillow/opencv-python）——无头 CI 用不到，且 opencv 在 ubuntu runner 上常因缺 libGL.so.1 导入失败。补装 pyproject 漏掉的 flask。
+  - **额度硬约束**：GitHub 免费账户 2000 分钟/月。*/30 会达 ≈1440 次/月（最小计费 1 分钟/次）叠加 push CI 必然超额；故定时设每 2 小时（≈360 次/月）。30 分钟粒度的「AI 推进计划」交给 WorkBuddy 自动化面板。
+- 下一步指针：S5。
