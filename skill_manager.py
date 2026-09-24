@@ -132,6 +132,15 @@ class SkillManager:
         """v2.0：改完 skill.py 后热重载，不必重启进程。"""
         self._loaded.pop(name, None)
         sys.modules.pop(f"ugf_skill_{name}", None)
+        # 强制失效字节码缓存：SourceFileLoader 按 (源文件 mtime, size) 校验 .pyc。
+        # 若改后的 skill.py 与旧版长度相同、且落在同一 mtime 粒度内（高速机器上必现，
+        # CI 全量测试 18s 跑完时会稳定复现），exec_module 会命中旧字节码，
+        # 热重载拿到的仍是旧代码。热重载的语义就是要新代码，故先删缓存再加载。
+        code_path = os.path.join(SKILLS_DIR, name, "skill.py")
+        try:
+            os.remove(importlib.util.cache_from_source(code_path))
+        except OSError:
+            pass
         return self.load(name)
 
     def is_loaded(self, name: str) -> bool:
