@@ -220,3 +220,20 @@ To https://github.com/gupi-bill/Universal-Game-Framework.git
 >>> 仓库待提交数
 1
 ```
+To https://github.com/gupi-bill/Universal-Game-Framework.git
+   a9d50e8..6668171  main -> main
+[2026-09-25 05:32:47] push exit=0
+
+### [2026-09-25 06:04:51] 格子 S5
+- 任务: 01:40 构建产物验证：`python -m build` 出 sdist/wheel，确认 py-modules 齐全 装 wheel 到干净 venv 能 `ugf-mcp --version`
+- headless: (headless 未启用：缺桌面宿主会话，该格待活会话 AI 处理)
+```
+>>> pytest
+........................................................................ [ 97%]
+..........................                                               [100%]
+962 passed in 117.77s (0:01:57)
+>>> ugf-mcp --version
+用法: ugf_cli.py [mcp|install|check]
+>>> 仓库待提交数
+1
+```
