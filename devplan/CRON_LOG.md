@@ -237,3 +237,18 @@ To https://github.com/gupi-bill/Universal-Game-Framework.git
 >>> 仓库待提交数
 1
 ```
+[2026-09-25 06:04:51] push exit=124
+
+### [2026-09-25 06:38:24] 格子 S5
+- 任务: 01:40 构建产物验证：`python -m build` 出 sdist/wheel，确认 py-modules 齐全 装 wheel 到干净 venv 能 `ugf-mcp --version`
+- headless: (headless 未启用：缺桌面宿主会话，该格待活会话 AI 处理)
+```
+>>> pytest
+=========================== short test summary info ============================
+FAILED tests/test_install_mcp.py::TestInstallMcp::test_check_reports_healthy
+1 failed, 961 passed in 117.40s (0:01:57)
+>>> ugf-mcp --version
+用法: ugf_cli.py [mcp|install|check]
+>>> 仓库待提交数
+1
+```
