@@ -60,3 +60,4 @@ FAILED tests/test_install_mcp.py::TestInstallMcp::test_check_reports_healthy
 >>> 仓库待提交数
 0
 ```
+[2026-09-25 00:03:06] push exit=124

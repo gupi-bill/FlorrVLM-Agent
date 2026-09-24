@@ -18,3 +18,9 @@
   - 依赖：只装 core（`pip install -e .`）+ dev；**刻意跳过** requirements.txt 的 optional 段（pyautogui/pillow/opencv-python）——无头 CI 用不到，且 opencv 在 ubuntu runner 上常因缺 libGL.so.1 导入失败。补装 pyproject 漏掉的 flask。
   - **额度硬约束**：GitHub 免费账户 2000 分钟/月。*/30 会达 ≈1440 次/月（最小计费 1 分钟/次）叠加 push CI 必然超额；故定时设每 2 小时（≈360 次/月）。30 分钟粒度的「AI 推进计划」交给 WorkBuddy 自动化面板。
 - 下一步指针：S5。
+
+- **S4 补充 · CI 转绿（4978029 success）**：CI 首建于 py3.11 挂红，改 py3.13 仍红。日志需 repo admin 权限（403 拿不到），改用「把 pytest 输出尾部抛成 `::error::` annotation」从公开页面读到真实报错：
+  `FAILED tests/test_skill_manager.py::test_reload_picks_up_change - AssertionError: assert 'v1' == 'v2'`（1 failed, 961 passed in 18.87s）
+  - **根因**：`reload()` 只 pop `sys.modules` 后重新 `load`，`exec_module` 走 SourceFileLoader 的 .pyc 缓存（按 `mtime + size` 校验）。v1→v2 两个文件**长度相同**，CI 高速（18.87s 跑完 962 个测试）使两次写入落在同一 mtime 粒度 → 命中旧字节码 → 热重载返回旧代码。**这是生产代码真实缺陷**（用户改完 skill.py 若同秒且长度不变，热重载会失效），不是测试 flaky。
+  - **修复**：`reload()` 中先 `os.remove(importlib.util.cache_from_source(code_path))` 强制失效字节码缓存。本地构造「size 相同 + mtime 强制相同」场景验证：修改前会返回 v1、修改后正确返回 v2；`tests/test_skill_manager.py` 34 passed；CI 已转绿。
+  - **诊断技巧（可复用）**：GitHub Actions 日志要 admin 权限时，用 `::error::` 把输出抛成 annotation（run 页面无需登录即可见）；注意每个 step 的 annotation 上限约 10 条，必须只抛关键行（失败用例 + 统计行），否则被截断。
