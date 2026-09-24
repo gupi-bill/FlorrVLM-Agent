@@ -33,8 +33,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # 用 3.13：与本机已验证通过的环境一致（本机 py3.13 全量 962 passed）。
+        # 曾用 3.11 跑出 19 秒即失败（收集阶段崩溃，日志需 repo admin 权限看不到具体报错），
+        # 在查明前先用已验证版本，避免 CI 长期挂红。
         # 单版本：矩阵多版本会让定时任务的分钟消耗成倍增加，额度吃不消。
-        python-version: ['3.11']
+        python-version: ['3.13']
 
     env:
       # 无头环境：键鼠 / 截图全部走 dry-run 与 mock 分支。
