@@ -61,3 +61,17 @@ FAILED tests/test_install_mcp.py::TestInstallMcp::test_check_reports_healthy
 0
 ```
 [2026-09-25 00:03:06] push exit=124
+
+### [2026-09-25 00:37:06] 格子 S5
+- 任务: 01:40 构建产物验证：`python -m build` 出 sdist/wheel，确认 py-modules 齐全 装 wheel 到干净 venv 能 `ugf-mcp --version`
+- headless: (headless 未启用：缺桌面宿主会话，该格待活会话 AI 处理)
+```
+>>> pytest
+........................................................................ [ 97%]
+..........................                                               [100%]
+962 passed in 121.57s (0:02:01)
+>>> ugf-mcp --version
+用法: ugf_cli.py [mcp|install|check]
+>>> 仓库待提交数
+0
+```
