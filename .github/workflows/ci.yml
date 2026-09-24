@@ -84,6 +84,11 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           tail -80 pytest_out.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # annotation 在 run 页面无需登录即可见：把输出尾部逐行抛成 annotation，
+          # 这样即使日志要 admin 权限、summary 抓不到，也能读到真实报错。
+          tail -25 pytest_out.txt | while IFS= read -r line; do
+            echo "::error::$line"
+          done
 
       - name: 静态检查（不阻断）
         run: ruff check . || true
