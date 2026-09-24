@@ -72,7 +72,18 @@ jobs:
       - name: 全量测试（push / PR 时）
         if: github.event_name != 'schedule'
         run: |
-          python -m pytest tests/ -q
+          # tee 保留输出：CI 日志本身要 repo admin 权限才看得到，
+          # 失败后由下一步把报错尾部写进 job summary（公开可读），便于定位。
+          python -m pytest tests/ -q --tb=short 2>&1 | tee pytest_out.txt
+          exit ${PIPESTATUS[0]}
+
+      - name: 失败诊断（报错尾部写入 job summary）
+        if: failure()
+        run: |
+          echo "### pytest 失败输出（尾部 80 行）" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -80 pytest_out.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: 静态检查（不阻断）
         run: ruff check . || true
