@@ -86,7 +86,10 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           # annotation 在 run 页面无需登录即可见：把输出尾部逐行抛成 annotation，
           # 这样即使日志要 admin 权限、summary 抓不到，也能读到真实报错。
-          tail -25 pytest_out.txt | while IFS= read -r line; do
+          # 注意：GitHub 每个 step 最多 ~10 条 annotation，所以只抛最关键的行
+          # （失败用例名 + 末尾统计行），不要抛进度条，否则会被截断。
+          { grep -aE "^(FAILED|ERROR)" pytest_out.txt | head -5; tail -3 pytest_out.txt; } |
+          while IFS= read -r line; do
             echo "::error::$line"
           done
 
