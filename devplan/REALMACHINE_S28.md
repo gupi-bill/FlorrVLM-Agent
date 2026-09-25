@@ -88,3 +88,25 @@ AI 能把**纯 Python 感知库**装好（pillow/opencv/mss），但：
 2. **真截图必须经 portal 授权**（Wayland 安全模型），AI 无法代点；
 3. 密钥/权重/游戏窗口属人类职责。
 补齐后即可跑 S18 真机 A/B。
+
+---
+
+## 真机像素链路已打通（2026-09-25 20:50）
+
+### 依赖结果
+| 项 | 结果 |
+|----|------|
+| pyautogui | 已装入项目 venv（import 通过） |
+| xdotool 3.20160805.1 | 已在 /usr/bin |
+| gnome-screenshot 41.0-3 | 已在 /usr/bin |
+
+### 真截图实测（决定性）
+环境变量：XDG_RUNTIME_DIR=/run/user/1000、DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus、DISPLAY=:0、XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.LOAHW3
+命令：gnome-screenshot -f /tmp/ugf_shot.png
+结果：PNG 1366x768 RGBA, 682KB；99.9% 非黑像素、65441 色、均值 RGB[174,194,194] → 真实桌面内容。
+
+### 结论修正
+旧判断「真截图须经 portal 交互授权、AI 翻不过」被推翻：gnome-screenshot 在正确会话变量下直接截图，无需交互授权。
+
+### 现状
+截图=✅打通；键鼠(xdotool)=✅；决策引擎=✅规则兜底；.env密钥=❌；YOLO权重=❌；游戏窗口=❌。
