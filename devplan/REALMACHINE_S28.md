@@ -43,3 +43,48 @@
 5. 至此可跑 **S18 真机 A/B**（基线组 vs 学习组真实胜率 + Bootstrap）
 
 > 上述 1~4 属**环境安装 + 人机交互**，需在你的桌面会话里执行；5 可由我在依赖就绪后驱动。
+
+---
+
+## 附：依赖安装实测（2026-09-25 由 AI 尝试）
+
+### ✅ 装成功（Python 侧，无需 sudo）
+| 包 | 结果 |
+|----|------|
+| pillow 12.3.0 | ✅ 已装（venv 可见） |
+| opencv-python-headless 5.0.0.93 | ✅ 已装 |
+| mss 10.2.0 | ✅ 已装 |
+
+### ⚠️ 装了但 venv 不可见
+| 包 | 现象 |
+|----|------|
+| pyautogui + python-xlib 等依赖 | pip 报 Successfully installed，但装到了 **user site** `/home/g-bill/.local/lib/python3.13/site-packages`，而 venv（`~/.workbuddy/.../ugf`）隔离，import 仍失败 |
+
+> 修：在该 venv 里 `pip install --force-reinstall pyautogui`，或 `PYTHONPATH=$HOME/.local/lib/python3.13/site-packages` 注入。
+
+### ❌ 装不了（需 sudo 密码）
+| 工具 | 原因 |
+|------|------|
+| xdotool / grim / scrot | `sudo: 需要密码`，AI 无法提权 |
+
+> 修：你在本机终端 `sudo apt install -y xdotool grim`。
+
+### 截图链路结论（决定性）
+| 路径 | 结果 |
+|------|------|
+| X11 `import`/`xwd`/`mss` 抓 root | ❌ BadMatch / XProtoError（**Xwayland rootless 不允许抓 root window**）|
+| `gnome-shell` DBus 截图 | ❌ `AccessDenied: Screenshot is not allowed`（mutter 安全策略）|
+| `xdg-desktop-portal` 截图 | ⚠️ 返回 request 对象，但**需桌面交互授权**（AI 点不了授权框）|
+| `xwininfo -root -tree` 读窗口树 | ✅ 可读（只有 Fcitx 输入窗，无游戏窗口）|
+
+### 还没做（需人类输入）
+- `.env` 密钥：AI 没有、也不应编造
+- YOLO 权重：需指定模型（ultralytics 未装）
+- 开游戏窗口：需 GUI 操作
+
+### 结论
+AI 能把**纯 Python 感知库**装好（pillow/opencv/mss），但：
+1. 系统级工具（xdotool/grim）与 **pyautogui 的 venv 可见性**需人类一步；
+2. **真截图必须经 portal 授权**（Wayland 安全模型），AI 无法代点；
+3. 密钥/权重/游戏窗口属人类职责。
+补齐后即可跑 S18 真机 A/B。
