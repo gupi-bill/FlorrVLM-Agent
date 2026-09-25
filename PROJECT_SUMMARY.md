@@ -97,7 +97,7 @@ Universal-Game-Framework/
 ├── config.py / config.yaml # 参数配置 + 热加载
 ├── game_profiles/          # 游戏档案：florr.yaml / space_invaders.yaml
 ├── tools/                  # add_game.py / build_dist.py / cli_smoke.py / mcp_tools_check.py / static_audit.py
-├── tests/                  # 14 个测试文件（743 用例，全离线可跑）
+├── tests/                  # 30 个测试文件（987 用例，全离线可跑）
 ├── scripts/check.sh        # 一条命令门禁（语法 + 自检 + 档案 + 测试）
 ├── devplan/                # PLAN / PROGRESS / AUDIT / OPS / TOOLS / PROFILE_SPEC / DIRECTION
 ├── packaging/              # Windows EXE / Android APK 构建
@@ -300,7 +300,7 @@ bash scripts/check.sh --fast   # 秒级：语法 + 启动自检 + 档案校验
 
 | 项 | 结论 |
 |---|---|
-| 单元测试 | **743 用例全绿** |
+| 单元测试 | **987 用例全绿** |
 | 启动自检 | ERROR 0 / WARN 6，每条附降级指引 |
 | MCP 工具 | 16 个全部可注册 / 可调用 / schema 正确 |
 | CLI | 31 条命令矩阵，0 traceback、0 卡死 |

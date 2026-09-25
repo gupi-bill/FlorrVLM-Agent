@@ -249,12 +249,12 @@ python tools/mcp_tools_check.py --strict        # MCP 15 工具注册 / 调用 /
 ### 一条命令门禁
 
 ```bash
-bash scripts/check.sh          # 全量 6 环节（约 4 分钟）
+bash scripts/check.sh          # 全量 7 环节（约 4 分钟）
 bash scripts/check.sh --fast   # 秒级：语法 + 启动自检 + 档案校验
 ```
 
-六个环节（S21 起 MCP 工具核对与 CLI 冒烟也纳入门禁）：
-`1` 语法编译 → `2` 启动自检 → `3` 游戏档案 → `4` 单元测试 → `5` MCP 工具核对 → `6` CLI 全命令冒烟。
+七个环节（S21 起 MCP 工具核对与 CLI 冒烟纳入门禁，M 阶段起安装契约也纳入）：
+`1` 语法编译 → `2` 启动自检 → `3` 游戏档案 → `4` 单元测试 → `5` MCP 工具核对 → `6` CLI 全命令冒烟 → `7` MCP 安装契约。
 退出码即失败环节编号，任一环节失败即整体非零。
 
 运行模式可观测（S21）：
@@ -270,7 +270,7 @@ python agent_cli.py -c mode     # 模式 / 感知后端 / LLM / VLM / 激活游�
 | 项 | 结论 | 复核命令 |
 |---|---|---|
 | Python 语法 | 全仓库 `compileall` 通过 | `bash scripts/check.sh --fast` |
-| 单元测试 | **920 用例全绿** | `python -m pytest tests/ -q` |
+| 单元测试 | **987 用例全绿** | `python -m pytest tests/ -q` |
 | 启动自检 | 本机 ERROR 0 / WARN 6，每条附「修复 + 降级」指引 | `python boot_check.py` |
 | 游戏档案 | florr / space_invaders 两份 `--strict` 全过 | `python game_profile_check.py --all --strict` |
 | MCP 工具 | 16 个工具可注册 / 可调用 / schema 正确 + 知识库往返保真 | `python tools/mcp_tools_check.py --strict` |
@@ -347,7 +347,7 @@ Universal-Game-Framework/
 ├── game_profiles/           # 游戏档案：florr.yaml / space_invaders.yaml
 ├── skills/                  # 技能包
 ├── tools/                   # add_game.py / build_dist.py / cli_smoke.py / mcp_tools_check.py / static_audit.py
-├── tests/                   # 14 个测试文件（743 用例，离线可跑）
+├── tests/                   # 30 个测试文件（987 用例，离线可跑）
 ├── scripts/check.sh         # 一条命令门禁
 ├── devplan/                 # PLAN / PROGRESS / AUDIT / OPS / TOOLS / PROFILE_SPEC / DIRECTION
 ├── packaging/               # Windows EXE / Android APK 构建

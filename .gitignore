@@ -65,3 +65,6 @@ Thumbs.db
 
 # Agent 工作区状态（自动化记忆 / 会话数据，不入库）
 .workbuddy/
+
+# 文档审计本地备份（v1.1，不入库）
+FUTURE.md.orig-v1.0

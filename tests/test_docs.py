@@ -26,7 +26,7 @@ DEVPLAN_DOCS = [
 ]
 
 # 冲刺基线：三份文档必须口径一致地声明同一个数字
-BASELINE_CASES = "743"
+BASELINE_CASES = "987"
 
 # 明确禁止再出现的失真表述（历史遗留，已被实测推翻）
 FORBIDDEN = [

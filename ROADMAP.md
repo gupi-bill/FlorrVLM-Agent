@@ -56,7 +56,7 @@ bash scripts/check.sh --fast   # 秒级：语法 + 启动自检 + 档案校验
 | 项 | 结论 | 复核命令 |
 |---|---|---|
 | Python 语法 | 全仓库 `compileall` 通过 | `bash scripts/check.sh --fast` |
-| 单元测试 | **743 用例全绿**（14 个测试文件） | `python -m pytest tests/ -q` |
+| 单元测试 | **987 用例全绿**（30 个测试文件） | `python -m pytest tests/ -q` |
 | 启动自检 | 本机 ERROR 0 / WARN 6，每条附「修复 + 降级」指引 | `python boot_check.py` |
 | 静态审计 | 跨模块缺失符号 0、kwargs 不匹配 0 | `python tools/static_audit.py` |
 | 游戏档案 | florr / space_invaders 两份 `--strict` 全过 | `python game_profile_check.py --all --strict` |

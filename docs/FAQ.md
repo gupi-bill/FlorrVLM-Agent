@@ -77,3 +77,21 @@ A：`kb_export` 打包成 tar.gz，`kb_import` 恢复。
 **Q：能拿去玩在线游戏吗？**
 A：不能。本能力包面向本地 / 自建 / 已授权的靶场环境。
 在他人运营的在线服务器上跑自动化程序违反其服务条款，框架不提供任何绕过手段。
+
+
+## 环境 / 本机踩坑（离线/容器常见）
+
+**Q：没有图形界面（无 X server），能跑吗？**
+A：能。`python launcher.py --dry-run --mock` 全链路离线可跑：感知走合成场景、动作只落盘不执行。真实截图 + YOLO 需 GUI 与模型权重，缺失时自动降级到 mock。
+
+**Q：没有 `.env` 密钥？**
+A：不影响离线链路。决策走 `_fallback_decide` 规则分支；联网检索 / Webhook 推送会返回降级提示而非崩溃。
+
+**Q：`/tmp` 不可写或磁盘紧张？**
+A：长跑检查器 `tools/longrun_check.py` 与主循环会做启动清理，跑完临时文件零残留（见 devplan/STABILITY_S22.md）；日志滚动到 `run_logs/` 并有大小上限。可用环境变量 `TMPDIR` 指定可写目录。
+
+**Q：怎么确认当前到底是什么模式？**
+A：`python agent_cli.py -c mode`，或看大盘「设置」页——口径统一由 `config.runtime_mode()` 提供。
+
+**Q：Windows / Android 的安装包能在这台机器上打吗？**
+A：Linux 侧 `.deb` / 便携版 `python tools/build_dist.py all` 本机可打（已实证）；Windows EXE / Android APK 需在对应系统构建，脚手架已就绪（见 packaging/README.md）。

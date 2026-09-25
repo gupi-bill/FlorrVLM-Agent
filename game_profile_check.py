@@ -52,8 +52,28 @@ THREAT_LADDER = ["highest_boss", "boss", "elite", "normal"]
 WARN_PREFIX = "[建议] "
 
 
+def _safe_profile_name(name: str) -> str:
+    """把档案名清洗为单层相对名（S23 安全加固）。
+
+    杜绝 `../../etc/passwd` 之类的穿越：去掉目录分隔符与 `..` 回溯片段，
+    调用方拿到的一定是 game_profiles/ 下的单层文件名。
+    """
+    if not isinstance(name, str):
+        return ""
+    raw = name.replace("\\", "/").replace("\0", "")
+    raw = raw.split("/")[-1]          # 只保留最后一段
+    raw = raw.replace("..", "").strip()  # 去掉回溯与空白
+    return raw
+
+
 def _profile_path(name: str) -> str:
-    return os.path.join(PROFILE_DIR, f"{name}.yaml")
+    safe = _safe_profile_name(name)
+    path = os.path.join(PROFILE_DIR, f"{safe}.yaml")
+    # 二次守门：归一化后必须仍在 PROFILE_DIR 内，否则回退到安全占位名。
+    if os.path.commonpath([os.path.normpath(PROFILE_DIR), os.path.normpath(path)]) \
+            != os.path.normpath(PROFILE_DIR):
+        return os.path.join(PROFILE_DIR, "__invalid__.yaml")
+    return path
 
 
 def _is_num(v) -> bool:

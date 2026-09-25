@@ -45,11 +45,11 @@
 | S19 | 学习链路离线化（视频→战术入库） | ✅ 完成 | 05:45~05:56 (F线) | `tests/test_video_learner.py`(27)、`devplan/LEARN_S19.md`；`video_learner.py` 可注入改造：`synthesize_frames`(纯标准库 PNG)/`extract_frames_offline`/`set_vlm_provider`+`_stub_vlm`/`learn_from_video`(结构化结果)/`set_frame_dir`/`cleanup_temp_frames` 返回 bool；CLI `--synthetic`/`--game`/`--keep-frames`；修复 4 个缺陷：入库不分区致学→检索断链(D4)/短中文战术被丢弃(D5)/去重形同虚设(D6)/清理不可断言(D7)；**862 用例全绿** |
 | S20 | 决策场景矩阵（战斗/组队/心态/边界） | ✅ 完成 | 05:58~06:05 (F线) | `tests/test_decision_scenarios.py`(38)、`devplan/SCENARIOS_S20.md`（11 战斗 + 4 组队 + 7 心态 + 12 闸门实测值）；`knowledge_loop` 新增 `knowledge_gate`/`decide_action`+`KB_GATE_HP`/`KB_GATE_THREAT`；`agent_main._fallback_decide` 由「知识无条件优先」改为「先过局面闸门」；修正 S18 归因：14 轮全 defend 的真实原因是 mock 含 boss(mantis 威胁 400) 决策本就 retreat；**900 用例全绿**，`bash scripts/check.sh` 退出码 0 |
 | S21 | 测试门禁与可观测性固化 | ✅ 完成 | 06:05~06:33 (F线) | `tests/test_check_script.py`(20)、`devplan/GATE_S21.md`；`scripts/check.sh` 由 4 环节扩为 **6 环节**（新增 MCP 工具核对 / CLI 全命令冒烟，退出码 5/6，`--fast` 跳过）；`config.runtime_mode()`/`runtime_mode_text()` 作为模式单一真源，`agent_cli` 新增 `mode` 命令，`admin_panel._mode()` 改为调用它并补充 LLM/VLM/游戏字段；README 门禁章节同步；**920 用例全绿**，全量门禁 3m07s 退出码 0 |
-| S22 | 稳定性长跑与资源门禁 | ⬜ 待执行 | | |
-| S23 | 安全与合规加固 | ⬜ 待执行 | | |
-| S24 | 打包分发实证 | ⬜ 待执行 | | |
-| S25 | 文档体系重写 | ⬜ 待执行 | | |
-| S26 | 版本发布与结项 | ⬜ 待执行 | | |
+| S22 | 稳定性长跑与资源门禁 | ✅ 完成（devplan/STABILITY_S22.md） | | |
+| S23 | 安全与合规加固 | ✅ 完成（devplan/SECURITY_S23.md） | | |
+| S24 | 打包分发实证 | ✅ 完成（devplan/DIST_S24.md，deb+portable 实证） | | |
+| S25 | 文档体系重写 | ✅ 完成（devplan/DOCS_S25.md） | | |
+| S26 | 版本发布与结项 | ✅ 完成（devplan/FINAL_REPORT.md） | | |
 
 > S15~S26 详见 `devplan/PLAN_PHASE2.md`；方向判断详见 `devplan/DIRECTION.md`。
 
